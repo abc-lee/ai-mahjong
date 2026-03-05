@@ -19,6 +19,7 @@ import {
   broadcastGameState,
   handleJoinAI,
   handleAIDecision,
+  handleAgentCommand,
 } from './handlers';
 
 export function setupSocket(io: Server): void {
@@ -44,6 +45,7 @@ export function setupSocket(io: Server): void {
     // AI 玩家事件
     socket.on('room:joinAI', (data, callback) => handleJoinAI(io, socket, roomManager, data, callback));
     socket.on('ai:decision', (data, callback) => handleAIDecision(io, socket, roomManager, data, callback));
+    socket.on('agent:command', (data, callback) => handleAgentCommand(io, socket, roomManager, data, callback));
     
     // 断开连接
     socket.on('disconnect', () => handleDisconnect(io, socket, roomManager));

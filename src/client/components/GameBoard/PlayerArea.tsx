@@ -103,7 +103,7 @@ export const PlayerArea: React.FC<PlayerAreaProps> = ({
         </div>
         <div className="player-stats">
           <span className="player-score">{player.score}分</span>
-          {player.type === 'ai' && (
+          {player.type === 'ai-agent' && (
             <span className="player-mood">{getMoodEmoji(player.mood)}</span>
           )}
         </div>

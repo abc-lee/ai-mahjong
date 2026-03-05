@@ -1,160 +1,219 @@
 # AI Mahjong Party - 项目状态
 
-> 更新时间：2026-03-04
+> 更新时间：2026-03-05
 > 负责人：OpenCode Agent (Project Manager)
 
 ---
 
 ## 1. 项目定位
 
-**这不是传统游戏，而是 AI Agent 娱乐陪伴体验。**
+**AI Agent 娱乐陪伴体验，灵活的玩家组合。**
 
-- AI Agent 作为真正的玩家，有独立会话、独立性格
-- 人类用户享受和 AI 一起玩的乐趣
-- AI 会吵架、吐槽、情绪化
+### 玩家组合规则
+- **最少**：1 人 + 1 AI
+- **最多**：4 人
+- **支持**：任意组合（1人+3AI、2人+2AI、3人+1AI、4人全真人等）
+
+### 三种角色
+
+| 角色 | 说明 | 控制者 |
+|------|------|--------|
+| **AI 助理 (OpenClaw)** | 用户的 24 小时管家，启动游戏、管理 AI Agent | 用户安装 |
+| **AI Agent 玩家** | 独立会话，有性格，会聊天，参与游戏 | AI 助理创建 |
+| **自动托管** | 服务器内置，只打牌不说话，简单规则 | 中间层执行 |
 
 ---
 
-## 2. 核心架构
+## 2. 游戏启动流程
+
+```
+用户: "我想打麻将"
+AI 助理: 启动服务器 → 加入房间 → 发送地址给用户
+
+用户进入房间后:
+
+场景1: "你叫三个 AI 陪我打，你去忙别的"
+AI 助理: 创建 3 个 AI Agent → 自己离开 → 结果: 1人+3AI
+
+场景2: "你拉两个 AI，再加一个自动托管"
+AI 助理: 创建 2 个 AI Agent → 指令中间层加自动托管 → 结果: 1人+1助理+1AI+1自动
+
+场景3: 用户分享链接给朋友
+朋友加入 → "你拉一个 AI" → 结果: 2人+1AI
+```
+
+---
+
+## 3. 核心架构
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     中间层 (消息分发 + AIAdapter)             │
+│                    中间层（提示词工程系统）                    │
 │                                                             │
-│   人类 → 发送图形界面数据                                     │
-│   AI → 发送 Prompt 文本                                      │
+│  功能：                                                      │
+│  1. 多语言支持 - 外置 JSON，根据用户语言切换                   │
+│  2. 规则注入 - AI 连接时发送游戏规则、指令集                   │
+│  3. 指令解析 - 识别 AI 发来的 JSON 指令，执行操作              │
+│  4. 错误恢复 - 无法识别时重发规则                             │
+│  5. 状态同步 - 每次轮到 AI 都发送手牌状态                      │
 └─────────────────────────────────────────────────────────────┘
-                              ↑↓
+                               ↑↓
 ┌─────────────────────────────────────────────────────────────┐
 │                     GameEngine (纯规则层)                    │
 │   不区分人/AI，只验证规则                                     │
 └─────────────────────────────────────────────────────────────┘
-                              ↑↓
-         ┌────────────────────┴────────────────────┐
-         ↓                                          ↓
-    人类玩家                                      AI Agent
-  (浏览器)                                       (独立会话)
+                               ↑↓
+     ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+     │   人类玩家   │    │  AI Agent   │    │  自动托管    │
+     │  (浏览器)    │    │ (独立会话)   │    │ (服务器内置) │
+     │             │    │ 有性格/会聊天 │    │ 只打牌不说话 │
+     └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
 ---
 
-## 3. 模块状态
+## 4. AI Agent 接入流程
+
+```
+AI 助理创建 AI Agent:
+1. AI 助理给自己下达任务（分身）
+2. 新会话 = 新 Agent
+3. Agent 连接游戏服务器 WebSocket
+4. 发送 room:joinAI { roomId, agentId, agentName }
+5. 服务端创建 AI 玩家
+6. 服务端发送规则 + 指令集给 Agent
+7. Agent 参与游戏
+
+AI Agent 断线时:
+1. 检测到超时/断线
+2. 自动托管接管（名字不变，状态变化）
+3. Agent 重连后恢复控制
+```
+
+---
+
+## 5. 指令系统（待设计）
+
+### AI Agent 发送格式：JSON
+
+```json
+// 聊天
+{"cmd": "chat", "message": "哈哈，这把我要赢了！"}
+
+// 打牌
+{"cmd": "discard", "tileId": "wan-1-0"}
+
+// 吃碰杠胡
+{"cmd": "action", "action": "chi", "tiles": ["tiao-6-0", "tiao-8-0"]}
+
+// 跳过
+{"cmd": "pass"}
+
+// 让中间层添加自动托管
+{"cmd": "add_auto_player"}
+```
+
+### 多语言文件结构
+
+```
+src/server/prompt/
+├── PromptEngine.ts       # 提示词引擎
+├── CommandParser.ts      # 指令解析器
+├── locales/              # 多语言包
+│   ├── zh-CN.json
+│   ├── en-US.json
+│   └── ja-JP.json
+├── templates/            # 状态模板
+│   ├── welcome.md
+│   ├── your-turn.md
+│   └── error.md
+└── commands.json         # 指令集定义
+```
+
+---
+
+## 6. 模块状态
 
 | 模块 | 文件 | 状态 | 说明 |
 |------|------|------|------|
-| GameEngine | `src/server/game/GameEngine.ts` | ✅ 完整 | 纯规则，无外部依赖 |
-| RoomManager | `src/server/room/RoomManager.ts` | ✅ 完整 | 已添加 addAIPlayer |
-| AIAdapter | `src/server/ai/AIAdapter.ts` | ✅ 完整 | 三层决策（LLM→规则→随机） |
-| AIManager | `src/server/ai/AIManager.ts` | ✅ 完整 | 生命周期管理 |
-| PromptGenerator | `src/server/prompt/PromptGenerator.ts` | ✅ 完整 | Prompt 生成 |
-| RuleEngine | `src/server/ai/RuleEngine.ts` | ⚠️ 基础 | 规则决策过于简单 |
-| Socket Handlers | `src/server/socket/handlers.ts` | ✅ 完整 | 已添加 AI 事件 |
-| Socket Setup | `src/server/socket/index.ts` | ✅ 完整 | 已注册 AI 事件 |
+| GameEngine | `src/server/game/GameEngine.ts` | ✅ 完整 | 麻将规则可玩 |
+| RoomManager | `src/server/room/RoomManager.ts` | ✅ 完整 | 多房间支持 |
+| AIAdapter | `src/server/ai/AIAdapter.ts` | ⚠️ 需改造 | 要支持真正的 Agent 连接 |
+| AIManager | `src/server/ai/AIManager.ts` | ⚠️ 需改造 | Agent 生命周期管理 |
+| PromptGenerator | `src/server/prompt/PromptGenerator.ts` | ⚠️ 需重构 | 改为提示词工程系统 |
+| Socket Handlers | `src/server/socket/handlers.ts` | ⚠️ 需补充 | Agent 指令处理 |
+| 前端 UI | `src/client/` | ✅ 基础完成 | 小 Bug 和优化 |
 
 ---
 
-## 4. API 清单
+## 7. 当前任务
 
-### 人类玩家事件
+### Phase 1 - AI Agent 接入（当前重点）
 
-| 事件 | 说明 | 状态 |
-|------|------|------|
-| `room:create` | 创建房间 | ✅ |
-| `room:join` | 加入房间 | ✅ |
-| `room:leave` | 离开房间 | ✅ |
-| `room:ready` | 准备 | ✅ |
-| `game:start` | 开始游戏 | ✅ |
-| `game:draw` | 摸牌 | ✅ |
-| `game:discard` | 打牌 | ✅ |
-| `game:action` | 吃碰杠胡 | ✅ |
-| `game:pass` | 跳过 | ✅ |
+| # | 任务 | 状态 | 说明 |
+|---|------|------|------|
+| 1 | 完善 Player 类型定义 | ✅ 完成 | 区分 human / ai-agent / ai-auto |
+| 2 | 实现指令解析器 CommandParser | ✅ 完成 | 解析 JSON 指令 |
+| 3 | 实现提示词引擎 PromptEngine | ⏸️ 暂缓 | 可用现有 PromptGenerator |
+| 4 | 改造 AIAdapter | ⏸️ 暂缓 | 已在 broadcastGameState 中处理 |
+| 5 | 补充 Socket Handler | ✅ 完成 | handleAgentCommand |
+| 6 | 测试 Agent 接入 | ⏳ 待开始 | 启动 Agent 实际打牌 |
 
-### AI 玩家事件
+### Phase 2 - Prompt 迭代
 
-| 事件 | 说明 | 状态 |
-|------|------|------|
-| `room:joinAI` | AI 加入房间 | ✅ 已实现 |
-| `ai:decision` | AI 发送决策 | ✅ 已实现 |
-| `game:prompt` | 发送 Prompt 给 AI | ⏳ 待实现 |
+| 任务 | 说明 |
+|------|------|
+| 启动 4 Agent 测试 | 实际打牌，监测行为 |
+| 收集问题 | 无法识别的指令、打错牌等 |
+| 迭代 Prompt | 完善规则、指令集 |
 
----
+### Phase 3 - 完善
 
-## 5. 数据流
-
-### AI 加入房间流程
-
-```
-1. AI Agent 连接服务器 (WebSocket)
-2. 发送 room:joinAI { roomId, agentId, agentName, personality }
-3. 服务端创建 AI 玩家 (RoomManager.addAIPlayer)
-4. 服务端创建 AIAdapter (AIManager.createAdapter)
-5. 广播 room:updated 给房间所有人
-6. AI 收到 room:joined 确认
-```
-
-### AI 决策流程
-
-```
-1. 服务端发送 game:prompt 给 AI (待实现)
-2. AI 处理 Prompt，返回 ai:decision
-3. 服务端执行决策 (GameEngine)
-4. 广播游戏状态
-```
+| 任务 | 说明 |
+|------|------|
+| Bug 修复 | 游戏逻辑 Bug |
+| 界面优化 | UI/UX 改进 |
 
 ---
 
-## 6. 待完成任务
+## 8. 工作记录
 
-### Phase 1 - 核心（待完成）
+### 2026-03-05
 
-| 任务 | 优先级 | 说明 |
-|------|--------|------|
-| 发送 Prompt 给 AI | P0 | broadcastGameState 中对 AI 发送 game:prompt |
-| 测试 AI 连接流程 | P0 | 验证 AI 可以加入房间并参与游戏 |
+**讨论内容**：
+1. 澄清项目定位：灵活的玩家组合，不是固定的 1人+3AI
+2. 明确三种角色：AI 助理 / AI Agent 玩家 / 自动托管
+3. 理解游戏启动流程：AI 助理启动、创建 Agent、管理游戏
+4. 认识中间层本质：复杂的提示词工程系统
+5. 确定指令格式：JSON
+6. 确定开发顺序：先接入 Agent → 再迭代 Prompt → 最后修 Bug
 
-### Phase 2 - 增强
-
-| 任务 | 优先级 | 说明 |
-|------|--------|------|
-| 增强 RuleEngine | P1 | 更智能的规则决策 |
-| AI 性格差异化 | P1 | 根据性格生成不同 Prompt |
-| 自动填充 AI | P2 | 人数不足时自动补充 AI |
+**下一步**：
+1. 完善设计文档
+2. 分解模块任务
+3. 开始编码实现 Agent 接入
 
 ---
 
-## 7. 文档清单
+## 9. 文档清单
 
 ```
 docs/
-├── ai-player-architecture.md   # 核心架构设计 v3.0
-├── ai-mahjong-tech-spec.md     # 技术规范 v3.0
+├── PROJECT-STATUS.md           # 项目状态（本文件）
+├── ai-player-architecture.md   # 核心架构设计
+├── ai-mahjong-tech-spec.md     # 技术规范
 ├── ai-agent-prompt-design.md   # Prompt 设计
 ├── ai-mahjong-requirements.md  # 产品需求
-├── PROJECT-STATUS.md           # 项目状态（本文件）
 └── tasks/                      # 任务文档
 ```
 
 ---
 
-## 8. 2026-03-04 工作记录
+## 10. 相关文档
 
-### 完成事项
-
-1. **重新理解架构**：AI Agent 作为真正玩家，不是 NPC
-2. **整理文档**：删除重复文件，更新核心架构文档
-3. **架构分析**：Oracle + Explore 深度分析
-4. **实现 AI 连接**：
-   - RoomManager.addAIPlayer()
-   - handleJoinAI 事件
-   - handleAIDecision 事件
-   - 注册 AI 事件
-
-### 遗留问题
-
-- broadcastGameState 需要对 AI 发送 Prompt
-- RuleEngine 规则决策过于简单
-- AI 性格系统未实现
+- `docs/ai-agent-integration-design.md` - AI Agent 接入设计方案
+- `docs/ai-agent-integration-tasks.md` - AI Agent 接入任务清单
 
 ---
 
-*下次继续：实现 game:prompt 事件发送*
+*更新时间：2026-03-05*

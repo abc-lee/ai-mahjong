@@ -1,0 +1,40 @@
+{
+  "version": "1.0",
+  "commands": [
+    {
+      "name": "chat",
+      "params": ["message"],
+      "description": "发送聊天消息"
+    },
+    {
+      "name": "draw",
+      "params": [],
+      "description": "摸牌"
+    },
+    {
+      "name": "discard",
+      "params": ["tileId"],
+      "description": "打牌"
+    },
+    {
+      "name": "action",
+      "params": ["action", "tiles?"],
+      "description": "吃碰杠胡"
+    },
+    {
+      "name": "pass",
+      "params": [],
+      "description": "跳过"
+    },
+    {
+      "name": "ready",
+      "params": ["ready"],
+      "description": "准备"
+    },
+    {
+      "name": "add_auto_player",
+      "params": [],
+      "description": "添加自动托管"
+    }
+  ]
+}

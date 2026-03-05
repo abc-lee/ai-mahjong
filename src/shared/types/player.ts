@@ -6,7 +6,7 @@ import { Tile } from './tile';
 import { Meld } from './meld';
 
 // 玩家类型
-export type PlayerType = 'human' | 'ai';
+export type PlayerType = 'human' | 'ai-agent' | 'ai-auto';
 
 // 情绪状态
 export type Mood = 'confident' | 'happy' | 'normal' | 'upset' | 'angry' | 'devastated';
@@ -49,6 +49,13 @@ export interface Player {
   // AI 玩家
   agentId?: string;           // OpenClaw Agent ID（仅 AI 有）
   aiConfig?: AIConfig;        // AI 配置（仅 AI 有）
+  
+  // AI 控制（agent 和 auto 共用）
+  aiControl?: {
+    mode: 'agent' | 'auto';   // 当前谁在控制
+    agentSessionId?: string;  // Agent 会话 ID
+    disconnectedAt?: number;  // 断线时间
+  };
   
   // 人类断线托管
   aiFallback?: AIConfig;      // 托管配置（人类断线后启用）

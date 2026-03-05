@@ -288,6 +288,7 @@ export class RoomManager {
       agentId?: string;
       name?: string;
       personality?: 'aggressive' | 'cautious' | 'balanced';
+      type?: 'ai-agent' | 'ai-auto';
     }
   ): Player {
     const room = this.rooms.get(roomId);
@@ -305,6 +306,7 @@ export class RoomManager {
 
     // 生成 AI 玩家 ID
     const aiPlayerId = options?.agentId || generateId();
+    const playerType = options?.type || 'ai-agent';
     
     // 默认 AI 名称
     const aiNames = ['紫璃', '白泽', '李瞳'];
@@ -318,8 +320,8 @@ export class RoomManager {
       id: aiPlayerId,
       name: availableName,
       position: room.players.length as 0 | 1 | 2 | 3,
-      type: 'ai',
-      agentId: aiPlayerId,
+      type: playerType,
+      agentId: playerType === 'ai-agent' ? aiPlayerId : undefined,
       aiConfig: {
         personality: options?.personality || 'balanced',
         llmEnabled: false,
@@ -328,6 +330,8 @@ export class RoomManager {
         thinkTimeMax: 3000,
         maxRetries: 3,
       },
+      // 自动托管玩家初始化控制状态
+      aiControl: playerType === 'ai-auto' ? { mode: 'auto' } : { mode: 'agent' },
       hand: [],
       melds: [],
       discards: [],
