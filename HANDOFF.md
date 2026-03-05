@@ -12,52 +12,72 @@
 
 ## 本次会话完成的工作
 
-### 1. 修复 Bug
+### 1. 完善 Agent 提示词工程
 
-| 问题 | 修复 |
+根据用户反馈，完善了中间层对 Agent 的支持：
+
+| 功能 | 修复 |
 |------|------|
-| `game_start` 事件重复 5 次 | 新游戏开始时调用 `memoryManager.clearAll()` |
-| AI 不发言 | 添加 `triggerProactiveSpeech` 触发机制 |
+| Agent 连接时无规则 | 发送 `agent:welcome` 事件，包含完整规则 |
+| 无算分/番型说明 | 添加算分公式(底分×2^番数)和番型列表 |
+| 无支招功能 | `generateTips` 添加推荐打牌逻辑 |
+| 无法重发手牌 | 新增 `agent:requestState` 事件 |
 
-### 2. 架构理解澄清
-
-**关键认知**：
-- AI Agent 通过 WebSocket 连接游戏服务器
-- 游戏服务器不需要 LLM API Key
-- 中间层负责提示词工程，发送完整 Prompt
-- Agent 自己思考，返回 JSON 决策
-
-### 3. Git 提交
+### 2. 新增的 Socket 事件
 
 ```
+agent:welcome       - Agent 连接时发送欢迎消息（规则+指令）
+agent:requestState  - Agent 主动请求游戏状态
+```
+
+### 3. Prompt 改进示例
+
+```
+═══════════════════════════════════════
+🀄 欢迎加入麻将游戏，紫璃！
+═══════════════════════════════════════
+
+【游戏目标】
+凑成胡牌牌型：4个顺子/刻子 + 1对将牌
+
+【算分规则】
+得分 = 底分(1000) × 2^番数
+
+【番型列表】
+• 平胡 (1番)、对对胡 (2番)、七对子 (2番)
+• 清一色 (6番)、字一色 (8番)、十三幺 (13番)
+
+【策略提示】
+🎯 推荐打出: 北风 (id: feng-4-123)
+   理由: 孤张字牌，优先打出
+```
+
+### 4. Git 提交
+
+```
+485d86a feat: 完善 Agent 提示词工程
 c9e530b fix: 修复记忆系统重复事件，添加发言触发机制
 be81783 fix: 修复 AI 不自动开始游戏和不出牌问题
 ```
 
 ---
 
-## 未完成的工作
+## 架构核心理解
 
-### 1. 发言系统验证
+**三种玩家角色**：
+| 类型 | 标识 | 说明 |
+|------|------|------|
+| 人类玩家 | `human` | 浏览器连接，点按钮 |
+| AI Agent 玩家 | `ai-agent` | 外部 Agent 连接，收 Prompt 发 JSON |
+| 自动托管 | `ai-auto` | 服务器内置，规则决策 |
 
-代码已添加但服务器未重启，需要验证：
-- `triggerProactiveSpeech` 是否正常触发
-- AI 是否会在轮次开始时发言
+**服务器不需要 LLM API Key** - Agent 自己是 LLM 会话
 
-### 2. 真正的 Agent 游戏测试
-
-已启动 `true-llm-agent.js`，Agent 紫璃正在参与游戏。
-需要：
-- 监控 `pending-state.json`
-- 思考后写入 `decision.json`
-
-### 3. 服务器进程
-
-```
-PID 10216 占用端口 3000
-Windows 无法通过 taskkill 杀掉
-需要手动重启
-```
+**中间层职责**：
+1. 识别玩家类型
+2. 生成完整 Prompt（规则 + 状态 + 指令）
+3. 发送给 Agent，接收 JSON 决策
+4. 验证规则，执行操作
 
 ---
 
@@ -70,9 +90,9 @@ npx tsx src/server/index.ts
 # 测试 4 AI 对局
 node scripts/test-4-agents.js
 
-# 真正的 Agent 参与
+# 真正的 Agent 参与（文件桥接）
 node scripts/true-llm-agent.js
-# 然后监控 pending-state.json，写入 decision.json
+# 监控 pending-state.json，写入 decision.json
 ```
 
 ---
@@ -82,15 +102,23 @@ node scripts/true-llm-agent.js
 1. **三种角色**：`human` / `ai-agent` / `ai-auto`
 2. **服务器不需要 LLM API Key**
 3. **Agent 直接连 WebSocket，中间层发完整 Prompt**
-4. **派发子 Agent 打麻将很简单：连接 → 收 Prompt → 思考 → 返回 JSON**
+4. **派发子 Agent 打麻将**：连接 → 收 Prompt → 思考 → 返回 JSON
+5. **中间层要观察 Agent**：不是让它们打就完了，要看它们遇到什么问题
 
 ---
 
 ## 用户反馈
 
-> "真服了你，这个是你没读懂文档呢" - 用户对架构理解错误的批评
+> "这个是你没读懂文档呢" - 对架构理解错误的批评
+> 
+> "中间层做的就是提示词工程" - Agent 连接时就应该发规则
+> 
+> "你要观察他们碰到什么问题了" - 像阿尔法下围棋一样持续迭代
 
-**教训**：仔细读文档，不要想当然。三种角色要分清楚。
+**教训**：
+- 仔细读文档，不要想当然
+- 提示词工程是中间层核心职责
+- 要持续观察 Agent 行为，发现问题
 
 ---
 
