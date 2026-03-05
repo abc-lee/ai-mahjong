@@ -6,6 +6,7 @@ import { Server } from 'socket.io';
 import { RoomManager } from '../room/RoomManager';
 import { 
   handleCreateRoom,
+  handleCreateRoomAI,
   handleJoinRoom,
   handleLeaveRoom,
   handleRoomList,
@@ -43,6 +44,7 @@ export function setupSocket(io: Server): void {
     socket.on('game:pass', (callback) => handlePass(io, socket, roomManager, callback));
     
     // AI 玩家事件
+    socket.on('room:createAI', (data, callback) => handleCreateRoomAI(io, socket, roomManager, data, callback));
     socket.on('room:joinAI', (data, callback) => handleJoinAI(io, socket, roomManager, data, callback));
     socket.on('ai:decision', (data, callback) => handleAIDecision(io, socket, roomManager, data, callback));
     socket.on('agent:command', (data, callback) => handleAgentCommand(io, socket, roomManager, data, callback));

@@ -94,10 +94,17 @@ class Agent {
 
   createRoom() {
     return new Promise((resolve) => {
-      this.socket.emit('room:create', { playerName: this.name }, (res) => {
+      // 使用 room:createAI 以 AI 身份创建房间
+      this.socket.emit('room:createAI', {
+        agentId: this.id,
+        agentName: this.name,
+        type: 'ai-agent'
+      }, (res) => {
         if (res.roomId) {
           this.roomId = res.roomId;
           console.log(`[${this.name}] 创建房间: ${res.roomId}`);
+        } else {
+          console.log(`[${this.name}] 创建房间失败: ${res.error || res.message}`);
         }
         resolve(res);
       });

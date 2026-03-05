@@ -263,6 +263,73 @@ export async function handleCreateRoom(
   }
 }
 
+/**
+ * AI Agent 创建房间（以 AI 身份）
+ */
+export async function handleCreateRoomAI(
+  io: Server,
+  socket: Socket,
+  roomManager: RoomManager,
+  payload: {
+    agentId: string;
+    agentName: string;
+    type?: 'ai-agent' | 'ai-auto';
+    personality?: 'aggressive' | 'cautious' | 'balanced';
+  },
+  callback: (response: { roomId: string; room: Room; playerId: string; position: number } | ErrorResponse) => void
+) {
+  try {
+    const { agentId, agentName, type, personality } = payload;
+    const playerType = type || 'ai-agent';
+    
+    console.log(`[Server] AI ${playerType} ${agentName}(${agentId}) 创建房间`);
+    
+    // 设置 socket 数据
+    socket.data.clientType = playerType;
+    socket.data.agentId = agentId;
+    socket.data.playerId = agentId;
+    socket.data.playerName = agentName;
+    
+    // 创建房间（用 agentId 作为房主）
+    const serverRoom = roomManager.createRoom(agentId, agentName);
+    socket.data.roomId = serverRoom.id;
+    socket.join(serverRoom.id);
+    
+    // 修改房主为 AI 类型
+    const hostPlayer = serverRoom.players.find(p => p.id === agentId);
+    if (hostPlayer) {
+      hostPlayer.type = playerType;
+      hostPlayer.agentId = agentId;
+      hostPlayer.aiConfig = {
+        personality: personality || 'balanced',
+        llmEnabled: false,
+        timeout: 5000,
+        thinkTimeMin: 1000,
+        thinkTimeMax: 3000,
+        maxRetries: 3,
+      };
+      hostPlayer.aiControl = { mode: playerType === 'ai-auto' ? 'auto' : 'agent' };
+    }
+    
+    // 创建 AIAdapter
+    if (playerType === 'ai-agent' && hostPlayer) {
+      aiManager.createAdapter(hostPlayer);
+    }
+    
+    console.log(`[Server] AI ${playerType} ${agentName} 创建房间成功: ${serverRoom.id}`);
+    
+    if (callback) callback({ 
+      roomId: serverRoom.id, 
+      room: toClientRoom(serverRoom),
+      playerId: agentId,
+      position: 0
+    });
+  } catch (error) {
+    console.error(`[Server] AI 创建房间失败:`, error);
+    if (callback) callback({ message: error instanceof Error ? error.message : '创建房间失败' });
+  }
+}
+
 export async function handleJoinRoom(
   io: Server,
   socket: Socket,
