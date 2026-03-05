@@ -91,8 +91,11 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
       const agentSocket = Array.from(io.sockets.sockets.values())
         .find(s => s.data.playerId === player.id && s.data.clientType === 'ai-agent');
       
+      console.log(`[broadcastGameState] 查找 Agent socket: playerId=${player.id}, 找到=${!!agentSocket}, yourTurn=${yourTurn}`);
+      
       if (agentSocket && yourTurn) {
         // Agent 已连接：发送结构化消息
+        console.log(`[broadcastGameState] 发送 agent:your_turn 给 ${player.name}, phase=${turnPhase}`);
         agentSocket.emit('agent:your_turn', {
           phase: turnPhase,
           hand: player.hand,
@@ -398,10 +401,10 @@ export async function handleGameStart(
     io.in(roomId).emit('game:started');
     broadcastGameState(io, roomId, roomManager);
     
-    callback({ success: true });
+    if (callback) callback({ success: true });
   } catch (error) {
     console.error(`[Server] handleGameStart 错误:`, error);
-    callback({ message: error instanceof Error ? error.message : '开始游戏失败' });
+    if (callback) callback({ message: error instanceof Error ? error.message : '开始游戏失败' });
   }
 }
 
