@@ -162,12 +162,23 @@ src/server/prompt/
 ### 测试方法
 
 ```bash
-# 1. 启动游戏服务器
+# 1. 启动游戏服务器（在一个终端）
 npm run dev:server
 
-# 2. 在另一个终端运行测试
-npx ts-node scripts/test-agent-connect.ts
+# 2. 启动前端（在另一个终端）
+npm run dev:client
+
+# 3. 打开浏览器访问 http://localhost:5173
+
+# 4. 创建房间后，启动 AI Agent（在新终端）
+node scripts/ai-agent-player.js <房间号>
 ```
+
+### 已知问题
+
+1. **AI 不出牌**：可能是因为紫璃（创建房间的玩家）被当作"人类"玩家处理，需要监听 `game:state` 事件而不是 `agent:your_turn`
+
+2. **解决方案**：使用 `scripts/test-4-agents.js` 进行完整测试，该脚本已处理这种情况
 
 ### 测试结果 (2026-03-05)
 
