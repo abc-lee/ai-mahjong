@@ -138,17 +138,19 @@ src/server/prompt/
 |------|------|------|------|
 | GameEngine | `src/server/game/GameEngine.ts` | ✅ 完整 | 麻将规则可玩 |
 | RoomManager | `src/server/room/RoomManager.ts` | ✅ 完整 | 多房间支持 |
-| AIAdapter | `src/server/ai/AIAdapter.ts` | ⚠️ 需改造 | 要支持真正的 Agent 连接 |
-| AIManager | `src/server/ai/AIManager.ts` | ⚠️ 需改造 | Agent 生命周期管理 |
-| PromptGenerator | `src/server/prompt/PromptGenerator.ts` | ⚠️ 需重构 | 改为提示词工程系统 |
-| Socket Handlers | `src/server/socket/handlers.ts` | ⚠️ 需补充 | Agent 指令处理 |
+| AIAdapter | `src/server/ai/AIAdapter.ts` | ✅ 完成 | Agent 决策适配，支持降级 |
+| AIManager | `src/server/ai/AIManager.ts` | ✅ 完成 | Agent 生命周期管理 |
+| PromptNL | `src/server/prompt/PromptNL.ts` | ✅ 完成 | 提示词工程系统 |
+| Socket Handlers | `src/server/socket/handlers.ts` | ✅ 完成 | Agent 指令处理完整 |
+| SpeechManager | `src/server/speech/SpeechManager.ts` | ✅ 完成 | 发言/情绪系统 |
+| MemoryManager | `src/server/speech/MemoryManager.ts` | ✅ 完成 | AI 记忆/记仇系统 |
 | 前端 UI | `src/client/` | ✅ 基础完成 | 小 Bug 和优化 |
 
 ---
 
 ## 7. 当前任务
 
-### Phase 1 - AI Agent 接入
+### Phase 1 - AI Agent 接入 ✅ 完成
 
 | # | 任务 | 状态 | 说明 |
 |---|------|------|------|
@@ -156,47 +158,33 @@ src/server/prompt/
 | 2 | 实现指令解析器 CommandParser | ✅ 完成 | 解析 JSON 指令 |
 | 3 | 补充 Socket Handler | ✅ 完成 | handleAgentCommand |
 | 4 | 修改 broadcastGameState | ✅ 完成 | 区分 ai-agent/ai-auto |
-| 5 | 创建测试脚本 | ✅ 完成 | scripts/test-agent-connect.ts |
-| 6 | 运行测试 | ⏳ 待执行 | |
+| 5 | 创建测试脚本 | ✅ 完成 | scripts/test-4-agents.js |
+| 6 | 运行测试 | ✅ 完成 | 4 AI 正常对局 |
+| 7 | 欢迎消息（规则推送） | ✅ 完成 | agent:welcome 事件 |
+| 8 | 支招功能 | ✅ 完成 | 推荐打牌逻辑 |
+| 9 | 状态重发 | ✅ 完成 | agent:requestState 事件 |
 
 ### 测试方法
 
 ```bash
-# 1. 启动游戏服务器（在一个终端）
+# 1. 启动游戏服务器
 npm run dev:server
 
-# 2. 启动前端（在另一个终端）
-npm run dev:client
+# 2. 测试 4 AI 对局
+node scripts/test-4-agents.js
 
-# 3. 打开浏览器访问 http://localhost:5173
-
-# 4. 创建房间后，启动 AI Agent（在新终端）
-node scripts/ai-agent-player.js <房间号>
+# 3. Agent 文件桥接测试
+node scripts/true-llm-agent.js
+# 监控 pending-state.json，写入 decision.json
 ```
-
-### 已知问题
-
-1. **AI 不出牌**：可能是因为紫璃（创建房间的玩家）被当作"人类"玩家处理，需要监听 `game:state` 事件而不是 `agent:your_turn`
-
-2. **解决方案**：使用 `scripts/test-4-agents.js` 进行完整测试，该脚本已处理这种情况
-
-### 测试结果 (2026-03-05)
-
-✅ Agent 连接服务器成功
-✅ 创建房间成功
-✅ 加入房间成功 (ai-agent + ai-auto)
-✅ 开始游戏成功
-✅ 收到 agent:your_turn 事件
-✅ 打牌指令执行成功
-✅ 轮次流转正常
-✅ 摸牌/打牌/吃碰杠胡 正常
 
 ### Git 提交记录
 
 ```
-bf58105 fix: 修复 AI Agent 游戏流程问题
-5fd82d0 docs: 更新项目状态
-213e59c test: 添加完整游戏流程测试脚本
+396864e docs: 更新 HANDOFF 文档
+485d86a feat: 完善 Agent 提示词工程
+c9e530b fix: 修复记忆系统重复事件，添加发言触发机制
+be81783 fix: 修复 AI 不自动开始游戏和不出牌问题
 74a62a9 docs: 更新测试结果
 ae69d3d test: 添加 Agent 接入测试脚本
 08b6f22 feat: AI Agent 接入基础实现
