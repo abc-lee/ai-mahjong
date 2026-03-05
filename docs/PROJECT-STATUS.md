@@ -177,11 +177,19 @@ npx ts-node scripts/test-agent-connect.ts
 ✅ 开始游戏成功
 ✅ 收到 agent:your_turn 事件
 ✅ 打牌指令执行成功
+✅ 轮次流转正常
+✅ 摸牌/打牌/吃碰杠胡 正常
 
-待优化：
-- 需要测试完整一局游戏流程
-- 需要测试吃碰杠胡操作
-- 需要测试 Agent 断线降级
+### Git 提交记录
+
+```
+bf58105 fix: 修复 AI Agent 游戏流程问题
+5fd82d0 docs: 更新项目状态
+213e59c test: 添加完整游戏流程测试脚本
+74a62a9 docs: 更新测试结果
+ae69d3d test: 添加 Agent 接入测试脚本
+08b6f22 feat: AI Agent 接入基础实现
+```
 
 ### Phase 2 - Prompt 迭代
 
