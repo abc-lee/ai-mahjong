@@ -78,6 +78,32 @@ export interface GameEndedEvent {
   winningHand: WinningHand | null;
 }
 
+// ==================== 发言系统事件 ====================
+
+export interface SpeechMessageEvent {
+  playerId: string;
+  playerName: string;
+  content: string;
+  emotion?: string;
+  targetPlayer?: string;
+  timestamp: number;
+}
+
+export interface EmotionEvent {
+  playerId: string;
+  emotion: {
+    mood: string;
+    emoji: string;
+    color: string;
+    values: {
+      happiness: number;
+      anger: number;
+      patience: number;
+      confidence: number;
+    };
+  };
+}
+
 // ==================== 通用响应 ====================
 
 export interface SuccessResponse {
@@ -118,6 +144,9 @@ export const ServerEvents = {
   GAME_ACTIONS: 'game:actions',
   GAME_ENDED: 'game:ended',
   GAME_ERROR: 'game:error',
+  // 发言系统
+  PLAYER_SPEECH: 'player:speech',
+  PLAYER_EMOTION: 'player:emotion',
 } as const;
 
 // ==================== 回调类型 ====================

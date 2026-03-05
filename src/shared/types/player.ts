@@ -72,11 +72,20 @@ export interface Player {
   // 状态
   isDealer: boolean;
   score: number;
+  lastScore?: number;  // 上一次分数（用于计算变化）
   isReady: boolean;
   isOnline: boolean;
   
   // 情绪（AI 显示用）
   mood: Mood;
+  
+  // 情绪值（服务端使用）
+  emotion?: {
+    happiness: number;   // 快乐 -100 ~ 100
+    anger: number;       // 愤怒 0 ~ 100
+    patience: number;    // 耐心 0 ~ 100
+    confidence: number;  // 自信 0 ~ 100
+  };
 }
 
 // 公开的玩家信息（其他玩家可以看到的）

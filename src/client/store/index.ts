@@ -12,6 +12,30 @@ import {
   GamePhase,
 } from '@shared/types';
 
+// 发言消息类型
+export interface SpeechMessage {
+  id: string;
+  playerId: string;
+  playerName: string;
+  content: string;
+  emotion?: string;
+  targetPlayer?: string;
+  timestamp: number;
+}
+
+// 情绪状态类型
+export interface EmotionState {
+  mood: string;
+  emoji: string;
+  color: string;
+  values: {
+    happiness: number;
+    anger: number;
+    patience: number;
+    confidence: number;
+  };
+}
+
 // 初始状态常量
 const initialState = {
   // 连接状态
@@ -31,6 +55,10 @@ const initialState = {
   lastDrawnTile: null as Tile | null,
   turnPhase: null as 'draw' | 'discard' | 'action' | null,
   availableActions: [] as PendingAction[],
+
+  // 发言系统状态
+  speechMessages: [] as SpeechMessage[],
+  playerEmotions: {} as Record<string, EmotionState>,
 
   // UI 状态
   selectedTile: null as Tile | null,
@@ -55,6 +83,10 @@ interface GameState {
   lastDrawnTile: Tile | null;
   turnPhase: 'draw' | 'discard' | 'action' | null;
   availableActions: PendingAction[];
+
+  // 发言系统状态
+  speechMessages: SpeechMessage[];
+  playerEmotions: Record<string, EmotionState>;
 
   // UI 状态
   selectedTile: Tile | null;
@@ -81,6 +113,12 @@ interface GameState {
   ) => void;
   setAvailableActions: (actions: PendingAction[]) => void;
   clearAvailableActions: () => void;
+
+  // Actions - 发言系统相关
+  addSpeechMessage: (message: SpeechMessage) => void;
+  clearSpeechMessages: () => void;
+  setPlayerEmotion: (playerId: string, emotion: EmotionState) => void;
+  clearPlayerEmotions: () => void;
 
   // Actions - UI 相关
   selectTile: (tile: Tile | null) => void;
@@ -177,6 +215,31 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
+  // ==================== 发言系统相关 ====================
+
+  addSpeechMessage: (message: SpeechMessage) => {
+    set((state) => ({
+      speechMessages: [...state.speechMessages, message].slice(-20), // Keep last 20 messages
+    }));
+  },
+
+  clearSpeechMessages: () => {
+    set({ speechMessages: [] });
+  },
+
+  setPlayerEmotion: (playerId: string, emotion: EmotionState) => {
+    set((state) => ({
+      playerEmotions: {
+        ...state.playerEmotions,
+        [playerId]: emotion,
+      },
+    }));
+  },
+
+  clearPlayerEmotions: () => {
+    set({ playerEmotions: {} });
+  },
+
   // ==================== UI 相关 ====================
 
   selectTile: (tile: Tile | null) => {
@@ -204,6 +267,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       availableActions: [],
       selectedTile: null,
       showActionModal: false,
+      speechMessages: [],
+      playerEmotions: {},
     });
   },
 }));
@@ -259,4 +324,19 @@ export const useIsHost = () =>
   useGameStore((state) => {
     if (!state.currentRoom || !state.playerId) return false;
     return state.currentRoom.host === state.playerId;
+  });
+
+// 发言系统选择器
+export const useSpeechMessages = () => useGameStore((state) => state.speechMessages);
+export const usePlayerEmotions = () => useGameStore((state) => state.playerEmotions);
+export const usePlayerEmotion = (playerId: string) =>
+  useGameStore((state) => state.playerEmotions[playerId]);
+
+// 获取当前回合玩家的发言
+export const useCurrentTurnPlayerSpeech = () =>
+  useGameStore((state) => {
+    if (!state.gamePublicState) return null;
+    const currentPlayerId = state.gamePublicState.players[state.gamePublicState.currentPlayerIndex]?.id;
+    if (!currentPlayerId) return null;
+    return state.speechMessages.filter((m) => m.playerId === currentPlayerId).slice(-1)[0] || null;
   });

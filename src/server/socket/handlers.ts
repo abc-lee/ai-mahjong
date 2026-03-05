@@ -6,6 +6,7 @@ import { Socket, Server } from 'socket.io';
 import { RoomManager, Room as ServerRoom } from '../room/RoomManager';
 import { Player, PendingAction, Tile, GameStatePublic, Room, PlayerPublic, toPublicPlayer } from '../../shared/types';
 import { aiManager } from '../ai/AIManager';
+import { getSpeechManager, removeSpeechManager, SpeechManager } from '../speech/SpeechManager';
 
 // Socket 数据类型
 interface SocketData {
@@ -63,6 +64,21 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
   const room = roomManager.getRoom(roomId);
   if (!room?.gameEngine) return;
 
+  // 获取发言管理器
+  let speechManager: SpeechManager | null = null;
+  try {
+    speechManager = getSpeechManager(io, roomId);
+  } catch (e) {
+    // 发言系统可能未初始化
+  }
+
+  // 找到当前回合玩家，开始等待计时
+  const currentPlayerIndex = room.gameEngine.getState().currentPlayerIndex;
+  const currentPlayer = room.players[currentPlayerIndex];
+  if (currentPlayer && speechManager) {
+    speechManager.startWaitingTimer(currentPlayer.id, currentPlayer.name);
+  }
+
   // 遍历所有玩家
   for (const player of room.players) {
     const publicState = room.gameEngine.getPublicState(player.id);
@@ -100,13 +116,19 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
         // 导入 Prompt 生成器
         const { generateYourTurnPrompt } = require('../prompt/PromptNL');
         
-        // 生成自然语言 Prompt
-        const prompt = generateYourTurnPrompt({
+        // 生成自然语言 Prompt（包含情绪上下文）
+        let prompt = generateYourTurnPrompt({
           phase: turnPhase,
           hand: player.hand,
           lastDrawnTile,
           gameState: publicState,
         });
+        
+        // 添加情绪上下文
+        if (speechManager) {
+          const emotionPrompt = speechManager.generateEmotionPrompt(player.id, player.name);
+          prompt = emotionPrompt + '\n' + prompt;
+        }
         
         agentSocket.emit('agent:your_turn', {
           prompt,  // 自然语言文本
@@ -115,6 +137,60 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
           hand: player.hand,
           lastDrawnTile,
         });
+        
+        // 添加超时机制：如果 AI 5秒内没有响应，自动托管
+        const timeoutKey = `ai_timeout_${player.id}`;
+        if (global[timeoutKey]) clearTimeout(global[timeoutKey]);
+        
+        global[timeoutKey] = setTimeout(() => {
+          // 检查是否还在等待这个玩家
+          const currentRoom = roomManager.getRoom(roomId);
+          if (!currentRoom || !currentRoom.gameEngine) return;
+          
+          const isStillWaiting = currentRoom.gameEngine.isPlayerTurn(player.id);
+          const currentPhase = currentRoom.gameEngine.getTurnPhase();
+          
+          if (isStillWaiting && currentPhase === turnPhase) {
+            console.log(`[AI Timeout] ${player.name} 超时，自动托管处理`);
+            
+            // 执行自动决策
+            const adapter = aiManager.getAdapter(player.id);
+            if (adapter) {
+              adapter.handleEvent({
+                type: turnPhase === 'draw' ? 'YOUR_TURN_DRAW' : 'YOUR_TURN_DISCARD',
+                lastDrawnTile,
+                gameState: publicState,
+              }).then(decision => {
+                if (decision) {
+                  executeAIDecision(roomId, player.id, decision, roomManager, io);
+                }
+              }).catch(err => {
+                console.error(`[AI Timeout] 自动决策失败:`, err);
+                // 强制摸牌或打牌
+                if (turnPhase === 'draw') {
+                  const gameEngine = currentRoom.gameEngine;
+                  gameEngine.drawTile(player.id);
+                  broadcastGameState(io, roomId, roomManager);
+                } else if (turnPhase === 'discard' && player.hand.length > 0) {
+                  const tile = player.hand[player.hand.length - 1];
+                  currentRoom.gameEngine.discardTile(player.id, tile.id);
+                  broadcastGameState(io, roomId, roomManager);
+                }
+              });
+            } else {
+              // 没有 adapter，强制执行
+              console.log(`[AI Timeout] ${player.name} 无 adapter，强制执行`);
+              if (turnPhase === 'draw') {
+                currentRoom.gameEngine.drawTile(player.id);
+                broadcastGameState(io, roomId, roomManager);
+              } else if (turnPhase === 'discard' && player.hand.length > 0) {
+                const tile = player.hand[player.hand.length - 1];
+                currentRoom.gameEngine.discardTile(player.id, tile.id);
+                broadcastGameState(io, roomId, roomManager);
+              }
+            }
+          }
+        }, 5000); // 5秒超时
       } else if (player.aiControl?.mode === 'auto' || !agentSocket) {
         // Agent 断线或降级为自动托管：使用 AIAdapter
         const adapter = aiManager.getAdapter(player.id);
@@ -331,9 +407,13 @@ export async function handleCreateRoomAI(
     
     console.log(`[Server] AI ${playerType} ${agentName} 创建房间成功: ${serverRoom.id}`);
     
+    // 广播房间更新（虽然只有一个人，但保持一致性）
+    const clientRoom = toClientRoom(serverRoom);
+    io.in(serverRoom.id).emit('room:updated', { room: clientRoom });
+    
     if (callback) callback({ 
       roomId: serverRoom.id, 
-      room: toClientRoom(serverRoom),
+      room: clientRoom,
       playerId: agentId,
       position: 0
     });
@@ -355,6 +435,18 @@ export async function handleJoinRoom(
     const playerName = payload.playerName || `玩家${playerId.slice(0, 4)}`;
     
     console.log(`[Server] 玩家 ${playerName}(${playerId}) 加入房间 ${payload.roomId}`);
+    
+    // 如果当前socket已经在其他房间，先离开
+    const oldRoomId = socket.data.roomId;
+    if (oldRoomId) {
+      console.log(`[Server] 清理旧房间状态: ${oldRoomId}`);
+      socket.leave(oldRoomId);
+      try {
+        roomManager.leaveRoom(oldRoomId, socket.data.playerId || playerId);
+      } catch (e) {
+        // 忽略错误
+      }
+    }
     
     socket.data.playerId = playerId;
     socket.data.playerName = playerName;
@@ -476,6 +568,21 @@ export async function handleGameStart(
     
     console.log(`[Server] 开始游戏，房间 ${roomId}`);
     roomManager.startGame(roomId);
+    
+    // 获取更新后的房间
+    const gameRoom = roomManager.getRoom(roomId);
+    
+    // 初始化 AIAdapter（关键修复：确保所有 AI 都有 adapter）
+    if (gameRoom) {
+      aiManager.initGame(gameRoom.players);
+      console.log(`[Server] AIAdapter 已初始化，玩家数: ${gameRoom.players.length}`);
+    }
+    
+    // 初始化发言系统
+    const speechManager = getSpeechManager(io, roomId);
+    gameRoom?.players.forEach(p => {
+      speechManager.initPlayerEmotion(p.id, p.name);
+    });
     
     // 广播给房间所有人（包括房主）
     io.in(roomId).emit('game:started');
@@ -601,10 +708,38 @@ export async function handleAction(
     if (gameState.phase === 'finished' && gameState.winner !== null) {
       // 游戏结束时广播最终状态，清除所有玩家的 pendingActions
       broadcastGameState(io, roomId, roomManager);
+      
+      // 处理分数变化和情绪更新
+      try {
+        const speechManager = getSpeechManager(io, roomId);
+        const scoreChanges = room.players.map((p, idx) => ({
+          playerId: p.id,
+          playerName: p.name,
+          scoreChange: (p.score || 0) - (p.lastScore || 0),
+        }));
+        speechManager.handleScoreChanges(scoreChanges);
+        
+        // 更新 lastScore
+        room.players.forEach(p => {
+          p.lastScore = p.score || 0;
+        });
+        
+        // 情绪衰减（为下一局做准备）
+        speechManager.decayEmotions();
+        
+      } catch (e) {
+        console.log(`[Score] 分数情绪处理失败:`, e);
+      }
+      
       console.log(`[Server] 发送 game:ended, winner=${gameState.winner}`);
       io.to(roomId).emit('game:ended', {
         winner: gameState.winner,
         winningHand: gameState.winningHand,
+        players: room.players.map(p => ({
+          id: p.id,
+          name: p.name,
+          score: p.score || 0,
+        })),
       });
     } else {
       console.log(`[Server] handleAction: 广播游戏状态给房间 ${roomId}`);
@@ -650,8 +785,40 @@ export async function handleDisconnect(
   
   const roomId = socket.data.roomId;
   const playerId = socket.data.playerId;
+  const clientType = socket.data.clientType;
   
   if (roomId && playerId) {
+    // AI Agent 断线：降级为自动托管，不移除玩家
+    if (clientType === 'ai-agent') {
+      console.log(`[断线] AI Agent ${playerId} 断线，降级为自动托管`);
+      
+      const room = roomManager.getRoom(roomId);
+      if (room) {
+        const player = room.players.find(p => p.id === playerId);
+        if (player) {
+          // 降级为自动托管模式
+          player.type = 'ai-auto';
+          player.aiControl = { mode: 'auto' };
+          
+          // 通知其他玩家
+          io.to(roomId).emit('player:status', {
+            playerId,
+            status: 'disconnected',
+            message: `${player.name} 已断线，系统自动托管`
+          });
+          
+          // 如果当前是断线玩家的回合，触发 AI 自动决策
+          if (room.gameEngine?.isPlayerTurn(playerId)) {
+            console.log(`[断线] 触发自动托管决策`);
+            broadcastGameState(io, roomId, roomManager);
+          }
+          
+          return;
+        }
+      }
+    }
+    
+    // 人类玩家或普通 AI：正常离开房间
     roomManager.leaveRoom(roomId, playerId);
     
     const serverRoom = roomManager.getRoom(roomId);
@@ -928,5 +1095,270 @@ export async function handleAgentCommand(
   } catch (error) {
     console.error(`[Server] Agent 指令处理失败:`, error);
     callback?.({ success: false, error: error instanceof Error ? error.message : '指令处理失败' });
+  }
+}
+
+/**
+ * AI Agent 重连
+ * 让断线的 AI Agent 重新接管游戏
+ */
+export async function handleReconnectAI(
+  io: Server,
+  socket: Socket,
+  roomManager: RoomManager,
+  payload: {
+    roomId: string;
+    agentId: string;
+  },
+  callback: (response: { success: boolean; playerId?: string; gameState?: any; error?: string }) => void
+) {
+  try {
+    const { roomId, agentId } = payload;
+    
+    console.log(`[重连] AI Agent ${agentId} 尝试重连房间 ${roomId}`);
+    
+    const room = roomManager.getRoom(roomId);
+    if (!room) {
+      callback?.({ success: false, error: '房间不存在' });
+      return;
+    }
+    
+    // 查找玩家
+    const player = room.players.find(p => p.id === agentId);
+    if (!player) {
+      callback?.({ success: false, error: '玩家不存在' });
+      return;
+    }
+    
+    // 恢复为 ai-agent 类型
+    player.type = 'ai-agent';
+    player.aiControl = { mode: 'agent' };
+    
+    // 更新 socket 数据
+    socket.data.clientType = 'ai-agent';
+    socket.data.agentId = agentId;
+    socket.data.playerId = agentId;
+    socket.data.playerName = player.name;
+    socket.data.roomId = roomId;
+    socket.join(roomId);
+    
+    // 通知其他玩家
+    io.to(roomId).emit('player:status', {
+      playerId: agentId,
+      status: 'reconnected',
+      message: `${player.name} 已重连`
+    });
+    
+    // 返回当前游戏状态
+    const gameState = room.gameEngine?.getPublicState(agentId);
+    const yourTurn = room.gameEngine?.isPlayerTurn(agentId);
+    
+    callback?.({
+      success: true,
+      playerId: agentId,
+      gameState: {
+        state: gameState,
+        yourHand: player.hand,
+        yourTurn,
+      }
+    });
+    
+    // 如果是当前玩家的回合，发送 Prompt
+    if (yourTurn && room.gameEngine) {
+      const turnPhase = room.gameEngine.getTurnPhase();
+      const lastDrawnTile = room.gameEngine.getLastDrawnTile(agentId);
+      
+      const { generateYourTurnPrompt } = require('../prompt/PromptNL');
+      const prompt = generateYourTurnPrompt({
+        phase: turnPhase,
+        hand: player.hand,
+        lastDrawnTile,
+        gameState,
+      });
+      
+      socket.emit('agent:your_turn', {
+        prompt,
+        phase: turnPhase,
+        hand: player.hand,
+        lastDrawnTile,
+      });
+    }
+    
+    console.log(`[重连] AI Agent ${agentId} 重连成功`);
+    
+  } catch (error) {
+    console.error(`[重连] 失败:`, error);
+    callback?.({ success: false, error: error instanceof Error ? error.message : '重连失败' });
+  }
+}
+
+/**
+ * 获取 AI Agent 可重连的房间列表
+ */
+export async function handleGetReconnectableRooms(
+  socket: Socket,
+  roomManager: RoomManager,
+  payload: {
+    agentId: string;
+  },
+  callback: (response: { rooms: Array<{ roomId: string; roomName: string; playerName: string }> }) => void
+) {
+  const rooms = roomManager.getRooms();
+  const reconnectableRooms: Array<{ roomId: string; roomName: string; playerName: string }> = [];
+  
+  for (const room of rooms) {
+    const player = room.players.find(p => p.id === payload.agentId);
+    if (player && (player.type === 'ai-auto' || player.aiControl?.mode === 'auto')) {
+      reconnectableRooms.push({
+        roomId: room.id,
+        roomName: room.name,
+        playerName: player.name,
+      });
+    }
+  }
+  
+  callback?.({ rooms: reconnectableRooms });
+}
+
+// ==================== 发言系统事件 ====================
+
+/**
+ * 处理 AI 发言
+ */
+export async function handleAgentSpeak(
+  io: Server,
+  socket: Socket,
+  roomManager: RoomManager,
+  payload: {
+    content: string;
+    emotion?: string;
+    targetPlayer?: string;
+  },
+  callback?: (response: { success: boolean; error?: string }) => void
+) {
+  try {
+    const roomId = socket.data.roomId;
+    const playerId = socket.data.playerId;
+    const playerName = socket.data.playerName;
+
+    if (!roomId || !playerId) {
+      callback?.({ success: false, error: '未加入房间' });
+      return;
+    }
+
+    const speechManager = getSpeechManager(io, roomId);
+    
+    speechManager.handleSpeech({
+      playerId,
+      playerName,
+      content: payload.content,
+      emotion: payload.emotion,
+      targetPlayer: payload.targetPlayer,
+      timestamp: Date.now(),
+    });
+
+    callback?.({ success: true });
+  } catch (error) {
+    console.error(`[Speech] 发言处理失败:`, error);
+    callback?.({ success: false, error: error instanceof Error ? error.message : '发言失败' });
+  }
+}
+
+/**
+ * 处理情绪刺激响应
+ * AI Agent 收到刺激后可以选择是否发言
+ */
+export async function handleStimulusResponse(
+  io: Server,
+  socket: Socket,
+  roomManager: RoomManager,
+  payload: {
+    respond: boolean;
+    content?: string;
+  },
+  callback?: (response: { success: boolean }) => void
+) {
+  try {
+    const roomId = socket.data.roomId;
+    const playerId = socket.data.playerId;
+    const playerName = socket.data.playerName;
+
+    if (!roomId || !playerId || !payload.respond || !payload.content) {
+      callback?.({ success: true });
+      return;
+    }
+
+    const speechManager = getSpeechManager(io, roomId);
+    
+    speechManager.handleSpeech({
+      playerId,
+      playerName,
+      content: payload.content,
+      timestamp: Date.now(),
+    });
+
+    callback?.({ success: true });
+  } catch (error) {
+    console.error(`[Stimulus] 响应处理失败:`, error);
+    callback?.({ success: true });
+  }
+}
+
+/**
+ * 获取玩家情绪状态
+ */
+export async function handleGetEmotion(
+  io: Server,
+  socket: Socket,
+  roomManager: RoomManager,
+  payload: {
+    playerId?: string;
+  },
+  callback: (response: { emotion?: any; error?: string }) => void
+) {
+  try {
+    const roomId = socket.data.roomId;
+    const targetId = payload.playerId || socket.data.playerId;
+
+    if (!roomId) {
+      callback?.({ error: '未加入房间' });
+      return;
+    }
+
+    const speechManager = getSpeechManager(io, roomId);
+    const emotion = speechManager.getEmotion(targetId);
+
+    callback?.({ emotion });
+  } catch (error) {
+    callback?.({ error: error instanceof Error ? error.message : '获取情绪失败' });
+  }
+}
+
+/**
+ * 获取发言历史
+ */
+export async function handleGetSpeechHistory(
+  io: Server,
+  socket: Socket,
+  roomManager: RoomManager,
+  payload: {
+    limit?: number;
+  },
+  callback: (response: { history?: any[]; error?: string }) => void
+) {
+  try {
+    const roomId = socket.data.roomId;
+
+    if (!roomId) {
+      callback?.({ error: '未加入房间' });
+      return;
+    }
+
+    const speechManager = getSpeechManager(io, roomId);
+    const history = speechManager.getSpeechHistory(payload.limit || 20);
+
+    callback?.({ history });
+  } catch (error) {
+    callback?.({ error: error instanceof Error ? error.message : '获取历史失败' });
   }
 }

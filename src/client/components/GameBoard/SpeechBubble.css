@@ -1,0 +1,167 @@
+/* 发言气泡样式 */
+
+.speech-bubble-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.speech-bubble {
+  position: absolute;
+  max-width: 200px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  animation: bubble-appear 0.3s ease-out;
+  pointer-events: auto;
+}
+
+.speech-bubble.fading {
+  animation: bubble-fade 0.5s ease-out forwards;
+}
+
+@keyframes bubble-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.8) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes bubble-fade {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* 位置定位 */
+.speech-bottom {
+  bottom: 180px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.speech-right {
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.speech-top {
+  top: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.speech-left {
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* 气泡尾巴 */
+.bubble-tail {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 8px solid transparent;
+}
+
+.bubble-tail-bottom {
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-top-color: white;
+  border-bottom: none;
+}
+
+.bubble-tail-right {
+  right: -16px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-left-color: white;
+  border-right: none;
+}
+
+.bubble-tail-top {
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-bottom-color: white;
+  border-top: none;
+}
+
+.bubble-tail-left {
+  left: -16px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-right-color: white;
+  border-left: none;
+}
+
+/* 情绪样式 */
+.emotion-happy {
+  background: linear-gradient(135deg, #fff9c4 0%, #fff59d 100%);
+  border: 2px solid #ffd54f;
+}
+
+.emotion-angry {
+  background: linear-gradient(135deg, #ffcdd2 0%, #ef9a9a 100%);
+  border: 2px solid #e57373;
+}
+
+.emotion-calm {
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  border: 2px solid #90caf9;
+}
+
+.emotion-frustrated {
+  background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+  border: 2px solid #ba68c8;
+}
+
+.emotion-excited {
+  background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%);
+  border: 2px solid #81c784;
+}
+
+/* 气泡内容 */
+.bubble-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bubble-text {
+  font-size: 14px;
+  color: #333;
+  line-height: 1.4;
+}
+
+/* 情绪动画 */
+.emotion-happy .bubble-text::before {
+  content: '😊 ';
+}
+
+.emotion-angry .bubble-text::before {
+  content: '😠 ';
+}
+
+.emotion-excited .bubble-text::before {
+  content: '🎉 ';
+}
+
+.emotion-frustrated .bubble-text::before {
+  content: '😔 ';
+}

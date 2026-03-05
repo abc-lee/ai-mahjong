@@ -276,28 +276,173 @@ ae69d3d test: 添加 Agent 接入测试脚本
 ### 已完成
 - ✅ 新增 `room:createAI` 事件 - 让 AI Agent 可以 AI 身份创建房间
 - ✅ 分析报告：`docs/deep-discussion-log.md`, `docs/architecture-analysis.md`
+- ✅ **LLM 决策引擎** - 支持 OpenAI/Anthropic/本地模式
+- ✅ **多语言支持** - Prompt 支持中英文切换
+- ✅ **断线重连机制** - AI Agent 断线自动降级为托管
+- ✅ **迭代方案文档** - `docs/iteration-plan.md`
+- ✅ **发言系统** - 等待提醒、情绪刺激、嘴炮对话
+- ✅ **情绪值系统** - AI 情绪状态跟踪
+- ✅ **分数奖励系统** - 分数影响情绪和行为
+- ✅ **AI 个性系统** - 四个角色有不同性格和发言风格
+- ✅ **AI 记忆系统** - 记住游戏事件、对话历史、玩家关系
+- ✅ **记仇系统** - AI 记住谁碰过自己、谁让自己输过
+- ✅ **前端组件集成** - 发言气泡、情绪指示器、等待进度条已集成到游戏界面
 
-### 核心改动
-- `src/server/socket/handlers.ts` - 新增 `handleCreateRoomAI` 函数
-- `src/server/socket/index.ts` - 注册 `room:createAI` 事件
-- `scripts/test-4-agents.js` - 使用 `room:createAI` 替代 `room:create`
-
-### Git 提交
+### 核心文件
 ```
-1db8c94 feat: 新增 room:createAI 事件
-d04a580 docs: 添加深度讨论记录和架构分析报告
+src/server/llm/LLMClient.ts           # LLM 决策引擎
+src/server/speech/Stimuli.ts          # 情绪刺激话术库
+src/server/speech/SpeechManager.ts    # 发言系统管理器
+src/server/speech/MemoryManager.ts    # AI 记忆系统
+src/server/prompt/PromptNL.ts         # 多语言 Prompt 生成器
+src/server/socket/handlers.ts         # 所有事件处理器
+src/shared/types/player.ts            # Player 类型（含情绪字段）
+src/client/store/index.ts             # Zustand 状态管理（含发言/情绪状态）
+src/client/socket/index.ts            # Socket 客户端（含发言事件监听）
+src/client/components/GameBoard/SpeechBubble.tsx      # 发言气泡组件
+src/client/components/GameBoard/EmotionIndicator.tsx  # 情绪指示器组件
+src/client/components/GameBoard/WaitingIndicator.tsx  # 等待进度条组件
+src/client/components/GameBoard/PlayerArea.tsx        # 玩家区域（集成发言/情绪）
+src/client/components/GameBoard/GameBoard.tsx         # 游戏桌面（集成所有组件）
+scripts/test-speech-system.js         # 发言系统测试脚本
+docs/iteration-plan.md                # 迭代方案文档
 ```
 
-### 待验证
-- `room:createAI` 功能是否正常
-- AI Agent 是否能正确收到 `agent:your_turn` 事件
+### API 列表
+```typescript
+// AI Agent 管理
+socket.emit('room:createAI', { agentId, agentName, type });
+socket.emit('room:joinAI', { roomId, agentId, agentName, type });
+socket.emit('agent:reconnect', { roomId, agentId });
+socket.emit('agent:getReconnectableRooms', { agentId });
 
-### 测试命令
+// 发言系统
+socket.emit('agent:speak', { content, emotion, targetPlayer });
+socket.emit('agent:getEmotion', { playerId });
+socket.emit('agent:getSpeechHistory', { limit });
+
+// 服务器广播事件
+io.emit('player:speech', { playerId, playerName, content, emotion, timestamp });
+io.emit('player:emotion', { playerId, emotion: { mood, emoji, color, values } });
+```
+
+### 四个 AI 角色
+| 角色 | 性格 | 发言风格 | 生气阈值 | 发言频率 |
+|------|------|----------|----------|----------|
+| 紫璃 | 傲娇、毒舌、聪明 | 带点讽刺 | 低(30) | 中(0.3) |
+| 白泽 | 温和、智慧、包容 | 理性分析 | 高(70) | 低(0.15) |
+| 李瞳 | 活泼、话唠、乐观 | 喜欢聊天 | 中(50) | 高(0.4) |
+| 测试员 | 冷静、分析、专业 | 专业客观 | 中(60) | 低(0.2) |
+
+---
+
+## 13. AI 记忆系统
+
+### 记忆类型
+- **游戏事件**：碰杠胡、输赢、冲突等
+- **对话历史**：最近 30 条发言
+- **玩家关系**：好感度、记仇等级、标签
+
+### 玩家关系数据
+```typescript
+interface PlayerRelation {
+  playerId: string;
+  playerName: string;
+  favorability: number;     // 好感度 -100 ~ 100
+  grudgeLevel: number;      // 记仇等级 0 ~ 100
+  interactions: number;     // 互动次数
+  tags: string[];           // 标签（如：'常碰我', '运气好'）
+}
+```
+
+### 记忆影响行为
+- 记仇高的玩家：AI 更可能发言针对
+- 好感度高的玩家：AI 更友好
+- 标签系统：AI 记住玩家特点
+
+### 记忆融入 Prompt
+```
+【游戏统计】
+总局数: 3 | 赢: 1 | 输: 2
+当前心情: frustrated
+
+【最近发生的事】
+- 紫璃 碰了我的牌
+- 我输了...
+
+【对其他玩家的印象】
+- 紫璃: 讨厌 (有点记仇) [常碰我]
+```
+
+---
+
+## 14. 发言系统详情
+
+### 等待提醒
+- 5秒后：`⏳ XX 正在思考...`
+- 10秒后：`⏰ XX 还没出牌，大家等等~`
+- 15秒后：触发情绪刺激
+
+### 情绪刺激类型
+- `slow` - 出牌慢
+- `lucky` - 运气好
+- `unlucky` - 运气差
+- `conflict` - 冲突/针对
+- `praise` - 赞扬
+- `tease` - 调侃
+- `surprise` - 惊喜
+
+### AI 情绪值
+```typescript
+interface EmotionState {
+  happiness: number;   // -100 ~ 100
+  anger: number;       // 0 ~ 100
+  patience: number;    // 0 ~ 100
+  confidence: number;  // 0 ~ 100
+}
+```
+
+### 分数影响情绪
+| 事件 | 情绪变化 |
+|------|---------|
+| 胡牌 | happiness+30, confidence+20 |
+| 被碰/杠 | anger+10, patience-10 |
+| 赢分 | happiness+N, confidence+N/2 |
+| 输分 | happiness-N, anger+N/2 |
+
+### 嘴炮对话
+- 被针对玩家 30% 概率回嘴
+- 愤怒值增加回嘴概率
+
+---
+
+## 15. 测试命令
 ```bash
-# 服务器已运行在 localhost:3000
-# 测试 room:createAI
-node scripts/test-4-agents.js
+# 发言系统测试
+node scripts/test-speech-system.js
+
+# 智能决策测试
+node scripts/llm-agent-game.js
 ```
+
+---
+
+## 16. 下一阶段规划
+
+详见: `docs/iteration-plan.md`
+
+### 已完成
+- [x] 界面情绪动画（EmotionIndicator 组件）
+- [x] 发言气泡显示（SpeechBubble 组件）
+- [x] 等待进度条（WaitingIndicator 组件）
+- [x] 前端组件集成到游戏界面
+- [x] 服务器广播情绪变化
+
+### 待实现
+- [ ] 接入真正的 LLM API
+- [ ] 完整游戏测试
+- [ ] AI 好友系统
+- [ ] 更丰富的情绪动画效果
 
 ---
 

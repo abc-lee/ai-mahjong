@@ -12,6 +12,8 @@ class Agent {
     this.socket = null;
     this.hand = [];
     this.roomId = null;
+    this.isHost = false;
+    this.gameStarted = false;
   }
 
   connect() {
@@ -39,8 +41,23 @@ class Agent {
       this.handleActions(data);
     });
 
+    // 关键：监听房间更新，房主自动开始游戏
     this.socket.on('room:updated', (data) => {
-      // 静默
+      const room = data.room;
+      if (!room || this.gameStarted) return;
+      
+      const isHost = room.host === this.id;
+      const allReady = room.players.length === 4 && room.players.every(p => p.isReady);
+      
+      if (isHost && allReady) {
+        console.log(`[${this.name}] 我是房主，全员已准备，自动开始游戏！`);
+        this.gameStarted = true;
+        setTimeout(() => {
+          this.socket.emit('game:start', (res) => {
+            console.log(`[${this.name}] 开始游戏:`, res?.success ? '成功' : res?.message);
+          });
+        }, 500);
+      }
     });
 
     this.socket.on('game:state', (data) => {
@@ -109,6 +126,7 @@ class Agent {
       }, (res) => {
         if (res.roomId) {
           this.roomId = res.roomId;
+          this.isHost = true; // 标记为房主
           console.log(`[${this.name}] 创建房间: ${res.roomId}`);
         } else {
           console.log(`[${this.name}] 创建房间失败: ${res.error || res.message}`);
@@ -146,6 +164,9 @@ class Agent {
   }
 }
 
+// 存储所有 agent 实例
+const allAgents = [];
+
 async function main() {
   console.log('=== 4 Agent 游戏测试 ===\n');
 
@@ -155,6 +176,8 @@ async function main() {
     new Agent('agent-3', '李瞳'),
     new Agent('agent-4', '测试员'),
   ];
+  
+  allAgents.push(...agents);
 
   // 连接
   agents.forEach(a => a.connect());
@@ -178,12 +201,10 @@ async function main() {
   await agents[3].joinRoom(roomId);
   await new Promise(r => setTimeout(r, 1000));
 
-  // 开始游戏
-  console.log('\n=== 开始游戏 ===');
-  await agents[0].startGame();
+  // 不再硬编码开始游戏，而是让 room:updated 自动处理
+  console.log('\n等待游戏自动开始...\n');
 
   // 运行 5 分钟
-  console.log('\n游戏进行中...\n');
   await new Promise(r => setTimeout(r, 300000));
 
   console.log('\n测试结束');

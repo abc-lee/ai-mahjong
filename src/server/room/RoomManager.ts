@@ -114,8 +114,13 @@ export class RoomManager {
       throw new Error('房间不存在');
     }
 
+    // 如果玩家已在其他房间，自动离开旧房间
     if (this.playerRoomMap.has(playerId)) {
-      throw new Error('玩家已在其他房间中');
+      const oldRoomId = this.playerRoomMap.get(playerId);
+      if (oldRoomId !== roomId) {
+        console.log(`[RoomManager] 玩家 ${playerId.slice(0,4)} 自动离开旧房间 ${oldRoomId}`);
+        this.leaveRoom(oldRoomId, playerId);
+      }
     }
 
     if (room.state !== 'waiting') {

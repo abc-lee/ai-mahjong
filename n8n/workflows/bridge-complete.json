@@ -1,0 +1,211 @@
+{
+  "name": "OpenCode-OpenClaw Bridge (Complete)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "opencode-send",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-send",
+      "name": "接收 OpenCode 消息",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "OpenCode Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:18789/hooks/agent",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"message\": \"{{ $json.content || $json.message || '来自 OpenCode 的消息' }}\",\n  \"name\": \"OpenCode Bridge\",\n  \"wakeMode\": \"now\",\n  \"deliver\": true,\n  \"channel\": \"imessage\",\n  \"to\": \"+8618603118098\"\n}",
+        "options": {}
+      },
+      "id": "forward-to-openclaw",
+      "name": "转发到 OpenClaw",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [470, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "OpenClaw Internal Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: '已转发到 OpenClaw', openclawResponse: $json }) }}",
+        "options": {}
+      },
+      "id": "respond-send",
+      "name": "返回确认",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [690, 200]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "openclaw-response",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-response",
+      "name": "接收 OpenClaw 回复",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 450],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "OpenClaw Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 存储 OpenClaw 的回复\nconst response = $input.all()[0].json;\nconst timestamp = Date.now();\n\n// 获取现有结果列表\nlet results = $static.results || [];\n\nresults.push({\n  id: `result_${timestamp}`,\n  timestamp: timestamp,\n  from: 'openclaw',\n  data: response\n});\n\n$static.results = results;\n\nreturn {\n  json: {\n    success: true,\n    resultId: `result_${timestamp}`,\n    stored: true\n  }\n};"
+      },
+      "id": "store-response",
+      "name": "存储回复",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [470, 450]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "respond-response",
+      "name": "返回确认",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [690, 450]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "opencode-result",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-result",
+      "name": "OpenCode 获取结果",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 700],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "OpenCode Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 获取存储的结果\nconst since = $input.all()[0].json.query?.since || 0;\nlet results = $static.results || [];\n\n// 筛选新结果\nconst newResults = results.filter(r => r.timestamp > since);\n\nreturn {\n  json: {\n    results: newResults,\n    count: newResults.length,\n    timestamp: Date.now()\n  }\n};"
+      },
+      "id": "get-results",
+      "name": "获取结果",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [470, 700]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "respond-result",
+      "name": "返回结果",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [690, 700]
+    }
+  ],
+  "connections": {
+    "接收 OpenCode 消息": {
+      "main": [
+        [
+          {
+            "node": "转发到 OpenClaw",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "转发到 OpenClaw": {
+      "main": [
+        [
+          {
+            "node": "返回确认",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "接收 OpenClaw 回复": {
+      "main": [
+        [
+          {
+            "node": "存储回复",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "存储回复": {
+      "main": [
+        [
+          {
+            "node": "返回确认",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenCode 获取结果": {
+      "main": [
+        [
+          {
+            "node": "获取结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "获取结果": {
+      "main": [
+        [
+          {
+            "node": "返回结果",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

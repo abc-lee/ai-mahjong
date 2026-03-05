@@ -98,12 +98,21 @@ export const Room: React.FC<RoomProps> = ({ onLeave }) => {
   // 离开房间
   const handleLeave = useCallback(async () => {
     try {
+      console.log('[Room] 点击离开房间');
       await leaveRoom();
+      console.log('[Room] 离开房间成功');
+      // 清除房间状态
+      setCurrentRoom(null);
+      // 导航到首页
+      navigate('/');
       onLeave?.();
     } catch (error) {
-      console.error('Failed to leave room:', error);
+      console.error('[Room] 离开房间失败:', error);
+      // 即使失败也清除状态并返回首页
+      setCurrentRoom(null);
+      navigate('/');
     }
-  }, [onLeave]);
+  }, [setCurrentRoom, navigate, onLeave]);
 
   // 获取指定位置的玩家
   const getPlayerByPosition = (pos: number): PlayerPublic | undefined => {

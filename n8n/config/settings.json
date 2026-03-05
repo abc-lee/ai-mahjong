@@ -1,0 +1,27 @@
+{
+  "network": {
+    "n8n": {
+      "ip": "192.168.3.19",
+      "port": 5678,
+      "baseUrl": "http://192.168.3.19:5678"
+    },
+    "openclaw": {
+      "ip": "192.168.3.19",
+      "port": 18789,
+      "baseUrl": "http://192.168.3.19:18789",
+      "note": "OpenClaw 与 n8n 在同一台电脑"
+    }
+  },
+  "auth": {
+    "opencodeToken": "opencode_secret_token_change_me",
+    "openclawToken": "openclaw_secret_token_change_me"
+  },
+  "paths": {
+    "sharedFolder": "E:\\game\\ai-mahjong\\n8n\\shared",
+    "sharedUrl": "\\\\192.168.3.19\\n8nshare"
+  },
+  "polling": {
+    "intervalMs": 5000,
+    "maxRetries": 3
+  }
+}

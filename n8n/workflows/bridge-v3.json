@@ -1,0 +1,154 @@
+{
+  "name": "OpenCode-OpenClaw Bridge",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "1-接收消息",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "OpenCode凭证"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:18789/hooks/wake",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": \"{{ $json.content || $json.message || '消息' }}\",\n  \"mode\": \"now\"\n}",
+        "options": {}
+      },
+      "name": "2-转发到OpenClaw",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "OpenClaw凭证"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({success:true, response: $json}) }}",
+        "options": {}
+      },
+      "name": "3-返回结果",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reply",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "4-接收OpenClaw回复",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 550],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "OpenClaw凭证"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const reply = $input.all()[0].json;\nlet replies = $static.replies || [];\nreplies.push({\n  time: Date.now(),\n  data: reply\n});\n$static.replies = replies;\nreturn { json: { success: true, count: replies.length } };"
+      },
+      "name": "5-存储回复",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 550]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "name": "6-返回确认",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [700, 550]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "replies",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "7-获取回复列表",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 800],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "OpenCode凭证"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let replies = $static.replies || [];\nreturn { json: { replies: replies, count: replies.length } };"
+      },
+      "name": "8-返回回复",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 800]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "name": "9-返回结果",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [700, 800]
+    }
+  ],
+  "connections": {
+    "1-接收消息": {
+      "main": [[{"node": "2-转发到OpenClaw", "type": "main", "index": 0}]]
+    },
+    "2-转发到OpenClaw": {
+      "main": [[{"node": "3-返回结果", "type": "main", "index": 0}]]
+    },
+    "4-接收OpenClaw回复": {
+      "main": [[{"node": "5-存储回复", "type": "main", "index": 0}]]
+    },
+    "5-存储回复": {
+      "main": [[{"node": "6-返回确认", "type": "main", "index": 0}]]
+    },
+    "7-获取回复列表": {
+      "main": [[{"node": "8-返回回复", "type": "main", "index": 0}]]
+    },
+    "8-返回回复": {
+      "main": [[{"node": "9-返回结果", "type": "main", "index": 0}]]
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { useGameStore } from './store';
-import { socket, setupSocketListeners, discardTile, drawTile, performAction, passAction } from './socket';
+import { useGameStore, SpeechMessage, EmotionState } from './store';
+import { socket, setupSocketListeners, discardTile, drawTile, performAction, passAction, onPlayerSpeech, onPlayerEmotion } from './socket';
 import { Room, Tile } from '@shared/types';
 import Lobby from './components/Lobby/Lobby';
 import RoomComponent from './components/Room/Room';
@@ -17,6 +17,8 @@ function App() {
     updateGameState,
     setAvailableActions,
     setPlayerInfo,
+    addSpeechMessage,
+    setPlayerEmotion,
     playerId,
     currentRoom,
   } = useGameStore();
@@ -53,13 +55,28 @@ function App() {
       onError: (message) => {
         alert(`错误: ${message}`);
       },
+      // 发言系统事件
+      onPlayerSpeech: (data) => {
+        addSpeechMessage({
+          id: `${data.playerId}-${data.timestamp}`,
+          playerId: data.playerId,
+          playerName: data.playerName,
+          content: data.content,
+          emotion: data.emotion,
+          targetPlayer: data.targetPlayer,
+          timestamp: data.timestamp,
+        });
+      },
+      onPlayerEmotion: (data) => {
+        setPlayerEmotion(data.playerId, data.emotion);
+      },
     });
 
     return () => {
       cleanup();
       socket.disconnect();
     };
-  }, [setConnected, setCurrentRoom, updateGameState, setAvailableActions, setPlayerInfo]);
+  }, [setConnected, setCurrentRoom, updateGameState, setAvailableActions, setPlayerInfo, addSpeechMessage, setPlayerEmotion]);
 
   const handleJoinRoom = (roomId: string, room: Room) => {
     setCurrentRoom(room);
@@ -99,6 +116,8 @@ function GameBoardWrapper() {
     playerId,
     currentRoom,
     availableActions,
+    speechMessages,
+    playerEmotions,
   } = useGameStore();
 
   // 如果没有游戏状态，等待
@@ -154,6 +173,13 @@ function GameBoardWrapper() {
   const myPlayer = gamePublicState.players.find(p => p.id === playerId);
   const myPosition = myPlayer?.position ?? 0;
 
+  // 转换发言消息为按玩家ID索引
+  const speechByPlayer: Record<string, typeof speechMessages[0]> = {};
+  speechMessages.forEach(msg => {
+    // 只保留每个玩家的最新发言
+    speechByPlayer[msg.playerId] = msg;
+  });
+
   return (
     <GameBoard
       key={roomId}
@@ -169,6 +195,8 @@ function GameBoardWrapper() {
       turnPhase={turnPhase}
       lastDrawnTile={lastDrawnTile}
       pendingActions={availableActions}
+      speechMessages={speechByPlayer}
+      playerEmotions={playerEmotions}
       onDiscard={handleDiscard}
       onDraw={handleDraw}
       onAction={handleAction}

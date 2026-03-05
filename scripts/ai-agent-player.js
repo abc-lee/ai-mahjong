@@ -34,6 +34,29 @@ agents.forEach((agent, index) => {
     }, 1000 * (index + 1));
   });
 
+  // 监听房间更新 - 关键：AI 作为房主时自动开始游戏
+  socket.on('room:updated', (data) => {
+    const room = data.room;
+    if (!room) return;
+    
+    // 检查是否是房主
+    const isHost = room.host === agent.id;
+    // 检查是否全员准备
+    const allReady = room.players.length === 4 && room.players.every(p => p.isReady);
+    
+    console.log(`[${agent.name}] 房间更新: 人数=${room.players.length}, 房主=${isHost}, 全员准备=${allReady}`);
+    
+    // 如果是房主且全员准备，自动开始游戏
+    if (isHost && allReady) {
+      console.log(`[${agent.name}] 我是房主，全员已准备，开始游戏！`);
+      setTimeout(() => {
+        socket.emit('game:start', (res) => {
+          console.log(`[${agent.name}] 开始游戏:`, res?.success ? '成功' : res?.message);
+        });
+      }, 500);
+    }
+  });
+
   // 持续处理轮次（agent:your_turn 事件 - AI Agent 专用）
   socket.on('agent:your_turn', (data) => {
     console.log(`[${agent.name}] 收到 agent:your_turn, phase: ${data.phase}, 手牌: ${data.hand?.length}张`);

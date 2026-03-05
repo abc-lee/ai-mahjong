@@ -3,9 +3,13 @@
  * 显示单个玩家的信息（名称、手牌背面、副露、弃牌等）
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { PlayerPublic, Tile, Meld, Mood } from '../../../shared/types';
 import { SEAT_NAMES } from '../../../shared/constants';
+import { SpeechBubble, SpeechMessage } from './SpeechBubble';
+import { EmotionIndicator } from './EmotionIndicator';
+import { WaitingBadge } from './WaitingIndicator';
+import { EmotionState } from '../../store';
 
 export interface PlayerAreaProps {
   player: PlayerPublic;
@@ -13,6 +17,9 @@ export interface PlayerAreaProps {
   isCurrentTurn: boolean;
   isDealer: boolean;
   getMoodEmoji: (mood: Mood) => string;
+  // 发言系统
+  speechMessage?: SpeechMessage | null;
+  emotion?: EmotionState | null;
 }
 
 /**
@@ -89,8 +96,20 @@ export const PlayerArea: React.FC<PlayerAreaProps> = ({
   isCurrentTurn,
   isDealer,
   getMoodEmoji,
+  speechMessage,
+  emotion,
 }) => {
   const seatName = SEAT_NAMES[player.position];
+  const [showSpeech, setShowSpeech] = useState(false);
+
+  // 当有新发言时显示
+  useEffect(() => {
+    if (speechMessage) {
+      setShowSpeech(true);
+      const timer = setTimeout(() => setShowSpeech(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [speechMessage]);
 
   return (
     <div className={`player-area player-${position} ${isCurrentTurn ? 'current-turn' : ''}`}>
@@ -104,10 +123,41 @@ export const PlayerArea: React.FC<PlayerAreaProps> = ({
         <div className="player-stats">
           <span className="player-score">{player.score}分</span>
           {player.type === 'ai-agent' && (
-            <span className="player-mood">{getMoodEmoji(player.mood)}</span>
+            <>
+              {/* 情绪指示器 */}
+              {emotion && (
+                <EmotionIndicator
+                  mood={emotion.mood}
+                  emoji={emotion.emoji}
+                  color={emotion.color}
+                  intensity={emotion.values.happiness > 0 ? emotion.values.happiness : 50}
+                  animated={true}
+                />
+              )}
+              {/* 备用：简单情绪表情 */}
+              {!emotion && (
+                <span className="player-mood">{getMoodEmoji(player.mood)}</span>
+              )}
+            </>
           )}
         </div>
+        {/* 等待徽章 */}
+        {isCurrentTurn && player.type === 'ai-agent' && (
+          <WaitingBadge active={true} />
+        )}
       </div>
+
+      {/* 发言气泡 */}
+      {showSpeech && speechMessage && (
+        <SpeechBubble
+          playerName={speechMessage.playerName}
+          content={speechMessage.content}
+          emotion={speechMessage.emotion}
+          position={position}
+          duration={5000}
+          onDismiss={() => setShowSpeech(false)}
+        />
+      )}
 
       {/* 游戏区域 */}
       <div className="player-game-area">

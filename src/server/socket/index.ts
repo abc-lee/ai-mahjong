@@ -21,6 +21,12 @@ import {
   handleJoinAI,
   handleAIDecision,
   handleAgentCommand,
+  handleReconnectAI,
+  handleGetReconnectableRooms,
+  handleAgentSpeak,
+  handleStimulusResponse,
+  handleGetEmotion,
+  handleGetSpeechHistory,
 } from './handlers';
 
 export function setupSocket(io: Server): void {
@@ -48,6 +54,14 @@ export function setupSocket(io: Server): void {
     socket.on('room:joinAI', (data, callback) => handleJoinAI(io, socket, roomManager, data, callback));
     socket.on('ai:decision', (data, callback) => handleAIDecision(io, socket, roomManager, data, callback));
     socket.on('agent:command', (data, callback) => handleAgentCommand(io, socket, roomManager, data, callback));
+    socket.on('agent:reconnect', (data, callback) => handleReconnectAI(io, socket, roomManager, data, callback));
+    socket.on('agent:getReconnectableRooms', (data, callback) => handleGetReconnectableRooms(socket, roomManager, data, callback));
+    
+    // 发言系统事件
+    socket.on('agent:speak', (data, callback) => handleAgentSpeak(io, socket, roomManager, data, callback));
+    socket.on('agent:stimulusResponse', (data, callback) => handleStimulusResponse(io, socket, roomManager, data, callback));
+    socket.on('agent:getEmotion', (data, callback) => handleGetEmotion(io, socket, roomManager, data, callback));
+    socket.on('agent:getSpeechHistory', (data, callback) => handleGetSpeechHistory(io, socket, roomManager, data, callback));
     
     // 断开连接
     socket.on('disconnect', () => handleDisconnect(io, socket, roomManager));

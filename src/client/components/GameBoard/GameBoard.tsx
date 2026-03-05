@@ -8,6 +8,8 @@ import { PlayerPublic, Tile, Meld, Mood } from '../../../shared/types';
 import { SEAT_NAMES } from '../../../shared/constants';
 import { PlayerArea } from './PlayerArea';
 import { CenterArea } from './CenterArea';
+import { WaitingIndicator } from './WaitingIndicator';
+import { SpeechMessage, EmotionState } from '../../store';
 import './GameBoard.css';
 
 // 位置映射：玩家 position (0-3) -> UI position
@@ -41,6 +43,10 @@ export interface GameBoardProps {
   
   // 待处理的操作（吃碰杠胡）
   pendingActions?: Array<{ action: string; tiles?: Tile[] }>;
+  
+  // 发言系统
+  speechMessages?: Record<string, SpeechMessage>;
+  playerEmotions?: Record<string, EmotionState>;
   
   // 回调
   onDiscard?: (tileId: string) => void;
@@ -92,6 +98,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   turnPhase,
   lastDrawnTile,
   pendingActions = [],
+  speechMessages = {},
+  playerEmotions = {},
   onDiscard,
   onDraw,
   onAction,
@@ -112,6 +120,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   console.log('[GameBoard] isMyTurn:', isMyTurn, 'myHand.length:', myHand.length, 'turnPhase:', turnPhase, 'lastDrawnTile:', lastDrawnTile, 'pendingActions:', pendingActions.length);
   console.log('[GameBoard] needDraw:', needDraw, 'canDiscard:', canDiscard, 'hasActions:', hasActions);
 
+  // 获取当前回合玩家名称（用于等待指示器）
+  const currentTurnPlayer = players[currentPlayerIndex];
+  const waitingPlayerName = currentTurnPlayer?.name || '';
+
   return (
     <div className="game-board">
       {/* 北/对家 */}
@@ -123,6 +135,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             isCurrentTurn={currentPlayerIndex === playersByPosition.top.index}
             isDealer={dealerIndex === playersByPosition.top.index}
             getMoodEmoji={getMoodEmoji}
+            speechMessage={speechMessages[playersByPosition.top.id]}
+            emotion={playerEmotions[playersByPosition.top.id]}
           />
         )}
       </div>
@@ -136,6 +150,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             isCurrentTurn={currentPlayerIndex === playersByPosition.left.index}
             isDealer={dealerIndex === playersByPosition.left.index}
             getMoodEmoji={getMoodEmoji}
+            speechMessage={speechMessages[playersByPosition.left.id]}
+            emotion={playerEmotions[playersByPosition.left.id]}
           />
         )}
       </div>
@@ -147,6 +163,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           wallRemaining={wallRemaining}
           roundNumber={roundNumber}
         />
+        {/* 等待指示器 - 显示当前回合玩家 */}
+        {!isMyTurn && waitingPlayerName && (
+          <WaitingIndicator
+            playerName={waitingPlayerName}
+            timeout={15000}
+          />
+        )}
       </div>
 
       {/* 东/下家 */}
@@ -158,6 +181,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             isCurrentTurn={currentPlayerIndex === playersByPosition.right.index}
             isDealer={dealerIndex === playersByPosition.right.index}
             getMoodEmoji={getMoodEmoji}
+            speechMessage={speechMessages[playersByPosition.right.id]}
+            emotion={playerEmotions[playersByPosition.right.id]}
           />
         )}
       </div>
@@ -172,6 +197,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               isCurrentTurn={isMyTurn}
               isDealer={dealerIndex === playersByPosition.bottom.index}
               getMoodEmoji={getMoodEmoji}
+              speechMessage={speechMessages[playersByPosition.bottom.id]}
+              emotion={playerEmotions[playersByPosition.bottom.id]}
             />
             
             {/* 操作提示区 */}

@@ -18,6 +18,8 @@ import type {
   SuccessResponse,
   ErrorResponse,
   Room,
+  SpeechMessageEvent,
+  EmotionEvent,
 } from './events';
 import { ClientEvents, ServerEvents } from './events';
 
@@ -184,6 +186,17 @@ export function onGameError(callback: (data: ErrorResponse) => void) {
   return () => socket.off(ServerEvents.GAME_ERROR, callback);
 }
 
+// 发言系统事件
+export function onPlayerSpeech(callback: (data: SpeechMessageEvent) => void) {
+  socket.on(ServerEvents.PLAYER_SPEECH, callback);
+  return () => socket.off(ServerEvents.PLAYER_SPEECH, callback);
+}
+
+export function onPlayerEmotion(callback: (data: EmotionEvent) => void) {
+  socket.on(ServerEvents.PLAYER_EMOTION, callback);
+  return () => socket.off(ServerEvents.PLAYER_EMOTION, callback);
+}
+
 // 连接管理
 export function connect() { socket.connect(); }
 export function disconnect() { socket.disconnect(); }
@@ -213,6 +226,9 @@ export interface SocketListeners {
   onActions: (actions: PendingAction[]) => void;
   onGameEnd: (winnerId: string, winningHand: Tile[]) => void;
   onError: (message: string) => void;
+  // 发言系统
+  onPlayerSpeech?: (data: SpeechMessageEvent) => void;
+  onPlayerEmotion?: (data: EmotionEvent) => void;
 }
 
 export function setupSocketListeners(listeners: SocketListeners): () => void {
@@ -224,6 +240,8 @@ export function setupSocketListeners(listeners: SocketListeners): () => void {
     onActions,
     onGameEnd,
     onError,
+    onPlayerSpeech,
+    onPlayerEmotion,
   } = listeners;
 
   // 连接事件
@@ -255,6 +273,14 @@ export function setupSocketListeners(listeners: SocketListeners): () => void {
     onError(data.message);
   });
 
+  // 发言系统事件
+  if (onPlayerSpeech) {
+    socket.on(ServerEvents.PLAYER_SPEECH, onPlayerSpeech);
+  }
+  if (onPlayerEmotion) {
+    socket.on(ServerEvents.PLAYER_EMOTION, onPlayerEmotion);
+  }
+
   // 返回清理函数
   return () => {
     socket.off('connect', onConnect);
@@ -266,6 +292,8 @@ export function setupSocketListeners(listeners: SocketListeners): () => void {
     socket.off(ServerEvents.GAME_ACTIONS);
     socket.off(ServerEvents.GAME_ENDED);
     socket.off(ServerEvents.GAME_ERROR);
+    socket.off(ServerEvents.PLAYER_SPEECH);
+    socket.off(ServerEvents.PLAYER_EMOTION);
   };
 }
 
@@ -276,6 +304,8 @@ export function removeAllGameListeners() {
   socket.off(ServerEvents.GAME_ACTIONS);
   socket.off(ServerEvents.GAME_ENDED);
   socket.off(ServerEvents.GAME_ERROR);
+  socket.off(ServerEvents.PLAYER_SPEECH);
+  socket.off(ServerEvents.PLAYER_EMOTION);
 }
 
 export function removeAllRoomListeners() {
@@ -287,4 +317,5 @@ export type {
   Room, Tile, PendingAction, GameStateEvent, ActionsEvent, GameEndedEvent,
   RoomUpdatedEvent, DrawResponse, CreateRoomResponse, JoinRoomResponse,
   RoomListResponse, SuccessResponse, ErrorResponse,
+  SpeechMessageEvent, EmotionEvent,
 };

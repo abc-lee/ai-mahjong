@@ -1,0 +1,87 @@
+{
+  "name": "OpenCode to OpenClaw Bridge v2",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "opencode-send",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-send",
+      "name": "接收 OpenCode 消息",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "opencode-send",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "header-auth-opencode",
+          "name": "OpenCode Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:18789/hooks/wake",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": \"{{ $json.content || $json.message || '来自 OpenCode 的消息' }}\",\n  \"mode\": \"now\"\n}",
+        "options": {}
+      },
+      "id": "forward-to-openclaw",
+      "name": "转发到 OpenClaw",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [470, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "header-auth-openclaw-internal",
+          "name": "OpenClaw Internal Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: '已转发到 OpenClaw', openclawResponse: $json }) }}",
+        "options": {}
+      },
+      "id": "respond-send",
+      "name": "返回确认",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [690, 300]
+    }
+  ],
+  "connections": {
+    "接收 OpenCode 消息": {
+      "main": [
+        [
+          {
+            "node": "转发到 OpenClaw",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "转发到 OpenClaw": {
+      "main": [
+        [
+          {
+            "node": "返回确认",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {}
+}
