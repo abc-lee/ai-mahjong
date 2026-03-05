@@ -271,4 +271,34 @@ ae69d3d test: 添加 Agent 接入测试脚本
 
 ---
 
+## 12. 最新进度 (2026-03-05)
+
+### 已完成
+- ✅ 新增 `room:createAI` 事件 - 让 AI Agent 可以 AI 身份创建房间
+- ✅ 分析报告：`docs/deep-discussion-log.md`, `docs/architecture-analysis.md`
+
+### 核心改动
+- `src/server/socket/handlers.ts` - 新增 `handleCreateRoomAI` 函数
+- `src/server/socket/index.ts` - 注册 `room:createAI` 事件
+- `scripts/test-4-agents.js` - 使用 `room:createAI` 替代 `room:create`
+
+### Git 提交
+```
+1db8c94 feat: 新增 room:createAI 事件
+d04a580 docs: 添加深度讨论记录和架构分析报告
+```
+
+### 待验证
+- `room:createAI` 功能是否正常
+- AI Agent 是否能正确收到 `agent:your_turn` 事件
+
+### 测试命令
+```bash
+# 服务器已运行在 localhost:3000
+# 测试 room:createAI
+node scripts/test-4-agents.js
+```
+
+---
+
 *更新时间：2026-03-05*
