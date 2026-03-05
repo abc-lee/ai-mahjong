@@ -94,13 +94,26 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
       console.log(`[broadcastGameState] 查找 Agent socket: playerId=${player.id}, 找到=${!!agentSocket}, yourTurn=${yourTurn}`);
       
       if (agentSocket && yourTurn) {
-        // Agent 已连接：发送结构化消息
+        // Agent 已连接：发送自然语言 Prompt
         console.log(`[broadcastGameState] 发送 agent:your_turn 给 ${player.name}, phase=${turnPhase}`);
-        agentSocket.emit('agent:your_turn', {
+        
+        // 导入 Prompt 生成器
+        const { generateYourTurnPrompt } = require('../prompt/PromptNL');
+        
+        // 生成自然语言 Prompt
+        const prompt = generateYourTurnPrompt({
           phase: turnPhase,
           hand: player.hand,
           lastDrawnTile,
           gameState: publicState,
+        });
+        
+        agentSocket.emit('agent:your_turn', {
+          prompt,  // 自然语言文本
+          // 同时保留结构化数据供脚本使用
+          phase: turnPhase,
+          hand: player.hand,
+          lastDrawnTile,
         });
       } else if (player.aiControl?.mode === 'auto' || !agentSocket) {
         // Agent 断线或降级为自动托管：使用 AIAdapter
