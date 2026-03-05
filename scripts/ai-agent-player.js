@@ -42,11 +42,14 @@ agents.forEach((agent, index) => {
 
   // 也监听 game:state（紫璃作为"人类"玩家时会收到这个）
   socket.on('game:state', (data) => {
+    // 打印收到的数据以便调试
+    console.log(`[${agent.name}] 收到 game:state, yourTurn=${data.yourTurn}, phase=${data.turnPhase}, hand=${data.yourHand?.length}张`);
+    
     if (data.yourHand) {
       agent.hand = data.yourHand;
     }
     if (data.yourTurn) {
-      console.log(`[${agent.name}] 收到 game:state, yourTurn=true, phase=${data.turnPhase}`);
+      console.log(`[${agent.name}] ★★★ 轮到我了！phase=${data.turnPhase}`);
       handleTurn(socket, agent.name, { phase: data.turnPhase, hand: data.yourHand });
     }
   });

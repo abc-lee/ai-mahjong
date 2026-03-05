@@ -638,14 +638,14 @@ export async function handleJoinAI(
     
     console.log(`[Server] AI ${playerType} ${agentName} 加入房间成功，位置: ${aiPlayer.position}`);
     
-    callback({ 
+    if (callback) callback({ 
       success: true, 
       playerId: aiPlayer.id, 
       position: aiPlayer.position 
     });
   } catch (error) {
     console.error(`[Server] AI 加入房间失败:`, error);
-    callback({ 
+    if (callback) callback({ 
       success: false, 
       error: error instanceof Error ? error.message : '加入失败' 
     });
