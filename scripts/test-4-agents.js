@@ -25,6 +25,13 @@ class Agent {
       this.hand = data.hand || [];
       console.log(`[${this.name}] 轮次: ${data.phase}, 手牌: ${this.hand.length}张`);
       
+      // 打印收到的自然语言 Prompt
+      if (data.prompt) {
+        console.log(`\n--- ${this.name} 收到的 Prompt ---`);
+        console.log(data.prompt);
+        console.log(`--- Prompt 结束 ---\n`);
+      }
+      
       setTimeout(() => this.handleTurn(data), 800);
     });
 
