@@ -73,6 +73,16 @@ class Agent {
       console.log(`\n=== 游戏结束 ===`);
       console.log(`赢家: ${data.winner}`);
     });
+
+    // 监听发言事件
+    this.socket.on('player:speech', (data) => {
+      console.log(`💬 [${data.playerName}]: ${data.content}`);
+    });
+    
+    // 监听情绪变化
+    this.socket.on('player:emotion', (data) => {
+      // 简化输出
+    });
   }
 
   handleTurn(data) {

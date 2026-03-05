@@ -139,7 +139,9 @@ export class SpeechManager {
    * 初始化玩家情绪
    * 如果已有情绪数据，则恢复部分情绪（跨局累积）
    */
-  initPlayerEmotion(playerId: string, playerName?: string): void {
+  initPlayerEmotion(playerId: string, playerName?: string, isNewGame: boolean = false): void {
+    console.log(`[initPlayerEmotion] playerId=${playerId?.slice(0,8)}, playerName=${playerName}, isNewGame=${isNewGame}`);
+    
     // 检查是否已有情绪数据
     const existingEmotion = this.playerEmotions.get(playerId);
     
@@ -163,8 +165,17 @@ export class SpeechManager {
       const existingMemory = memoryManager.getMemory(playerId);
       if (!existingMemory) {
         memoryManager.initMemory(playerId, playerName);
+      } else if (isNewGame) {
+        // 新一局开始，清理旧事件
+        console.log(`[Memory] ${playerName} 开始新一局，清理旧事件`);
+        memoryManager.startNewGame(playerId);
       }
-      memoryManager.recordEvent(playerId, { type: 'game_start' });
+      
+      // 记录游戏开始事件
+      if (isNewGame) {
+        console.log(`[Memory] ${playerName} 记录 game_start 事件`);
+        memoryManager.recordEvent(playerId, { type: 'game_start' });
+      }
     }
   }
 
@@ -546,8 +557,11 @@ export class SpeechManager {
     const personality = PERSONALITIES[playerName] || PERSONALITIES['测试员'];
     const emotion = this.getEmotion(playerId);
     
+    console.log(`[Speech] triggerProactiveSpeech: ${playerName}, situation=${situation}, chatFrequency=${personality.chatFrequency}`);
+    
     // 根据个性决定是否发言
     if (Math.random() > personality.chatFrequency) {
+      console.log(`[Speech] ${playerName} 不发言 (概率检查1)`);
       return; // 不发言
     }
 
@@ -557,6 +571,7 @@ export class SpeechManager {
     if (emotion.happiness > 30) speechProbability += 0.1;
     
     if (Math.random() > speechProbability) {
+      console.log(`[Speech] ${playerName} 不发言 (概率检查2)`);
       return;
     }
 
@@ -591,11 +606,16 @@ export class SpeechManager {
 
     if (template) {
       content = template;
+      console.log(`[Speech] ${playerName} 选择模板: ${template}`);
+    } else {
+      console.log(`[Speech] ${playerName} 没有找到模板`);
     }
 
     if (content) {
       // 延迟发送，模拟思考
+      console.log(`[Speech] ${playerName} 将在 0.5-2秒后发言: ${content}`);
       setTimeout(() => {
+        console.log(`[Speech] ${playerName} 发言中...`);
         this.handleSpeech({
           playerId,
           playerName,

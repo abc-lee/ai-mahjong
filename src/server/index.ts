@@ -1,4 +1,5 @@
-import express from 'express';
+import * as expressModule from 'express';
+const express = expressModule.default || expressModule;
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';

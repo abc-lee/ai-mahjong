@@ -1,0 +1,52 @@
+{
+  "name": "OpenCode-OpenClaw Bridge (CLI)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "1-接收消息",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "OpenCode凭证"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=openclaw agent --session-id main -m \"{{ $json.content || '消息' }}\""
+      },
+      "name": "2-执行OpenClaw命令",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({success:true, output: $json}) }}",
+        "options": {}
+      },
+      "name": "3-返回结果",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "1-接收消息": {
+      "main": [[{"node": "2-执行OpenClaw命令", "type": "main", "index": 0}]]
+    },
+    "2-执行OpenClaw命令": {
+      "main": [[{"node": "3-返回结果", "type": "main", "index": 0}]]
+    }
+  }
+}

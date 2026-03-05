@@ -437,10 +437,35 @@ node scripts/llm-agent-game.js
 - [x] 等待进度条（WaitingIndicator 组件）
 - [x] 前端组件集成到游戏界面
 - [x] 服务器广播情绪变化
+- [x] LLM 决策引擎（AIAdapter 支持调用 LLM API）
+- [x] 规则引擎降级（LLM 失败时自动降级到规则引擎）
+- [x] 自然语言 Prompt 生成器（PromptNL.ts）
+- [x] AI 房主自动开始游戏
+- [x] AI 正常出牌/摸牌
+
+### LLM 集成状态
+**代码已接入，默认关闭**
+
+```typescript
+// src/server/ai/AIAdapter.ts
+// 决策优先级：LLM → 规则引擎 → 随机
+
+// AIConfig 配置
+interface AIConfig {
+  llmEnabled: boolean;     // 当前默认 false
+  llmEndpoint?: string;    // API 地址
+  llmApiKey?: string;      // API Key
+}
+
+// 启用方式：
+// 1. 创建 AI 时设置 llmEnabled: true
+// 2. 配置 llmEndpoint（如 OpenAI/Anthropic API）
+// 3. 配置 llmApiKey
+```
 
 ### 待实现
-- [ ] 接入真正的 LLM API
-- [ ] 完整游戏测试
+- [ ] 配置 LLM API（设置 llmEnabled=true 和 API 密钥）
+- [ ] 完整游戏测试（人类 + AI 混合）
 - [ ] AI 好友系统
 - [ ] 更丰富的情绪动画效果
 

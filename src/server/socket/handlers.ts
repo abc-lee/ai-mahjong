@@ -128,6 +128,11 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
         if (speechManager) {
           const emotionPrompt = speechManager.generateEmotionPrompt(player.id, player.name);
           prompt = emotionPrompt + '\n' + prompt;
+          
+          // 触发 AI 发言（30% 概率）
+          if (Math.random() < 0.3) {
+            speechManager.triggerProactiveSpeech(player.id, player.name, 'turn_start');
+          }
         }
         
         agentSocket.emit('agent:your_turn', {
@@ -580,8 +585,15 @@ export async function handleGameStart(
     
     // 初始化发言系统
     const speechManager = getSpeechManager(io, roomId);
+    
+    // 清理所有旧记忆（新游戏开始）
+    const { memoryManager } = require('../speech/MemoryManager');
+    memoryManager.clearAll();
+    console.log(`[Server] 已清理所有旧记忆`);
+    
     gameRoom?.players.forEach(p => {
-      speechManager.initPlayerEmotion(p.id, p.name);
+      // 每个玩家都初始化新记忆
+      speechManager.initPlayerEmotion(p.id, p.name, true);
     });
     
     // 广播给房间所有人（包括房主）

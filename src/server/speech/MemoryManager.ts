@@ -93,6 +93,17 @@ export class MemoryManager {
     this.memories.set(playerId, memory);
     return memory;
   }
+  
+  /**
+   * 开始新一局（清理事件但保留统计数据）
+   */
+  startNewGame(playerId: string): void {
+    const memory = this.getMemory(playerId);
+    if (memory) {
+      memory.events = [];
+      memory.currentMood = 'excited';
+    }
+  }
 
   /**
    * 获取记忆

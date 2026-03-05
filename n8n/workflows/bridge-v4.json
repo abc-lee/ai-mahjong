@@ -1,0 +1,193 @@
+{
+  "name": "OpenCode-OpenClaw Bridge v4",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "1-接收消息",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "OpenCode凭证"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:18789/hooks/wake",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"text\": \"{{ $json.content || $json.message || '消息' }}\",\n  \"mode\": \"now\"\n}",
+        "options": {}
+      },
+      "name": "2-转发到OpenClaw",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "OpenClaw凭证"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({success:true, response: $json}) }}",
+        "options": {}
+      },
+      "name": "3-返回结果",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "reply",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "4-接收OpenClaw回复",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 550],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "OpenClaw凭证"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fileName": "/tmp/openclaw_replies.json",
+        "options": {}
+      },
+      "name": "5-读取现有回复",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [350, 550]
+    },
+    {
+      "parameters": {
+        "jsCode": "const newReply = $input.first().json;\nlet replies = [];\ntry {\n  const prev = $input.first(1).json;\n  if (prev && prev.data) {\n    replies = JSON.parse(prev.data);\n  }\n} catch (e) {}\nreplies.push({\n  time: Date.now(),\n  data: newReply\n});\nreturn { json: { data: JSON.stringify(replies) } };"
+      },
+      "name": "6-合并回复",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 550]
+    },
+    {
+      "parameters": {
+        "fileName": "/tmp/openclaw_replies.json",
+        "options": {}
+      },
+      "name": "7-保存回复",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [650, 550]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({success:true}) }}",
+        "options": {}
+      },
+      "name": "8-返回确认",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [800, 550]
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "replies",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "9-获取回复列表",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 800],
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "OpenCode凭证"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fileName": "/tmp/openclaw_replies.json",
+        "options": {}
+      },
+      "name": "10-读取回复文件",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [400, 800]
+    },
+    {
+      "parameters": {
+        "jsCode": "let replies = [];\ntry {\n  const data = $input.first().json;\n  if (data && data.data) {\n    replies = JSON.parse(data.data);\n  }\n} catch (e) {}\nreturn { json: { replies: replies, count: replies.length } };"
+      },
+      "name": "11-解析回复",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 800]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "name": "12-返回结果",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [800, 800]
+    }
+  ],
+  "connections": {
+    "1-接收消息": {
+      "main": [[{"node": "2-转发到OpenClaw", "type": "main", "index": 0}]]
+    },
+    "2-转发到OpenClaw": {
+      "main": [[{"node": "3-返回结果", "type": "main", "index": 0}]]
+    },
+    "4-接收OpenClaw回复": {
+      "main": [[{"node": "5-读取现有回复", "type": "main", "index": 0}]]
+    },
+    "5-读取现有回复": {
+      "main": [[{"node": "6-合并回复", "type": "main", "index": 0}]]
+    },
+    "6-合并回复": {
+      "main": [[{"node": "7-保存回复", "type": "main", "index": 0}]]
+    },
+    "7-保存回复": {
+      "main": [[{"node": "8-返回确认", "type": "main", "index": 0}]]
+    },
+    "9-获取回复列表": {
+      "main": [[{"node": "10-读取回复文件", "type": "main", "index": 0}]]
+    },
+    "10-读取回复文件": {
+      "main": [[{"node": "11-解析回复", "type": "main", "index": 0}]]
+    },
+    "11-解析回复": {
+      "main": [[{"node": "12-返回结果", "type": "main", "index": 0}]]
+    }
+  }
+}
