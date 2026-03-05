@@ -408,6 +408,17 @@ export async function handleCreateRoomAI(
     // 创建 AIAdapter
     if (playerType === 'ai-agent' && hostPlayer) {
       aiManager.createAdapter(hostPlayer);
+      
+      // 发送欢迎消息（包含完整规则）
+      const { generateWelcomePrompt } = require('../prompt/PromptNL');
+      const welcomePrompt = generateWelcomePrompt(agentName);
+      socket.emit('agent:welcome', { 
+        prompt: welcomePrompt,
+        agentId,
+        agentName,
+        position: 0, // 房主总是位置0
+      });
+      console.log(`[Server] 已发送欢迎消息给 ${agentName}`);
     }
     
     console.log(`[Server] AI ${playerType} ${agentName} 创建房间成功: ${serverRoom.id}`);
@@ -887,6 +898,17 @@ export async function handleJoinAI(
     // ai-auto 由服务器内部托管
     if (playerType === 'ai-agent') {
       aiManager.createAdapter(aiPlayer);
+      
+      // 发送欢迎消息（包含完整规则）
+      const { generateWelcomePrompt } = require('../prompt/PromptNL');
+      const welcomePrompt = generateWelcomePrompt(agentName);
+      socket.emit('agent:welcome', { 
+        prompt: welcomePrompt,
+        agentId,
+        agentName,
+        position: aiPlayer.position,
+      });
+      console.log(`[Server] 已发送欢迎消息给 ${agentName}`);
     }
     
     // 广播房间更新
@@ -1372,5 +1394,68 @@ export async function handleGetSpeechHistory(
     callback?.({ history });
   } catch (error) {
     callback?.({ error: error instanceof Error ? error.message : '获取历史失败' });
+  }
+}
+
+/**
+ * Agent 主动请求游戏状态（重新发送手牌）
+ */
+export async function handleAgentRequestState(
+  io: Server,
+  socket: Socket,
+  roomManager: RoomManager,
+  callback: (response: { prompt?: string; hand?: any[]; phase?: string; error?: string }) => void
+) {
+  try {
+    const roomId = socket.data.roomId;
+    const playerId = socket.data.playerId;
+    
+    if (!roomId || !playerId) {
+      callback?.({ error: '未加入房间' });
+      return;
+    }
+    
+    const room = roomManager.getRoom(roomId);
+    if (!room?.gameEngine) {
+      callback?.({ error: '游戏未开始' });
+      return;
+    }
+    
+    // 找到玩家
+    const player = room.players.find(p => p.id === playerId);
+    if (!player) {
+      callback?.({ error: '玩家不存在' });
+      return;
+    }
+    
+    const turnPhase = room.gameEngine.getTurnPhase();
+    const isMyTurn = room.gameEngine.isPlayerTurn(playerId);
+    const lastDrawnTile = room.gameEngine.getLastDrawnTile(playerId);
+    const publicState = room.gameEngine.getPublicState(playerId);
+    
+    // 生成 Prompt
+    const { generateYourTurnPrompt } = require('../prompt/PromptNL');
+    let prompt = generateYourTurnPrompt({
+      phase: turnPhase,
+      hand: player.hand,
+      lastDrawnTile,
+      gameState: publicState,
+      playerName: player.name,
+    });
+    
+    // 添加情绪上下文
+    const speechManager = getSpeechManager(io, roomId);
+    const emotionPrompt = speechManager.generateEmotionPrompt(player.id, player.name);
+    prompt = emotionPrompt + '\n' + prompt;
+    
+    console.log(`[Server] Agent ${player.name} 请求重新发送状态`);
+    
+    callback?.({ 
+      prompt, 
+      hand: player.hand,
+      phase: isMyTurn ? turnPhase : 'waiting',
+    });
+  } catch (error) {
+    callback?.({ error: error instanceof Error ? error.message : '获取状态失败' });
   }
 }

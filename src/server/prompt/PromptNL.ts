@@ -239,7 +239,7 @@ export function generateYourTurnPrompt(data: {
 }
 
 /**
- * 生成策略提示
+ * 生成策略提示（含推荐打牌）
  */
 function generateTips(hand: any[], lang: Language): string[] {
   const tips: string[] = [];
@@ -263,14 +263,18 @@ function generateTips(hand: any[], lang: Language): string[] {
   }
   
   // 检查孤张
-  const valueCount: { [key: string]: number } = {};
+  const valueCount: { [key: string]: { count: number; tiles: any[] } } = {};
   hand.forEach(t => {
     if (!t) return;
     const key = `${t.suit}-${t.value}`;
-    valueCount[key] = (valueCount[key] || 0) + 1;
+    if (!valueCount[key]) {
+      valueCount[key] = { count: 0, tiles: [] };
+    }
+    valueCount[key].count++;
+    valueCount[key].tiles.push(t);
   });
   
-  const singles = Object.entries(valueCount).filter(([_, count]) => count === 1);
+  const singles = Object.entries(valueCount).filter(([_, data]) => data.count === 1);
   if (singles.length > 0) {
     tips.push(t('tipIsolated', lang));
   }
@@ -281,6 +285,57 @@ function generateTips(hand: any[], lang: Language): string[] {
     tips.push(`${t('tipHonors', lang)} (${honorCount})`);
   }
   
+  // ===== 添加推荐打牌 =====
+  // 策略：优先打出孤张字牌，其次打出孤张幺九，再次打出最少花色的孤张
+  let recommendedTile: any = null;
+  let reason = '';
+  
+  // 1. 找孤张字牌（风、箭）
+  const singleHonors = singles.filter(([key, _]) => 
+    key.startsWith('feng-') || key.startsWith('jian-')
+  );
+  if (singleHonors.length > 0) {
+    recommendedTile = singleHonors[0][1].tiles[0];
+    reason = '孤张字牌，优先打出';
+  }
+  
+  // 2. 找孤张幺九（1、9）
+  if (!recommendedTile) {
+    const singleTerminals = singles.filter(([key, data]) => {
+      const tile = data.tiles[0];
+      return (tile.suit === 'wan' || tile.suit === 'tiao' || tile.suit === 'tong') 
+        && (tile.value === 1 || tile.value === 9);
+    });
+    if (singleTerminals.length > 0) {
+      recommendedTile = singleTerminals[0][1].tiles[0];
+      reason = '孤张幺九牌，可以考虑打出';
+    }
+  }
+  
+  // 3. 找最少花色的孤张
+  if (!recommendedTile && singles.length > 0) {
+    const minSuit = suits[0][0];
+    const singleInMinSuit = singles.find(([key, data]) => 
+      data.tiles[0].suit === minSuit
+    );
+    if (singleInMinSuit) {
+      recommendedTile = singleInMinSuit[1].tiles[0];
+      reason = `${getSuitName(minSuit, lang)}较少，建议打出`;
+    }
+  }
+  
+  // 4. 随机推荐
+  if (!recommendedTile && hand.length > 0) {
+    recommendedTile = hand[0];
+    reason = '没有明显劣势牌，可自由选择';
+  }
+  
+  // 添加推荐到 tips
+  if (recommendedTile) {
+    tips.push(`🎯 推荐打出: ${recommendedTile.display} (id: ${recommendedTile.id})`);
+    tips.push(`   理由: ${reason}`);
+  }
+  
   if (tips.length === 0) {
     tips.push(t('tipDefault', lang));
   }
@@ -289,27 +344,62 @@ function generateTips(hand: any[], lang: Language): string[] {
 }
 
 /**
- * 生成欢迎 Prompt
+ * 生成欢迎 Prompt（完整规则版）
  */
 export function generateWelcomePrompt(agentName: string, lang: Language = 'zh'): string {
   const lines: string[] = [];
   
   lines.push('═══════════════════════════════════════');
-  lines.push(`${t('welcome', lang)} ${agentName}!`);
+  lines.push(`🀄 欢迎加入麻将游戏，${agentName}！`);
   lines.push('═══════════════════════════════════════');
   lines.push('');
-  lines.push(t('objective', lang));
-  lines.push(t('objectiveText', lang));
+  
+  // 游戏目标
+  lines.push('【游戏目标】');
+  lines.push('凑成胡牌牌型：4个顺子/刻子 + 1对将牌（眼睛）');
   lines.push('');
-  lines.push(t('rules', lang));
-  lines.push('• ' + t('rule1', lang));
-  lines.push('• ' + t('rule2', lang));
-  lines.push('• ' + t('rule3', lang));
+  
+  // 基本规则
+  lines.push('【基本规则】');
+  lines.push('• 每人13张手牌，庄家14张');
+  lines.push('• 轮流摸牌、打牌，直到有人胡牌或牌墙耗尽');
+  lines.push('• 可以吃（顺子）、碰（刻子）、杠、胡');
   lines.push('');
-  lines.push(t('controls', lang));
-  lines.push(t('controlsText', lang));
+  
+  // 算分规则
+  lines.push('【算分规则】');
+  lines.push('得分 = 底分(1000) × 2^番数');
   lines.push('');
-  lines.push(t('readyText', lang));
+  
+  // 番型列表
+  lines.push('【番型列表】');
+  lines.push('• 平胡 (1番)：4个顺子 + 1对将');
+  lines.push('• 对对胡 (2番)：4个刻子 + 1对将');
+  lines.push('• 七对子 (2番)：7个对子');
+  lines.push('• 清一色 (6番)：只有一种花色');
+  lines.push('• 字一色 (8番)：全是字牌');
+  lines.push('• 十三幺 (13番)：13种幺九牌各一张');
+  lines.push('');
+  
+  // 可用指令
+  lines.push('【指令格式】');
+  lines.push('摸牌: {"cmd": "draw"}');
+  lines.push('打牌: {"cmd": "discard", "tileId": "牌ID"}');
+  lines.push('吃牌: {"cmd": "action", "action": "chi", "tiles": ["牌ID1", "牌ID2"]}');
+  lines.push('碰牌: {"cmd": "action", "action": "peng"}');
+  lines.push('杠牌: {"cmd": "action", "action": "gang"}');
+  lines.push('胡牌: {"cmd": "action", "action": "hu"}');
+  lines.push('跳过: {"cmd": "pass"}');
+  lines.push('');
+  
+  // 提示
+  lines.push('【提示】');
+  lines.push('• 每次轮到你时，会收到完整的手牌和牌局信息');
+  lines.push('• 如果不确定打什么，prompt中会有策略建议');
+  lines.push('• 超时5秒未操作，系统将自动托管');
+  lines.push('');
+  
+  lines.push('准备好后游戏将自动开始，祝你好运！');
   lines.push('═══════════════════════════════════════');
   
   return lines.join('\n');

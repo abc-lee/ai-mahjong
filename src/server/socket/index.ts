@@ -27,6 +27,7 @@ import {
   handleStimulusResponse,
   handleGetEmotion,
   handleGetSpeechHistory,
+  handleAgentRequestState,
 } from './handlers';
 
 export function setupSocket(io: Server): void {
@@ -56,6 +57,7 @@ export function setupSocket(io: Server): void {
     socket.on('agent:command', (data, callback) => handleAgentCommand(io, socket, roomManager, data, callback));
     socket.on('agent:reconnect', (data, callback) => handleReconnectAI(io, socket, roomManager, data, callback));
     socket.on('agent:getReconnectableRooms', (data, callback) => handleGetReconnectableRooms(socket, roomManager, data, callback));
+    socket.on('agent:requestState', (callback) => handleAgentRequestState(io, socket, roomManager, callback));
     
     // 发言系统事件
     socket.on('agent:speak', (data, callback) => handleAgentSpeak(io, socket, roomManager, data, callback));
