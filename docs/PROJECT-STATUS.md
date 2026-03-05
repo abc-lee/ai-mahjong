@@ -169,6 +169,20 @@ npm run dev:server
 npx ts-node scripts/test-agent-connect.ts
 ```
 
+### 测试结果 (2026-03-05)
+
+✅ Agent 连接服务器成功
+✅ 创建房间成功
+✅ 加入房间成功 (ai-agent + ai-auto)
+✅ 开始游戏成功
+✅ 收到 agent:your_turn 事件
+✅ 打牌指令执行成功
+
+待优化：
+- 需要测试完整一局游戏流程
+- 需要测试吃碰杠胡操作
+- 需要测试 Agent 断线降级
+
 ### Phase 2 - Prompt 迭代
 
 | 任务 | 说明 |
