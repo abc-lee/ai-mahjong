@@ -237,6 +237,18 @@ docs/
 
 - `docs/ai-agent-integration-design.md` - AI Agent 接入设计方案
 - `docs/ai-agent-integration-tasks.md` - AI Agent 接入任务清单
+- `docs/CHANGELOG.md` - 更新日志
+
+---
+
+## 11. Git 提交记录
+
+```
+213e59c test: 添加完整游戏流程测试脚本
+74a62a9 docs: 更新测试结果
+ae69d3d test: 添加 Agent 接入测试脚本
+08b6f22 feat: AI Agent 接入基础实现
+```
 
 ---
 
