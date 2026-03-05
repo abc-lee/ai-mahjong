@@ -318,9 +318,9 @@ node scripts/test-agent-connect.js
 | 3.1 | 修改 handleJoinAI | ✅ 完成 | |
 | 3.2 | 新增 handleAgentCommand | ✅ 完成 | |
 | 3.3 | 修改 broadcastGameState | ✅ 完成 | |
-| 4.1 | AIAdapter 改造 | ⏳ 待开始 | |
-| T.1 | 单 Agent 测试 | ⏳ 待开始 | |
-| T.2 | 4 Agent 测试 | ⏳ 待开始 | |
+| 4.1 | AIAdapter 改造 | ✅ 完成 | 已在 broadcastGameState 处理 |
+| T.1 | 测试脚本 | ✅ 完成 | scripts/test-agent-connect.ts |
+| T.2 | 运行测试 | ⏳ 待执行 | |
 
 ---
 

@@ -148,16 +148,26 @@ src/server/prompt/
 
 ## 7. 当前任务
 
-### Phase 1 - AI Agent 接入（当前重点）
+### Phase 1 - AI Agent 接入
 
 | # | 任务 | 状态 | 说明 |
 |---|------|------|------|
 | 1 | 完善 Player 类型定义 | ✅ 完成 | 区分 human / ai-agent / ai-auto |
 | 2 | 实现指令解析器 CommandParser | ✅ 完成 | 解析 JSON 指令 |
-| 3 | 实现提示词引擎 PromptEngine | ⏸️ 暂缓 | 可用现有 PromptGenerator |
-| 4 | 改造 AIAdapter | ⏸️ 暂缓 | 已在 broadcastGameState 中处理 |
-| 5 | 补充 Socket Handler | ✅ 完成 | handleAgentCommand |
-| 6 | 测试 Agent 接入 | ⏳ 待开始 | 启动 Agent 实际打牌 |
+| 3 | 补充 Socket Handler | ✅ 完成 | handleAgentCommand |
+| 4 | 修改 broadcastGameState | ✅ 完成 | 区分 ai-agent/ai-auto |
+| 5 | 创建测试脚本 | ✅ 完成 | scripts/test-agent-connect.ts |
+| 6 | 运行测试 | ⏳ 待执行 | |
+
+### 测试方法
+
+```bash
+# 1. 启动游戏服务器
+npm run dev:server
+
+# 2. 在另一个终端运行测试
+npx ts-node scripts/test-agent-connect.ts
+```
 
 ### Phase 2 - Prompt 迭代
 
