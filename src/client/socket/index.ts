@@ -266,6 +266,8 @@ export function setupSocketListeners(listeners: SocketListeners): () => void {
     onGameState(data.state, data.yourHand, data.yourTurn, data.lastDrawnTile, data.turnPhase);
   });
   socket.on(ServerEvents.GAME_ACTIONS, (data: ActionsEvent) => {
+    console.log('[Socket] 收到 GAME_ACTIONS 事件!');
+    console.log('[Socket] actions:', data.actions);
     onActions(data.actions);
   });
   socket.on(ServerEvents.GAME_ENDED, (data: GameEndedEvent) => {

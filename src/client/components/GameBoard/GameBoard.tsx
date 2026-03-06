@@ -115,9 +115,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // 判断当前阶段 - 使用服务器发送的 turnPhase
   const needDraw = isMyTurn && turnPhase === 'draw' && pendingActions.length === 0;
   const canDiscard = isMyTurn && turnPhase === 'discard' && pendingActions.length === 0;
-  const hasActions = pendingActions.length > 0;
+  const hasActions = pendingActions && pendingActions.length > 0;
   
-  console.log('[GameBoard] isMyTurn:', isMyTurn, 'myHand.length:', myHand.length, 'turnPhase:', turnPhase, 'lastDrawnTile:', lastDrawnTile, 'pendingActions:', pendingActions.length);
+  console.log('[GameBoard] pendingActions:', pendingActions);
   console.log('[GameBoard] needDraw:', needDraw, 'canDiscard:', canDiscard, 'hasActions:', hasActions);
 
   // 获取当前回合玩家名称（用于等待指示器）
@@ -242,15 +242,27 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             {/* 手牌区 - 仅自己显示 */}
             <div className="hand-area">
               <div className="hand-tiles">
-                {myHand.map((tile, index) => (
-                  <div
-                    key={tile.id}
-                    className={`hand-tile ${lastDrawnTile?.id === tile.id ? 'last-drawn' : ''} ${canDiscard ? 'clickable' : ''}`}
-                    onClick={() => canDiscard && onDiscard?.(tile.id)}
-                  >
-                    <span className="tile-display">{tile.display}</span>
-                  </div>
-                ))}
+                {myHand
+                  .slice()
+                  .sort((a, b) => {
+                    // 花色优先级：万 -> 条 -> 筒 -> 风 -> 箭
+                    const suitOrder: Record<string, number> = {
+                      'wan': 1, 'tiao': 2, 'tong': 3, 'feng': 4, 'jian': 5,
+                    };
+                    const suitA = suitOrder[a.suit] || 99;
+                    const suitB = suitOrder[b.suit] || 99;
+                    if (suitA !== suitB) return suitA - suitB;
+                    return (a.value || 0) - (b.value || 0);
+                  })
+                  .map((tile, index) => (
+                    <div
+                      key={tile.id}
+                      className={`hand-tile ${lastDrawnTile?.id === tile.id ? 'last-drawn' : ''} ${canDiscard ? 'clickable' : ''}`}
+                      onClick={() => canDiscard && onDiscard?.(tile.id)}
+                    >
+                      <span className="tile-display">{tile.display}</span>
+                    </div>
+                  ))}
               </div>
             </div>
           </>
