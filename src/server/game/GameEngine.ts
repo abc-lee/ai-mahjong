@@ -214,6 +214,14 @@ export class GameEngine {
     }
     
     console.log(`[GameEngine] performAction ${action.action} 结果: ${result}`);
+    
+    // 如果操作成功，清除所有 pendingActions（因为吃碰杠胡是互斥的）
+    if (result) {
+      console.log(`[GameEngine] performAction 成功，清除 pendingActions`);
+      this.state.pendingActions = [];
+      this.respondedPlayers.clear();
+    }
+    
     return result;
   }
 

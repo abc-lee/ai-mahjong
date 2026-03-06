@@ -58,6 +58,30 @@ function toClientRoom(serverRoom: ServerRoom): Room {
 }
 
 /**
+ * 强制为玩家执行动作（当 AIAdapter 不可用时的保底方案）
+ */
+function forceExecutePlayerAction(
+  room: ServerRoom,
+  player: Player,
+  turnPhase: string,
+  io: Server,
+  roomId: string,
+  roomManager: RoomManager
+): void {
+  if (!room.gameEngine) return;
+  
+  if (turnPhase === 'draw') {
+    room.gameEngine.drawTile(player.id);
+    broadcastGameState(io, roomId, roomManager);
+  } else if (turnPhase === 'discard' && player.hand.length > 0) {
+    const tile = player.hand[player.hand.length - 1];
+    console.log(`[forceExecutePlayerAction] 强制打出: ${tile.display}`);
+    room.gameEngine.discardTile(player.id, tile.id);
+    broadcastGameState(io, roomId, roomManager);
+  }
+}
+
+/**
  * 广播游戏状态给房间内所有玩家（人类 + AI）
  */
 export function broadcastGameState(io: Server, roomId: string, roomManager: RoomManager): void {
@@ -195,34 +219,22 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
                 }
               }).catch(err => {
                 console.error(`[AI Timeout] 自动决策失败:`, err);
-                // 强制摸牌或打牌
-                if (turnPhase === 'draw') {
-                  const gameEngine = currentRoom.gameEngine;
-                  gameEngine.drawTile(player.id);
-                  broadcastGameState(io, roomId, roomManager);
-                } else if (turnPhase === 'discard' && player.hand.length > 0) {
-                  const tile = player.hand[player.hand.length - 1];
-                  currentRoom.gameEngine.discardTile(player.id, tile.id);
-                  broadcastGameState(io, roomId, roomManager);
-                }
+                // 强制摸牌或打牌（使用 helper 函数）
+                forceExecutePlayerAction(currentRoom, player, turnPhase, io, roomId, roomManager);
               });
             } else {
               // 没有 adapter，强制执行
               console.log(`[AI Timeout] ${player.name} 无 adapter，强制执行`);
-              if (turnPhase === 'draw') {
-                currentRoom.gameEngine.drawTile(player.id);
-                broadcastGameState(io, roomId, roomManager);
-              } else if (turnPhase === 'discard' && player.hand.length > 0) {
-                const tile = player.hand[player.hand.length - 1];
-                currentRoom.gameEngine.discardTile(player.id, tile.id);
-                broadcastGameState(io, roomId, roomManager);
-              }
+              forceExecutePlayerAction(currentRoom, player, turnPhase, io, roomId, roomManager);
             }
           }
         }, 5000); // 5秒超时
-      } else if (player.aiControl?.mode === 'auto' || !agentSocket) {
-        // Agent 断线或降级为自动托管：使用 AIAdapter
+      } else if (!agentSocket || player.aiControl?.mode === 'auto') {
+        // Agent 没有连接 socket 或 mode 为 auto：使用 AIAdapter
+        // 修复：确保无论 mode 是什么，只要没有 socket 就使用 adapter
         const adapter = aiManager.getAdapter(player.id);
+        console.log(`[broadcastGameState] ${player.name}(ai-agent, 无socket或auto) 使用 adapter: ${!!adapter}, yourTurn=${yourTurn}`);
+        
         if (adapter && yourTurn) {
           adapter.handleEvent({
             type: turnPhase === 'draw' ? 'YOUR_TURN_DRAW' : 'YOUR_TURN_DISCARD',
@@ -234,7 +246,13 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
             }
           }).catch(err => {
             console.error(`[AIAdapter] 决策失败:`, err);
+            // 失败时强制执行
+            forceExecutePlayerAction(room, player, turnPhase, io, roomId, roomManager);
           });
+        } else if (!adapter) {
+          // 没有 adapter，强制执行
+          console.log(`[broadcastGameState] ${player.name} 无 adapter，强制执行`);
+          forceExecutePlayerAction(room, player, turnPhase, io, roomId, roomManager);
         }
       }
     } else if (player.type === 'ai-auto') {
@@ -253,19 +271,13 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
           }
         }).catch(err => {
           console.error(`[AIAdapter] 决策失败:`, err);
+          // 失败时强制执行
+          forceExecutePlayerAction(room, player, turnPhase, io, roomId, roomManager);
         });
       } else if (!adapter) {
         // 没有 adapter，强制执行
         console.log(`[broadcastGameState] ai-auto ${player.name} 无 adapter，强制执行`);
-        if (turnPhase === 'draw') {
-          room.gameEngine.drawTile(player.id);
-          broadcastGameState(io, roomId, roomManager);
-        } else if (turnPhase === 'discard' && player.hand.length > 0) {
-          const tile = player.hand[player.hand.length - 1];
-          console.log(`[broadcastGameState] 强制打出: ${tile.display}`);
-          room.gameEngine.discardTile(player.id, tile.id);
-          broadcastGameState(io, roomId, roomManager);
-        }
+        forceExecutePlayerAction(room, player, turnPhase, io, roomId, roomManager);
       }
     }
   }
