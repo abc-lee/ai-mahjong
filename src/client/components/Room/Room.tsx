@@ -114,6 +114,29 @@ export const Room: React.FC<RoomProps> = ({ onLeave }) => {
     }
   }, [setCurrentRoom, navigate, onLeave]);
 
+  // 如果 currentRoom 为空，尝试根据 URL 中的 roomId 获取房间信息
+  useEffect(() => {
+    if (!currentRoom && playerId) {
+      // 检查 URL 中的 roomId
+      const pathParts = window.location.pathname.split('/');
+      const urlRoomId = pathParts[2]; // /room/:roomId
+      
+      if (urlRoomId) {
+        console.log('[Room] currentRoom 为空，尝试重新加入房间:', urlRoomId);
+        // 重新加入房间
+        socket.emit('room:join', { roomId: urlRoomId, playerName }, (response: any) => {
+          if (response.message) {
+            console.log('[Room] 重新加入失败:', response.message);
+            navigate('/');
+          } else {
+            console.log('[Room] 重新加入成功');
+            setCurrentRoom(response.room);
+          }
+        });
+      }
+    }
+  }, [currentRoom, playerId, playerName, navigate, setCurrentRoom]);
+
   // 获取指定位置的玩家
   const getPlayerByPosition = (pos: number): PlayerPublic | undefined => {
     return currentRoom?.players.find((p) => p.position === pos);
