@@ -110,6 +110,54 @@ export const PERSONALITIES: Record<string, Personality> = {
       goodbye: ['测试结束', '数据已保存', '下次测试见'],
     },
   },
+  小狐狸: {
+    name: '小狐狸',
+    traits: ['狡猾', '调皮', '聪明'],
+    speakStyle: '喜欢开玩笑，说话带点小聪明',
+    angerThreshold: 40,
+    chatFrequency: 0.35,
+    templates: {
+      happy: ['嘿嘿，得手了~', '运气来了挡都挡不住~', '这把有意思了！'],
+      angry: ['哼，被发现了...', '可恶！', '这次算你运气好！'],
+      thinking: ['让我算算...', '嗯...有办法了', '这牌有门道...'],
+      winning: ['嘿嘿嘿，我就知道！', '小狐狸的胜利~', '太简单了太简单了~'],
+      losing: ['下次一定赢回来！', '让我再想想...', '哼，不玩了！'],
+      greeting: ['嘿嘿，又见面了~', '准备好输了吗？', '来来来，开始吧！'],
+      goodbye: ['下次再来玩哦~', '拜拜~记得想我~', '嘿嘿，下次见！'],
+    },
+  },
+  老师傅: {
+    name: '老师傅',
+    traits: ['沉稳', '经验丰富', '话不多'],
+    speakStyle: '言简意赅，偶尔指点',
+    angerThreshold: 80,
+    chatFrequency: 0.1,
+    templates: {
+      happy: ['嗯。', '不错。', '这手打得好。'],
+      angry: ['...', '冷静。', '失误了。'],
+      thinking: ['...', '让我想想。', '这牌...'],
+      winning: ['承让。', '运气好。', '还可以。'],
+      losing: ['下次努力。', '技不如人。', '输了。'],
+      greeting: ['来了。', '开始吧。', '坐。'],
+      goodbye: ['走了。', '下次。', '再见。'],
+    },
+  },
+  小可爱: {
+    name: '小可爱',
+    traits: ['可爱', '天真', '乐观'],
+    speakStyle: '说话软萌，喜欢用颜文字',
+    angerThreshold: 90,
+    chatFrequency: 0.45,
+    templates: {
+      happy: ['好开心呀~ (≧▽≦)', '运气好棒！', '耶耶耶~'],
+      angry: ['有点难过... (´；ω；`)', '不要这样啦...', '呜呜...'],
+      thinking: ['让我想想呢...', '嗯嗯...', '这个有点难...'],
+      winning: ['赢啦赢啦！ヽ(✿ﾟ▽ﾟ)ノ', '太棒了！', '我好厉害~'],
+      losing: ['没关系啦~', '下次加油！(ง •̀_•́)ง', '输赢不重要~'],
+      greeting: ['大家好呀~ (◕ᴗ◕✿)', '来打牌吧！', '今天也要加油哦~'],
+      goodbye: ['拜拜啦~ つ◕_◕つ', '下次见！', '记得想我哦~'],
+    },
+  },
 };
 
 // 等待超时配置
@@ -552,7 +600,7 @@ export class SpeechManager {
   triggerProactiveSpeech(
     playerId: string,
     playerName: string,
-    situation: 'turn_start' | 'good_tile' | 'bad_tile' | 'someone_hu' | 'someone_pong' | 'game_start' | 'game_end'
+    situation: 'turn_start' | 'good_tile' | 'bad_tile' | 'someone_hu' | 'someone_pong' | 'someone_gang' | 'game_start' | 'game_end' | 'drew_tile' | 'waiting' | 'almost_hu'
   ): void {
     const personality = PERSONALITIES[playerName] || PERSONALITIES['测试员'];
     const emotion = this.getEmotion(playerId);
@@ -584,6 +632,7 @@ export class SpeechManager {
         template = this.getPersonalityTemplate(playerName, 'thinking');
         break;
       case 'good_tile':
+      case 'drew_tile':
         template = this.getPersonalityTemplate(playerName, 'happy');
         break;
       case 'bad_tile':
@@ -594,6 +643,10 @@ export class SpeechManager {
           ? this.getPersonalityTemplate(playerName, 'losing')
           : this.getPersonalityTemplate(playerName, 'winning');
         break;
+      case 'someone_pong':
+      case 'someone_gang':
+        template = this.getPersonalityTemplate(playerName, 'angry');
+        break;
       case 'game_start':
         template = this.getPersonalityTemplate(playerName, 'greeting');
         break;
@@ -601,6 +654,12 @@ export class SpeechManager {
         template = emotion.happiness > 0
           ? this.getPersonalityTemplate(playerName, 'winning')
           : this.getPersonalityTemplate(playerName, 'losing');
+        break;
+      case 'waiting':
+        template = this.getPersonalityTemplate(playerName, 'thinking');
+        break;
+      case 'almost_hu':
+        template = this.getPersonalityTemplate(playerName, 'happy');
         break;
     }
 
