@@ -28,6 +28,9 @@ import {
   handleGetEmotion,
   handleGetSpeechHistory,
   handleAgentRequestState,
+  handleAddFriend,
+  handleRemoveFriend,
+  handleGetFriends,
 } from './handlers';
 
 export function setupSocket(io: Server): void {
@@ -64,6 +67,11 @@ export function setupSocket(io: Server): void {
     socket.on('agent:stimulusResponse', (data, callback) => handleStimulusResponse(io, socket, roomManager, data, callback));
     socket.on('agent:getEmotion', (data, callback) => handleGetEmotion(io, socket, roomManager, data, callback));
     socket.on('agent:getSpeechHistory', (data, callback) => handleGetSpeechHistory(io, socket, roomManager, data, callback));
+    
+    // 好友系统事件
+    socket.on('friend:add', (data, callback) => handleAddFriend(io, socket, roomManager, data, callback));
+    socket.on('friend:remove', (data, callback) => handleRemoveFriend(io, socket, roomManager, data, callback));
+    socket.on('friend:list', (callback) => handleGetFriends(io, socket, roomManager, callback));
     
     // 断开连接
     socket.on('disconnect', () => handleDisconnect(io, socket, roomManager));

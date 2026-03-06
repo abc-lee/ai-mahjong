@@ -1459,3 +1459,85 @@ export async function handleAgentRequestState(
     callback?.({ error: error instanceof Error ? error.message : '获取状态失败' });
   }
 }
+
+/**
+ * 添加好友
+ */
+export async function handleAddFriend(
+  io: Server,
+  socket: Socket,
+  roomManager: RoomManager,
+  payload: { aiPlayerId: string; aiPlayerName: string; aiPersonality: string },
+  callback: (response: { success?: boolean; friend?: any; error?: string }) => void
+) {
+  try {
+    const playerId = socket.data.playerId;
+    if (!playerId) {
+      callback?.({ error: '请先登录' });
+      return;
+    }
+
+    const { friendManager } = require('../friend/FriendManager');
+    const friend = friendManager.addFriend(
+      playerId,
+      payload.aiPlayerId,
+      payload.aiPlayerName,
+      payload.aiPersonality
+    );
+
+    callback?.({ success: true, friend });
+  } catch (error) {
+    callback?.({ error: error instanceof Error ? error.message : '添加好友失败' });
+  }
+}
+
+/**
+ * 移除好友
+ */
+export async function handleRemoveFriend(
+  io: Server,
+  socket: Socket,
+  roomManager: RoomManager,
+  payload: { aiPlayerId: string },
+  callback: (response: { success?: boolean; error?: string }) => void
+) {
+  try {
+    const playerId = socket.data.playerId;
+    if (!playerId) {
+      callback?.({ error: '请先登录' });
+      return;
+    }
+
+    const { friendManager } = require('../friend/FriendManager');
+    const removed = friendManager.removeFriend(playerId, payload.aiPlayerId);
+
+    callback?.({ success: removed });
+  } catch (error) {
+    callback?.({ error: error instanceof Error ? error.message : '移除好友失败' });
+  }
+}
+
+/**
+ * 获取好友列表
+ */
+export async function handleGetFriends(
+  io: Server,
+  socket: Socket,
+  roomManager: RoomManager,
+  callback: (response: { friends?: any[]; error?: string }) => void
+) {
+  try {
+    const playerId = socket.data.playerId;
+    if (!playerId) {
+      callback?.({ friends: [] });
+      return;
+    }
+
+    const { friendManager } = require('../friend/FriendManager');
+    const friends = friendManager.getFriends(playerId);
+
+    callback?.({ friends });
+  } catch (error) {
+    callback?.({ error: error instanceof Error ? error.message : '获取好友列表失败' });
+  }
+}
