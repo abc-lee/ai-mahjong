@@ -303,6 +303,13 @@ function executeAIDecision(
       const tile = room.gameEngine.drawTile(playerId);
       if (tile) {
         broadcastGameState(io, roomId, roomManager);
+        
+        // 检查是否有 pendingActions（如暗杠）
+        const state = room.gameEngine.getState();
+        if (state.pendingActions.length > 0) {
+          console.log(`[AI] 摸牌后有 pendingActions: ${state.pendingActions.length}`);
+          handleAIActions(roomId, roomManager, io);
+        }
       }
       break;
       

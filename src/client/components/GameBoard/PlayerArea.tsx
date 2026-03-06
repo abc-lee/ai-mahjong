@@ -53,8 +53,8 @@ const MeldView: React.FC<{ meld: Meld }> = ({ meld }) => {
  * 渲染弃牌区
  */
 const DiscardArea: React.FC<{ discards: Tile[] }> = ({ discards }) => {
-  // 将弃牌分成多行显示
-  const ROW_SIZE = 6;
+  // 将弃牌分成多行显示，减小每行数量以节省空间
+  const ROW_SIZE = 4;
   const rows: Tile[][] = [];
   for (let i = 0; i < discards.length; i += ROW_SIZE) {
     rows.push(discards.slice(i, i + ROW_SIZE));
