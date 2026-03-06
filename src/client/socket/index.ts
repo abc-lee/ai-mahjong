@@ -261,6 +261,8 @@ export function setupSocketListeners(listeners: SocketListeners): () => void {
     console.log('[Socket] Game started event received');
   });
   socket.on(ServerEvents.GAME_STATE, (data: GameStateEvent) => {
+    console.log('[Socket] 收到 GAME_STATE 事件!');
+    console.log('[Socket] data:', JSON.stringify(data).slice(0, 200));
     onGameState(data.state, data.yourHand, data.yourTurn, data.lastDrawnTile, data.turnPhase);
   });
   socket.on(ServerEvents.GAME_ACTIONS, (data: ActionsEvent) => {

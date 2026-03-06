@@ -34,6 +34,10 @@ function App() {
       onDisconnect: () => setConnected(false),
       onRoomUpdate: (room) => setCurrentRoom(room),
       onGameState: (state, hand, yourTurn, lastDrawn, turnPhase) => {
+        console.log('[App] 收到 game:state 事件!');
+        console.log('[App] state:', state);
+        console.log('[App] hand:', hand?.length);
+        console.log('[App] yourTurn:', yourTurn);
         updateGameState(state, hand, yourTurn, lastDrawn, turnPhase);
         // 如果没有待处理操作，清除 availableActions
         if (!state.hasPendingActions) {

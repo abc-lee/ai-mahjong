@@ -86,15 +86,39 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
     const lastDrawnTile = room.gameEngine.getLastDrawnTile(player.id);
     const turnPhase = room.gameEngine.getTurnPhase();
 
-    console.log(`[broadcastGameState] player=${player.name}(${player.id.slice(0,4)}), type=${player.type}, yourTurn=${yourTurn}, turnPhase=${turnPhase}`);
+    console.log(`[broadcastGameState] player=${player.name}(${player.id.slice(0,8)}), type=${player.type}, yourTurn=${yourTurn}, turnPhase=${turnPhase}`);
 
     if (player.type === 'human') {
-      // 人类玩家：通过 Socket 发送
-      const socket = Array.from(io.sockets.sockets.values())
+      // 人类玩家：发送 game:state
+      console.log(`[broadcastGameState] 人类玩家 ${player.name}(${player.id.slice(0,8)}) 需要发送状态`);
+      
+      // 调试：打印所有 socket 信息
+      const allSocketsData = Array.from(io.sockets.sockets.values()).map(s => ({
+        id: s.id.slice(0, 8),
+        playerId: s.data.playerId?.slice(0, 8),
+        roomId: s.data.roomId?.slice(0, 8),
+      }));
+      console.log(`[broadcastGameState] 当前所有 sockets:`, JSON.stringify(allSocketsData));
+      
+      // 方式1: 通过 playerId 查找
+      let foundSocket: Socket | undefined = Array.from(io.sockets.sockets.values())
         .find(s => s.data.playerId === player.id);
       
-      if (socket) {
-        socket.emit('game:state', {
+      console.log(`[broadcastGameState] 方式1查找结果: ${foundSocket ? '找到' : '未找到'}`);
+      
+      // 方式2: 如果没找到，直接广播到房间（所有人都能收到）
+      if (!foundSocket) {
+        console.log(`[broadcastGameState] 方式2: 广播到房间 ${roomId}`);
+        io.to(roomId).emit('game:state', {
+          state: publicState,
+          yourHand: player.hand,
+          yourTurn,
+          lastDrawnTile,
+          turnPhase,
+        });
+      } else {
+        console.log(`[broadcastGameState] 发送 game:state 给 ${player.name}`);
+        foundSocket.emit('game:state', {
           state: publicState,
           yourHand: player.hand,
           yourTurn,
@@ -216,18 +240,32 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
     } else if (player.type === 'ai-auto') {
       // 自动托管玩家：使用 AIAdapter
       const adapter = aiManager.getAdapter(player.id);
+      console.log(`[broadcastGameState] ai-auto ${player.name}: adapter=${!!adapter}, yourTurn=${yourTurn}, phase=${turnPhase}`);
       if (adapter && yourTurn) {
         adapter.handleEvent({
           type: turnPhase === 'draw' ? 'YOUR_TURN_DRAW' : 'YOUR_TURN_DISCARD',
           lastDrawnTile,
           gameState: publicState,
         }).then(decision => {
+          console.log(`[broadcastGameState] ai-auto ${player.name} 决策:`, decision);
           if (decision) {
             executeAIDecision(roomId, player.id, decision, roomManager, io);
           }
         }).catch(err => {
           console.error(`[AIAdapter] 决策失败:`, err);
         });
+      } else if (!adapter) {
+        // 没有 adapter，强制执行
+        console.log(`[broadcastGameState] ai-auto ${player.name} 无 adapter，强制执行`);
+        if (turnPhase === 'draw') {
+          room.gameEngine.drawTile(player.id);
+          broadcastGameState(io, roomId, roomManager);
+        } else if (turnPhase === 'discard' && player.hand.length > 0) {
+          const tile = player.hand[player.hand.length - 1];
+          console.log(`[broadcastGameState] 强制打出: ${tile.display}`);
+          room.gameEngine.discardTile(player.id, tile.id);
+          broadcastGameState(io, roomId, roomManager);
+        }
       }
     }
   }
@@ -273,13 +311,29 @@ function executeAIDecision(
     case 'peng':
     case 'gang':
     case 'hu':
+      // 从玩家手牌中获取完整的 Tile 对象
+      const player = room.players.find(p => p.id === playerId);
+      const fullTiles = decision.tiles?.map(id => 
+        player?.hand.find(t => t.id === id)
+      ).filter(Boolean) as Tile[] | undefined;
+      
+      console.log(`[AI] 执行 ${decision.action}, tiles:`, fullTiles?.map(t => t.display));
+      
       const pendingAction: PendingAction = {
         playerId,
         action: decision.action as 'chi' | 'peng' | 'gang' | 'hu',
-        tiles: decision.tiles?.map(id => ({ id } as Tile)),
+        tiles: fullTiles,
         priority: decision.action === 'hu' ? 4 : decision.action === 'gang' ? 3 : decision.action === 'peng' ? 2 : 1,
       };
-      room.gameEngine.performAction(playerId, pendingAction);
+      const result = room.gameEngine.performAction(playerId, pendingAction);
+      console.log(`[AI] performAction ${decision.action} 结果:`, result);
+      
+      // 如果操作失败，自动跳过
+      if (!result) {
+        console.log(`[AI] ${decision.action} 失败，自动跳过`);
+        room.gameEngine.passAction(playerId);
+      }
+      
       broadcastGameState(io, roomId, roomManager);
       break;
       
@@ -311,8 +365,12 @@ function handleAIActions(roomId: string, roomManager: RoomManager, io: Server): 
   // 对每个 AI 玩家处理
   for (const [playerId, actions] of playerActionsMap) {
     const player = room.players.find(p => p.id === playerId);
-    if (player?.type === 'ai-agent') {
+    
+    // 处理 ai-agent 和 ai-auto
+    if (player?.type === 'ai-agent' || player?.type === 'ai-auto') {
       const adapter = aiManager.getAdapter(playerId);
+      console.log(`[handleAIActions] ${player.name}(${player.type}) 有待处理操作: ${actions.map(a => a.action).join(',')}, adapter=${!!adapter}`);
+      
       if (adapter) {
         adapter.handleEvent({
           type: 'ACTION_REQUIRED',
@@ -320,12 +378,24 @@ function handleAIActions(roomId: string, roomManager: RoomManager, io: Server): 
           lastDiscard: state.lastDiscard!,
           gameState: publicState,
         }).then(decision => {
+          console.log(`[handleAIActions] ${player.name} 决策:`, decision);
           if (decision) {
             executeAIDecision(roomId, playerId, decision, roomManager, io);
           }
         }).catch(err => {
           console.error(`[AIAdapter] 操作决策失败:`, err);
         });
+      } else {
+        // 没有 adapter，自动跳过
+        console.log(`[handleAIActions] ${player.name} 无 adapter，自动跳过`);
+        // 延迟 1 秒后跳过
+        setTimeout(() => {
+          const currentRoom = roomManager.getRoom(roomId);
+          if (currentRoom?.gameEngine) {
+            currentRoom.gameEngine.passAction(playerId);
+            broadcastGameState(io, roomId, roomManager);
+          }
+        }, 1000);
       }
     }
   }
@@ -548,9 +618,35 @@ export async function handleReady(
     const serverRoom = roomManager.getRoom(roomId);
     if (serverRoom) {
       const clientRoom = toClientRoom(serverRoom);
-      console.log(`[Server] 广播 room:updated, 玩家数=${clientRoom.players.length}, 全部准备=${clientRoom.players.every(p => p.isReady)}`);
+      const allReady = clientRoom.players.length >= 4 && clientRoom.players.every(p => p.isReady);
+      console.log(`[Server] 广播 room:updated, 玩家数=${clientRoom.players.length}, 全部准备=${allReady}`);
       // 广播给房间所有人
       io.in(roomId).emit('room:updated', { room: clientRoom });
+      
+      // 自动开始游戏：如果所有人准备好了，且房主是 AI（不是人类）
+      if (allReady) {
+        const host = serverRoom.players.find(p => p.id === serverRoom.host);
+        console.log(`[Server] 检查自动开始: 房主=${host?.name}, 类型=${host?.type}`);
+        // 修改：房主是 AI 类型（ai-agent 或 ai-auto）就自动开始
+        if (host && host.type !== 'human') {
+          console.log(`[Server] AI 房主 ${host.name} 检测到全员准备，自动开始游戏`);
+          // 延迟 1 秒开始，让玩家看到准备状态
+          setTimeout(() => {
+            const startRoom = roomManager.getRoom(roomId);
+            if (startRoom && startRoom.state === 'waiting') {
+              roomManager.startGame(roomId);
+              const gameRoom = roomManager.getRoom(roomId);
+              if (gameRoom) {
+                aiManager.initGame(gameRoom.players);
+                console.log(`[Server] AI 房主自动开始游戏成功`);
+                io.in(roomId).emit('game:started', { roomId });
+                broadcastGameState(io, roomId, roomManager);
+              }
+            }
+          }, 1000);
+        }
+      }
+      
       callback({ success: true, room: clientRoom });
     } else {
       callback({ success: true });
@@ -690,6 +786,9 @@ export async function handleDiscard(
           targetSocket.emit('game:actions', { actions });
         }
       }
+      
+      // 处理 AI 玩家的待处理操作
+      handleAIActions(roomId, roomManager, io);
     }
     
     if (callback) callback({ success: true });
@@ -915,6 +1014,29 @@ export async function handleJoinAI(
     const serverRoom = roomManager.getRoom(roomId);
     if (serverRoom) {
       io.in(roomId).emit('room:updated', { room: toClientRoom(serverRoom) });
+      
+      // 检查是否应该自动开始游戏
+      const allReady = serverRoom.players.length >= 4 && serverRoom.players.every(p => p.isReady);
+      if (allReady) {
+        const host = serverRoom.players.find(p => p.id === serverRoom.host);
+        console.log(`[Server] AI加入后检查自动开始: 房主=${host?.name}, 类型=${host?.type}, 全员准备=${allReady}`);
+        if (host && host.type !== 'human') {
+          console.log(`[Server] AI 房主 ${host.name} 检测到全员准备，自动开始游戏`);
+          setTimeout(() => {
+            const startRoom = roomManager.getRoom(roomId);
+            if (startRoom && startRoom.state === 'waiting') {
+              roomManager.startGame(roomId);
+              const gameRoom = roomManager.getRoom(roomId);
+              if (gameRoom) {
+                aiManager.initGame(gameRoom.players);
+                console.log(`[Server] 游戏开始成功`);
+                io.in(roomId).emit('game:started', { roomId });
+                broadcastGameState(io, roomId, roomManager);
+              }
+            }
+          }, 1000);
+        }
+      }
     }
     
     console.log(`[Server] AI ${playerType} ${agentName} 加入房间成功，位置: ${aiPlayer.position}`);
