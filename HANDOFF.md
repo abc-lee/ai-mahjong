@@ -6,58 +6,46 @@
 
 ## 最近会话日期
 
-2026-03-05
+2026-03-06
 
 ---
 
 ## 本次会话完成的工作
 
-### 1. 完善 Agent 提示词工程
+### 1. 修复 Bug
 
-根据用户反馈，完善了中间层对 Agent 的支持：
-
-| 功能 | 修复 |
+| 问题 | 修复 |
 |------|------|
-| Agent 连接时无规则 | 发送 `agent:welcome` 事件，包含完整规则 |
-| 无算分/番型说明 | 添加算分公式(底分×2^番数)和番型列表 |
-| 无支招功能 | `generateTips` 添加推荐打牌逻辑 |
-| 无法重发手牌 | 新增 `agent:requestState` 事件 |
+| Room 页面卡在加载中 | 添加 useEffect，根据 URL roomId 重新加入 |
 
-### 2. 新增的 Socket 事件
+### 2. 新增 Agent 性格
+
+新增 3 个性格（共 7 个）：
+
+| 性格 | 特点 | 发言频率 |
+|------|------|---------|
+| 小狐狸 | 狡猾调皮，爱开玩笑 | 35% |
+| 老师傅 | 沉稳话少，经验丰富 | 10% |
+| 小可爱 | 软萌乐观，喜欢颜文字 | 45% |
+
+### 3. AI 好友系统
 
 ```
-agent:welcome       - Agent 连接时发送欢迎消息（规则+指令）
-agent:requestState  - Agent 主动请求游戏状态
-```
-
-### 3. Prompt 改进示例
-
-```
-═══════════════════════════════════════
-🀄 欢迎加入麻将游戏，紫璃！
-═══════════════════════════════════════
-
-【游戏目标】
-凑成胡牌牌型：4个顺子/刻子 + 1对将牌
-
-【算分规则】
-得分 = 底分(1000) × 2^番数
-
-【番型列表】
-• 平胡 (1番)、对对胡 (2番)、七对子 (2番)
-• 清一色 (6番)、字一色 (8番)、十三幺 (13番)
-
-【策略提示】
-🎯 推荐打出: 北风 (id: feng-4-123)
-   理由: 孤张字牌，优先打出
+好友管理器：src/server/friend/FriendManager.ts
+Socket 事件：friend:add, friend:remove, friend:list
+关系等级：陌生人→熟人→朋友→好友→挚友
+亲密度：0-100，一起玩牌增加
 ```
 
 ### 4. Git 提交
 
 ```
+f5ccab7 feat: 实现 AI 好友系统
+4f4b394 feat: 添加更多 Agent 性格和发言场景
+e9fd7f4 fix: 修复 Room 页面 currentRoom 为空时卡在加载中的问题
 485d86a feat: 完善 Agent 提示词工程
-c9e530b fix: 修复记忆系统重复事件，添加发言触发机制
-be81783 fix: 修复 AI 不自动开始游戏和不出牌问题
+c9e530b fix: 修复记忆系统重复事件
+be81783 fix: 修复 AI 不自动开始游戏
 ```
 
 ---
@@ -87,39 +75,40 @@ be81783 fix: 修复 AI 不自动开始游戏和不出牌问题
 # 启动服务器
 npx tsx src/server/index.ts
 
+# 启动前端
+npm run dev:client
+
 # 测试 4 AI 对局
 node scripts/test-4-agents.js
 
-# 真正的 Agent 参与（文件桥接）
+# Agent 文件桥接
 node scripts/true-llm-agent.js
-# 监控 pending-state.json，写入 decision.json
 ```
 
 ---
 
-## 关键理解（避免重复问用户）
+## 关键文件
 
-1. **三种角色**：`human` / `ai-agent` / `ai-auto`
-2. **服务器不需要 LLM API Key**
-3. **Agent 直接连 WebSocket，中间层发完整 Prompt**
-4. **派发子 Agent 打麻将**：连接 → 收 Prompt → 思考 → 返回 JSON
-5. **中间层要观察 Agent**：不是让它们打就完了，要看它们遇到什么问题
+```
+src/server/
+├── friend/FriendManager.ts    # 好友系统（新增）
+├── speech/SpeechManager.ts    # 发言/性格系统
+├── prompt/PromptNL.ts         # 提示词工程
+└── socket/handlers.ts         # 事件处理
 
----
-
-## 用户反馈
-
-> "这个是你没读懂文档呢" - 对架构理解错误的批评
-> 
-> "中间层做的就是提示词工程" - Agent 连接时就应该发规则
-> 
-> "你要观察他们碰到什么问题了" - 像阿尔法下围棋一样持续迭代
-
-**教训**：
-- 仔细读文档，不要想当然
-- 提示词工程是中间层核心职责
-- 要持续观察 Agent 行为，发现问题
+src/client/
+├── components/Room/Room.tsx   # 房间页面（已修复）
+└── components/Lobby/          # 大厅
+```
 
 ---
 
-*更新时间: 2026-03-05*
+## 待完成
+
+- [ ] 前端好友列表 UI
+- [ ] 邀请好友加入游戏
+- [ ] 好友亲密度显示
+
+---
+
+*更新时间: 2026-03-06*
