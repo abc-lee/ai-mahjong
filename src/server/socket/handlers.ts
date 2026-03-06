@@ -782,6 +782,8 @@ export async function handleDiscard(
     // 向有操作权的玩家发送可用操作
     const gameState = room.gameEngine.getState();
     if (gameState.pendingActions.length > 0) {
+      console.log(`[handleDiscard] 有 ${gameState.pendingActions.length} 个待处理操作`);
+      
       // 收集每个玩家的所有操作，避免重复发送
       const playerActionsMap = new Map<string, typeof gameState.pendingActions>();
       for (const action of gameState.pendingActions) {
@@ -792,8 +794,12 @@ export async function handleDiscard(
       
       // 对每个玩家只发送一次
       for (const [playerId, actions] of playerActionsMap) {
+        const player = room.players.find(p => p.id === playerId);
         const targetSocket = Array.from(io.sockets.sockets.values())
           .find(s => s.data.playerId === playerId);
+        
+        console.log(`[handleDiscard] 发送 game:actions 给 ${player?.name}(${player?.type || 'human'}), socket=${!!targetSocket}, actions=${actions.map(a => a.action).join(',')}`);
+        
         if (targetSocket) {
           targetSocket.emit('game:actions', { actions });
         }
@@ -801,6 +807,29 @@ export async function handleDiscard(
       
       // 处理 AI 玩家的待处理操作
       handleAIActions(roomId, roomManager, io);
+      
+      // 检查是否有人类玩家的待处理操作，如果有，设置超时
+      const humanPending = Array.from(playerActionsMap.entries())
+        .filter(([playerId]) => {
+          const p = room.players.find(p => p.id === playerId);
+          return p?.type === 'human' || !p?.type;
+        });
+      
+      if (humanPending.length > 0) {
+        console.log(`[handleDiscard] 有人类玩家待处理操作，设置 10 秒超时`);
+        setTimeout(() => {
+          const currentRoom = roomManager.getRoom(roomId);
+          if (currentRoom?.gameEngine) {
+            const currentState = currentRoom.gameEngine.getState();
+            if (currentState.pendingActions.length > 0) {
+              console.log(`[handleDiscard] 人类玩家超时，自动跳过所有待处理操作`);
+              // 清除所有 pendingActions
+              currentState.pendingActions = [];
+              broadcastGameState(io, roomId, roomManager);
+            }
+          }
+        }, 10000);
+      }
     }
     
     if (callback) callback({ success: true });

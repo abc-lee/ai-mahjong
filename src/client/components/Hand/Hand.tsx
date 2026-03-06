@@ -1,7 +1,7 @@
 /**
  * 手牌组件 - 显示玩家手牌
  */
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Tile } from '../../../shared/types';
 import { TileComponent } from '../Tile';
@@ -16,6 +16,35 @@ export interface HandProps {
   hidden?: boolean; // 是否隐藏牌面（其他玩家）
 }
 
+/**
+ * 麻将牌排序
+ * 顺序：万 -> 条 -> 筒 -> 风 -> 箭
+ * 同花色内按数值排序
+ */
+function sortTiles(tiles: Tile[]): Tile[] {
+  // 花色优先级
+  const suitOrder: Record<string, number> = {
+    'wan': 1,    // 万
+    'tiao': 2,   // 条
+    'tong': 3,   // 筒
+    'feng': 4,   // 风
+    'jian': 5,   // 箭
+  };
+  
+  return [...tiles].sort((a, b) => {
+    // 先按花色排序
+    const suitA = suitOrder[a.suit] || 99;
+    const suitB = suitOrder[b.suit] || 99;
+    
+    if (suitA !== suitB) {
+      return suitA - suitB;
+    }
+    
+    // 同花色按数值排序
+    return (a.value || 0) - (b.value || 0);
+  });
+}
+
 export const Hand: React.FC<HandProps> = ({
   tiles,
   selectedTileId,
@@ -25,6 +54,9 @@ export const Hand: React.FC<HandProps> = ({
   hidden = false,
 }) => {
   const canInteract = isMyTurn && !disabled;
+  
+  // 手牌排序
+  const sortedTiles = useMemo(() => sortTiles(tiles), [tiles]);
 
   return (
     <div className={`${styles.handContainer} ${!isMyTurn ? styles.notMyTurn : ''}`}>
@@ -34,7 +66,7 @@ export const Hand: React.FC<HandProps> = ({
           layout
         >
           <AnimatePresence mode="popLayout">
-            {tiles.map((tile, index) => (
+            {sortedTiles.map((tile, index) => (
               <motion.div
                 key={tile.id}
                 className={`${styles.tileWrapper} ${hidden ? styles.hiddenTile : ''}`}
