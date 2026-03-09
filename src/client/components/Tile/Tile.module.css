@@ -1,63 +1,39 @@
 /**
- * 麻将牌样式 - 中国像素风格
+ * 麻将牌样式
  */
-
-/* 像素字体 */
-@import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
 
 .tile {
   position: relative;
   user-select: none;
-  perspective: 1000px;
-}
-
-/* 尺寸变体 */
-.small {
-  --tile-width: 36px;
-  --tile-height: 50px;
-  --font-size-number: 16px;
-  --font-size-suit: 10px;
-  --font-size-honor: 18px;
-}
-
-.medium {
-  --tile-width: 48px;
-  --tile-height: 64px;
-  --font-size-number: 22px;
-  --font-size-suit: 12px;
-  --font-size-honor: 24px;
-}
-
-.large {
-  --tile-width: 60px;
-  --tile-height: 80px;
-  --font-size-number: 28px;
-  --font-size-suit: 14px;
-  --font-size-honor: 30px;
-}
-
-.tileInner {
-  width: var(--tile-width);
-  height: var(--tile-height);
-  position: relative;
-}
-
-.tileFace {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(145deg, #faf8f0 0%, #f5f0e0 50%, #e8e0c8 100%);
-  border-radius: 4px;
-  box-shadow: 
-    inset 2px 2px 0 rgba(255, 255, 255, 0.8),
-    inset -2px -2px 0 rgba(0, 0, 0, 0.1),
-    3px 3px 0 rgba(0, 0, 0, 0.3),
-    4px 4px 8px rgba(0, 0, 0, 0.2);
-  border: 2px solid #d4c8a8;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-  overflow: hidden;
+}
+
+/* 尺寸变体 - 这里不设置宽高，让 SVG 自己决定 */
+.small {}
+.medium {}
+.large {}
+
+/* 选中状态 */
+.selected {
+  transform: translateY(-4px);
+}
+
+/* 点击效果 */
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover {
+  transform: translateY(-2px);
+}
+
+/* 禁用状态 */
+.disabled {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 /* 像素风格边角装饰 */

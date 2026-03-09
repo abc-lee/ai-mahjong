@@ -104,7 +104,107 @@ AI Agent（独立 LLM 会话）←WebSocket→ 游戏服务器（只做规则验
 
 ---
 
-## 4. 如何让 Agent 加入游戏
+## 4. Agent 行为约束规则
+
+### 4.1 MUST DO（必须遵守）
+
+| 规则 | 说明 |
+|------|------|
+| 使用轻量会话模式 | 麻将 Agent 只在对话中思考，不创建持久编程环境 |
+| 直连 WebSocket | Agent 通过 socket.io-client 直接连接游戏服务器 |
+| 使用预定义指令集 | 只发送服务器允许的 JSON 指令格式 |
+| 保持会话隔离 | 每个 Agent 独立会话，独立 WebSocket 连接 |
+
+### 4.2 MUST NOT DO（禁止事项）
+
+| 规则 | 说明 |
+|------|------|
+| 禁止派发编程型 Agent | 不要用 task 或 sessions_spawn 创建麻将 Agent |
+| 禁止文件系统访问 | 不要读取/写入游戏服务器的文件 |
+| 禁止 bash/process 执行 | 不要在游戏中执行系统命令 |
+| 禁止创建子 Agent | 麻将 Agent 不应再派发子 Agent |
+
+### 4.3 正确的调用模式
+
+**stdin/stdout 零延迟通信**（推荐）：
+
+```
+主 Agent (你)
+    │
+    │  1. 发送游戏状态 Prompt
+    ▼
+┌─────────────────────────────────────┐
+│  麻将 Agent（轻量对话会话）          │
+│  - 接收游戏状态                      │
+│  - 思考决策                          │
+│  - 返回 JSON 指令                    │
+└─────────────────────────────────────┘
+    │
+    │  2. 返回决策 JSON
+    ▼
+主 Agent (你)
+```
+
+**调用模板**：
+
+```markdown
+# 麻将游戏回合
+
+你是一个麻将玩家，请根据以下游戏状态做出决策。
+
+## 当前状态
+[粘贴游戏服务器发送的完整 Prompt]
+
+## 可用指令
+- 摸牌: {"cmd": "draw"}
+- 打牌: {"cmd": "discard", "tileId": "牌ID"}
+- 吃碰杠胡: {"cmd": "action", "action": "chi|peng|gang|hu"}
+- 跳过: {"cmd": "pass"}
+
+## 输出要求
+只返回 JSON 格式的指令，不要包含其他文字。
+```
+
+**WebSocket 直连模板**（适用于支持 WebSocket 的 Agent）：
+
+```javascript
+const { io } = require('socket.io-client');
+const socket = io('http://localhost:3000');
+
+// 连接并加入游戏
+socket.emit('room:createAI', {
+  agentId: 'your-agent-id',
+  agentName: '玩家名称',
+  type: 'ai-agent'
+});
+
+// 监听回合事件
+socket.on('agent:your_turn', (data) => {
+  // data.prompt 包含完整游戏状态
+  // 思考后发送决策
+  socket.emit('agent:command', {
+    cmd: 'discard',
+    tileId: 'wan-1-xxx'
+  });
+});
+```
+
+### 4.4 禁止事项清单
+
+以下行为**严格禁止**，违者将导致游戏异常或安全风险：
+
+- ❌ 尝试修改游戏服务器代码
+- ❌ 尝试读取服务器日志或配置文件
+- ❌ 发送非预定义的指令格式
+- ❌ 在游戏中执行 HTTP 请求到外部 API
+- ❌ 创建文件或目录
+- ❌ 尝试 SQL 注入或任何攻击行为
+- ❌ 多线程/并发操作游戏状态
+- ❌ 劫持其他玩家的会话
+
+---
+
+## 5. 如何让 Agent 加入游戏
 
 ### 方式一：文件桥接（scripts/true-llm-agent.js）
 
@@ -142,7 +242,7 @@ socket.on('agent:your_turn', (data) => {
 });
 ```
 
-### 方式三：派发子 Agent
+### 方式三：派发轻量对话 Agent
 
 ```
 作为主 Agent，可以派发子 Agent 来参与游戏：
@@ -155,7 +255,7 @@ socket.on('agent:your_turn', (data) => {
 
 ---
 
-## 5. 已完成的功能
+## 6. 已完成的功能
 
 | 功能 | 状态 | 文件 |
 |------|------|------|
@@ -166,10 +266,11 @@ socket.on('agent:your_turn', (data) => {
 | 发言/情绪系统 | ✅ | src/server/speech/ |
 | 前端 UI | ✅ | src/client/ |
 | 记忆/记仇系统 | ✅ | src/server/speech/MemoryManager.ts |
+| Agent 行为约束 | ✅ | AGENTS.md |
 
 ---
 
-## 6. 测试方法
+## 7. 测试方法
 
 ```bash
 # 1. 启动游戏服务器
@@ -187,7 +288,7 @@ node scripts/true-llm-agent.js
 
 ---
 
-## 7. 关键文件
+## 8. 关键文件
 
 ```
 src/server/
@@ -210,18 +311,20 @@ scripts/
 
 ---
 
-## 8. 常见误解
+## 9. 常见误解
 
-| 误解 | 正确理解 |
-|------|----------|
+| 理解 |
+|------误解 | 正确|----------|
 | 服务器需要配置 LLM API Key | 不需要，AI Agent 自己是 LLM 会话 |
 | AI Agent 和 ai-auto 是一回事 | 不是，ai-agent 是外部连接，ai-auto 是服务器内置 |
 | 要写脚本让 Agent 打牌 | Agent 直接连 WebSocket，中间层发完整 Prompt |
+| 可以派发编程型 Agent 打麻将 | 必须用轻量对话模式，stdin/stdout 通信 |
 
 ---
 
-## 9. 下一步
+## 10. 下一步
 
+- [x] Agent 行为约束规则文档化
 - [ ] 让多个 AI Agent（有 LLM 能力）真正参与游戏
 - [ ] 人类玩家加入测试
 - [ ] 接入语音/聊天功能
@@ -229,6 +332,6 @@ scripts/
 
 ---
 
-*文档版本: v1.0*
-*更新时间: 2026-03-05*
+*文档版本: v1.1*
+*更新时间: 2026-03-09*
 *维护者: 项目经理 Agent*

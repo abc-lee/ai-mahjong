@@ -41,11 +41,14 @@ export class HandAnalyzer {
    * @returns 是否可以胡牌
    */
   canWin(hand: Tile[], melds: Meld[]): boolean {
-    // 检查基本胡牌牌型
+    // 检查基本胡牌牌型（4组面子 + 1对将）
     if (this.canBasicWin(hand, melds)) return true;
     
     // 检查七对子（无副露时）
     if (melds.length === 0 && this.canSevenPairs(hand)) return true;
+    
+    // 检查十三幺（无副露时）
+    if (melds.length === 0 && this.canThirteenOrphans(hand, melds)) return true;
     
     return false;
   }
@@ -171,6 +174,62 @@ export class HandAnalyzer {
     }
     
     return pairs === 7;
+  }
+
+  /**
+   * 检查十三幺（国士无双）
+   * 需要一万、九万、一条、九条、一筒、九筒、东风、南风、西风、北风、红中、发财、白板
+   * 再加其中任意一张作为将牌
+   */
+  private canThirteenOrphans(hand: Tile[], melds: Meld[]): boolean {
+    // 有副露不能十三幺
+    if (melds.length > 0) return false;
+    
+    // 必须是14张牌
+    if (hand.length !== 14) return false;
+    
+    // 十三幺所需的13种牌
+    const thirteenOrphansTiles = [
+      { suit: 'wan', value: 1 },   // 一万
+      { suit: 'wan', value: 9 },   // 九万
+      { suit: 'tiao', value: 1 },  // 一条
+      { suit: 'tiao', value: 9 },  // 九条
+      { suit: 'tong', value: 1 },  // 一筒
+      { suit: 'tong', value: 9 },  // 九筒
+      { suit: 'feng', value: 1 },  // 东风
+      { suit: 'feng', value: 2 },  // 南风
+      { suit: 'feng', value: 3 },  // 西风
+      { suit: 'feng', value: 4 },  // 北风
+      { suit: 'jian', value: 1 },  // 红中
+      { suit: 'jian', value: 2 },  // 发财
+      { suit: 'jian', value: 3 },  // 白板
+    ];
+    
+    const counts = this.toTileCountMap(hand);
+    
+    // 检查是否所有13种牌都至少有一张
+    let hasAllThirteen = true;
+    for (const required of thirteenOrphansTiles) {
+      const key = `${required.suit}-${required.value}`;
+      const item = counts.get(key);
+      if (!item || item.count < 1) {
+        hasAllThirteen = false;
+        break;
+      }
+    }
+    
+    if (!hasAllThirteen) return false;
+    
+    // 检查是否有某张牌是成对的（作为将牌）
+    for (const required of thirteenOrphansTiles) {
+      const key = `${required.suit}-${required.value}`;
+      const item = counts.get(key);
+      if (item && item.count === 2) {
+        return true;
+      }
+    }
+    
+    return false;
   }
 
   /**

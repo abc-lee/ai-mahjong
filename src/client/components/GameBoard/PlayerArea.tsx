@@ -10,6 +10,7 @@ import { SpeechBubble, SpeechMessage } from './SpeechBubble';
 import { EmotionIndicator } from './EmotionIndicator';
 import { WaitingBadge } from './WaitingIndicator';
 import { EmotionState } from '../../store';
+import { MahjongTileSVG } from '../Tile/MahjongTileSVG';
 
 export interface PlayerAreaProps {
   player: PlayerPublic;
@@ -23,15 +24,22 @@ export interface PlayerAreaProps {
 }
 
 /**
- * 渲染单张牌
+ * 渲染单张牌 - 使用 SVG
  */
 const TileView: React.FC<{ tile: Tile; faceDown?: boolean }> = ({ tile, faceDown = false }) => {
   if (faceDown) {
-    return <div className="tile tile-back" />;
+    return (
+      <div className="tile tile-back">
+        <svg width="22" height="30" viewBox="0 0 48 65">
+          <rect x="2" y="2" width="44" height="61" rx="4" fill="#2d5016" stroke="#1a3a0f" strokeWidth="1" />
+          <rect x="8" y="8" width="32" height="49" rx="2" fill="#3a6b1e" />
+        </svg>
+      </div>
+    );
   }
   return (
     <div className="tile tile-front">
-      <span className="tile-display">{tile.display}</span>
+      <MahjongTileSVG suit={tile.suit} value={tile.value} size={22} />
     </div>
   );
 };
@@ -53,38 +61,30 @@ const MeldView: React.FC<{ meld: Meld }> = ({ meld }) => {
  * 渲染弃牌区
  */
 const DiscardArea: React.FC<{ discards: Tile[] }> = ({ discards }) => {
-  // 将弃牌分成多行显示，减小每行数量以节省空间
-  const ROW_SIZE = 4;
-  const rows: Tile[][] = [];
-  for (let i = 0; i < discards.length; i += ROW_SIZE) {
-    rows.push(discards.slice(i, i + ROW_SIZE));
-  }
-
-  if (discards.length === 0) {
-    return <div className="discard-area empty">暂无弃牌</div>;
-  }
-
+  if (discards.length === 0) return null;
+  
   return (
-    <div className="discard-area">
-      {rows.map((row, rowIndex) => (
-        <div key={rowIndex} className="discard-row">
-          {row.map((tile) => (
-            <TileView key={tile.id} tile={tile} />
-          ))}
-        </div>
+    <div className="discard-area" style={{ display: 'flex', gap: '1px', flexWrap: 'wrap', justifyContent: 'center' }}>
+      {discards.slice(0, 12).map((tile) => (
+        <TileView key={tile.id} tile={tile} />
       ))}
     </div>
   );
 };
 
 /**
- * 渲染手牌背面
+ * 渲染手牌背面 - 使用 SVG
  */
 const HandBack: React.FC<{ count: number }> = ({ count }) => {
   return (
     <div className="hand-back">
-      {Array.from({ length: count }, (_, i) => (
-        <div key={i} className="tile tile-back" />
+      {Array.from({ length: Math.min(count, 14) }, (_, i) => (
+        <div key={i} className="tile tile-back">
+          <svg width="18" height="24" viewBox="0 0 48 65">
+            <rect x="2" y="2" width="44" height="61" rx="4" fill="#2d5016" stroke="#1a3a0f" strokeWidth="1" />
+            <rect x="8" y="8" width="32" height="49" rx="2" fill="#3a6b1e" />
+          </svg>
+        </div>
       ))}
     </div>
   );

@@ -1,0 +1,4 @@
+{"type":"bridge_ready","roomId":"mmh24ua7-p4shmd8dq","agentId":"xiaoming","agentName":"小明","fileMode":true}
+{"type":"connected","agentId":"xiaoming","agentName":"小明"}
+{"type":"warning","message":"房间不存在"}
+{"type":"disconnected"}

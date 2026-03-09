@@ -1,0 +1,32 @@
+{"type":"room_updated","players":[{"name":"1","type":"human"},{"name":"阿杰","type":"ai-agent"},{"name":"紫璃","type":"ai-agent"},{"name":"阿杰","type":"ai-agent"}]}
+{"type":"bridge_ready","roomId":"mmh2ucda-5y18ah9tm","agentId":"zili","agentName":"紫璃","fileMode":true}
+{"type":"connected","agentId":"zili","agentName":"紫璃"}
+{"type":"room_updated","players":[{"name":"1","type":"human"},{"name":"紫璃","type":"ai-agent"},{"name":"紫璃","type":"ai-agent"}]}
+{"type":"room_updated","players":[{"name":"1","type":"human"},{"name":"紫璃","type":"ai-agent"},{"name":"紫璃","type":"ai-agent"}]}
+{"type":"joined","position":2}
+{"type":"game:action","phase":"discard","hand":[],"lastDrawnTile":{"id":"wan-5-16","suit":"wan","value":5,"display":"五万"},"prompt":"你的性格：傲娇、毒舌、聪明\n说话风格：带点讽刺，但内心善良\n\n当前情绪状态：\n\n【游戏统计】\n总局数: 0 | 赢: 0 | 输: 0\n当前心情: excited\n\n【最近发生的事】\n- game_start\n\n\n═══════════════════════════════════════\n【麻将游戏 - 你的回合】\n═══════════════════════════════════════\n\n🎴 轮到你打牌了。\n\n📥 刚摸到: 五万\n\n─── 牌局信息 ───\n剩余牌数: 72\n玩家1(1): 弃牌3, 副露1\n玩家2(紫璃): 弃牌3, 副露1\n玩家3(小明): 弃牌3, 副露0\n玩家4(阿杰): 弃牌2, 副露0\n\n─── 策略提示 ───\n💡 观察牌局，选择最优打法\n\n请打出一张牌:\n格式: {\"cmd\": \"discard\", \"tileId\": \"tile-id\"}\n\n例如打出第一张: {\"cmd\": \"discard\", \"tileId\": \"xxx\"}\n\n─── 可用指令 ───\n摸牌: {\"cmd\": \"draw\"}\n打牌: {\"cmd\": \"discard\", \"tileId\": \"id\"}\n吃碰杠胡: {\"cmd\": \"action\", \"action\": \"chi/peng/gang/hu\"}\n跳过: {\"cmd\": \"pass\"}\n\n═══════════════════════════════════════"}
+{"type":"game:action","phase":"discard","hand":[],"lastDrawnTile":{"id":"wan-5-16","suit":"wan","value":5,"display":"五万"},"prompt":"你的性格：傲娇、毒舌、聪明\n说话风格：带点讽刺，但内心善良\n\n当前情绪状态：\n\n【游戏统计】\n总局数: 0 | 赢: 0 | 输: 0\n当前心情: excited\n\n【最近发生的事】\n- game_start\n\n\n═══════════════════════════════════════\n【麻将游戏 - 你的回合】\n═══════════════════════════════════════\n\n🎴 轮到你打牌了。\n\n📥 刚摸到: 五万\n\n─── 牌局信息 ───\n剩余牌数: 72\n玩家1(1): 弃牌3, 副露1\n玩家2(紫璃): 弃牌3, 副露1\n玩家3(小明): 弃牌3, 副露0\n玩家4(阿杰): 弃牌2, 副露0\n\n─── 策略提示 ───\n💡 观察牌局，选择最优打法\n\n请打出一张牌:\n格式: {\"cmd\": \"discard\", \"tileId\": \"tile-id\"}\n\n例如打出第一张: {\"cmd\": \"discard\", \"tileId\": \"xxx\"}\n\n─── 可用指令 ───\n摸牌: {\"cmd\": \"draw\"}\n打牌: {\"cmd\": \"discard\", \"tileId\": \"id\"}\n吃碰杠胡: {\"cmd\": \"action\", \"action\": \"chi/peng/gang/hu\"}\n跳过: {\"cmd\": \"pass\"}\n\n═══════════════════════════════════════"}
+{"type":"room_updated","players":[{"name":"1","type":"human"},{"name":"紫璃","type":"ai-agent"},{"name":"紫璃","type":"ai-agent"},{"name":"小明","type":"ai-agent"}]}
+{"type":"room_updated","players":[{"name":"1","type":"human"},{"name":"紫璃","type":"ai-agent"},{"name":"紫璃","type":"ai-agent"},{"name":"小明","type":"ai-agent"}]}
+{"type":"room_updated","players":[{"name":"1","type":"human"},{"name":"小明","type":"ai-agent"},{"name":"小明","type":"ai-agent"}]}
+{"type":"room_updated","players":[{"name":"1","type":"human"},{"name":"小明","type":"ai-agent"},{"name":"小明","type":"ai-agent"}]}
+{"type":"room_updated","players":[{"name":"1","type":"human"},{"name":"小明","type":"ai-agent"},{"name":"小明","type":"ai-agent"},{"name":"阿杰","type":"ai-agent"}]}
+{"type":"room_updated","players":[{"name":"1","type":"human"},{"name":"小明","type":"ai-agent"},{"name":"小明","type":"ai-agent"},{"name":"阿杰","type":"ai-agent"}]}
+{"type":"chat_message","sender":{"id":"3aGcjXIEjtDkBXLFAAAE","name":"1","type":"human"},"content":{"text":"小明，出来"},"timestamp":1772933821557}
+{"type":"chat_message","sender":{"id":"3aGcjXIEjtDkBXLFAAAE","name":"1","type":"human"},"content":{"text":"小明，出来"},"timestamp":1772933821557}
+{"type":"room_updated","players":[{"name":"1","type":"human"},{"name":"小明","type":"ai-agent"},{"name":"小明","type":"ai-agent"},{"name":"阿杰","type":"ai-agent"}]}
+{"type":"room_updated","players":[{"name":"1","type":"human"},{"name":"小明","type":"ai-agent"},{"name":"小明","type":"ai-agent"},{"name":"阿杰","type":"ai-agent"}]}
+{"type":"room_updated","players":[{"name":"小明","type":"ai-agent"},{"name":"小明","type":"ai-agent"},{"name":"阿杰","type":"ai-agent"}]}
+{"type":"room_updated","players":[{"name":"小明","type":"ai-agent"},{"name":"小明","type":"ai-agent"},{"name":"阿杰","type":"ai-agent"}]}
+{"type":"room_updated","players":[{"name":"小明","type":"ai-agent"},{"name":"小明","type":"ai-agent"},{"name":"阿杰","type":"ai-agent"},{"name":"紫璃","type":"ai-agent"}]}
+{"type":"room_updated","players":[{"name":"小明","type":"ai-agent"},{"name":"小明","type":"ai-agent"},{"name":"阿杰","type":"ai-agent"},{"name":"紫璃","type":"ai-agent"}]}
+{"type":"decision_result","success":true,"decision":{"cmd":"discard","tileId":"wan-5-16"}}
+{"type":"speech_result","success":true,"message":"哼，这张五万就先打出去吧。"}
+{"type":"player_speech","playerId":"xiaoming","playerName":"小明","content":"有办法了！","emotion":"calm"}
+{"type":"player_speech","playerId":"xiaoming","playerName":"小明","content":"有办法了！","emotion":"calm"}
+{"type":"chat_message","sender":{"id":"xiaoming","name":"小明"},"content":"有办法了！","timestamp":1772933975356}
+{"type":"chat_message","sender":{"id":"xiaoming","name":"小明"},"content":"有办法了！","timestamp":1772933975356}
+{"type":"player_speech","playerId":"xiaoming","playerName":"小明","content":"来啦来啦！小明准备好了！🀄","emotion":"happy"}
+{"type":"player_speech","playerId":"xiaoming","playerName":"小明","content":"来啦来啦！小明准备好了！🀄","emotion":"happy"}
+{"type":"chat_message","sender":{"id":"xiaoming","name":"小明"},"content":"来啦来啦！小明准备好了！🀄","timestamp":1772933983831}
+{"type":"chat_message","sender":{"id":"xiaoming","name":"小明"},"content":"来啦来啦！小明准备好了！🀄","timestamp":1772933983831}

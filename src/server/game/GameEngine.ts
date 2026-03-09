@@ -308,6 +308,7 @@ export class GameEngine {
   private checkSelfDrawActions(player: Player): void {
     const actions = this.validator.getAvailableActions(player, null, true, -1, this.state.currentPlayerIndex);
     
+    // 胡牌优先级最高，如果可以胡，就不检查杠
     if (actions.canHu) {
       this.state.pendingActions.push({
         playerId: player.id,
@@ -315,8 +316,10 @@ export class GameEngine {
         priority: getActionPriority('hu'),
       });
       this.turnPhase = 'action';
+      return; // 直接返回，不添加杠操作
     }
     
+    // 只有不能胡时才检查杠
     if (actions.canGang && actions.gangTiles.length > 0) {
       this.state.pendingActions.push({
         playerId: player.id,
@@ -331,6 +334,9 @@ export class GameEngine {
     this.state.pendingActions = [];
     this.respondedPlayers.clear();
     
+    // 先收集所有玩家的操作
+    const allActions: PendingAction[] = [];
+    
     for (let i = 0; i < this.state.players.length; i++) {
       if (i === discardPlayerIndex) continue;
       
@@ -343,7 +349,28 @@ export class GameEngine {
       
       for (const action of actions.actions) {
         console.log(`[checkDiscardActions] 添加操作: ${action.action} 给玩家 ${player.name}`);
-        this.state.pendingActions.push(action);
+        allActions.push(action);
+      }
+    }
+    
+    // 检查是否有胡牌操作（优先级最高）
+    const hasHuAction = allActions.some(a => a.action === 'hu');
+    
+    if (hasHuAction) {
+      // 如果有人可以胡，只保留胡牌操作
+      this.state.pendingActions = allActions.filter(a => a.action === 'hu');
+      console.log(`[checkDiscardActions] 有玩家可以胡，只保留胡牌操作`);
+    } else {
+      // 没有胡牌，检查是否有杠/碰操作
+      const hasGangOrPeng = allActions.some(a => a.action === 'gang' || a.action === 'peng');
+      
+      if (hasGangOrPeng) {
+        // 有杠或碰，过滤掉吃牌操作
+        this.state.pendingActions = allActions.filter(a => a.action !== 'chi');
+        console.log(`[checkDiscardActions] 有杠/碰操作，过滤吃牌`);
+      } else {
+        // 只有吃牌操作
+        this.state.pendingActions = allActions;
       }
     }
     

@@ -9,6 +9,9 @@ import { SEAT_NAMES } from '../../../shared/constants';
 import { PlayerArea } from './PlayerArea';
 import { CenterArea } from './CenterArea';
 import { WaitingIndicator } from './WaitingIndicator';
+import { ChatContainer } from '../Chat/ChatContainer';
+import { TileComponent } from '../Tile/Tile';
+import { ChatMessage } from '../../../shared/types/chat';
 import { SpeechMessage, EmotionState } from '../../store';
 import './GameBoard.css';
 
@@ -47,6 +50,13 @@ export interface GameBoardProps {
   // 发言系统
   speechMessages?: Record<string, SpeechMessage>;
   playerEmotions?: Record<string, EmotionState>;
+  
+  // 聊天系统
+  chatMessages?: ChatMessage[];
+  onSendChat?: (content: { text: string }) => void;
+  myPlayerId?: string;
+  myPlayerName?: string;
+  myPlayerType?: 'human' | 'ai-agent';
   
   // 回调
   onDiscard?: (tileId: string) => void;
@@ -100,6 +110,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   pendingActions = [],
   speechMessages = {},
   playerEmotions = {},
+  chatMessages = [],
+  onSendChat,
+  myPlayerId = '',
+  myPlayerName = '玩家',
+  myPlayerType = 'human',
   onDiscard,
   onDraw,
   onAction,
@@ -125,7 +140,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const waitingPlayerName = currentTurnPlayer?.name || '';
 
   return (
-    <div className="game-board">
+    <div className="game-board-wrapper">
+      <div className="game-board">
       {/* 北/对家 */}
       <div className="player-slot player-top">
         {playersByPosition.top && (
@@ -156,20 +172,35 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         )}
       </div>
 
-      {/* 中央区域 */}
+      {/* 中央区域 - 游戏信息在上，聊天窗口在下 */}
       <div className="center-slot">
-        <CenterArea
-          lastDiscard={lastDiscard}
-          wallRemaining={wallRemaining}
-          roundNumber={roundNumber}
-        />
-        {/* 等待指示器 - 显示当前回合玩家 */}
-        {!isMyTurn && waitingPlayerName && (
-          <WaitingIndicator
-            playerName={waitingPlayerName}
-            timeout={15000}
+        {/* 游戏信息 */}
+        <div className="center-game-area">
+          <CenterArea
+            lastDiscard={lastDiscard}
+            wallRemaining={wallRemaining}
+            roundNumber={roundNumber}
           />
-        )}
+          {/* 等待指示器 */}
+          {!isMyTurn && waitingPlayerName && (
+            <WaitingIndicator
+              playerName={waitingPlayerName}
+              timeout={15000}
+            />
+          )}
+        </div>
+        
+        {/* 聊天窗口 - 在中间底部 */}
+        <div className="chat-panel">
+          <ChatContainer
+            myPlayerId={myPlayerId}
+            myPlayerName={myPlayerName}
+            myPlayerType={myPlayerType}
+            messages={chatMessages}
+            onSendMessage={onSendChat}
+            showInput={myPlayerType === 'human'}
+          />
+        </div>
       </div>
 
       {/* 东/下家 */}
@@ -255,18 +286,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     return (a.value || 0) - (b.value || 0);
                   })
                   .map((tile, index) => (
-                    <div
+                    <TileComponent
                       key={tile.id}
-                      className={`hand-tile ${lastDrawnTile?.id === tile.id ? 'last-drawn' : ''} ${canDiscard ? 'clickable' : ''}`}
+                      tile={tile}
+                      selected={lastDrawnTile?.id === tile.id}
                       onClick={() => canDiscard && onDiscard?.(tile.id)}
-                    >
-                      <span className="tile-display">{tile.display}</span>
-                    </div>
+                      disabled={!canDiscard}
+                      size="medium"
+                    />
                   ))}
               </div>
             </div>
           </>
         )}
+      </div>
       </div>
     </div>
   );

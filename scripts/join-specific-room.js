@@ -4,7 +4,7 @@
 const { io } = require('socket.io-client');
 
 const SERVER_URL = 'http://localhost:3000';
-const ROOM_ID = 'mmdbswrm-0qfm00w5m';
+const ROOM_ID = 'mmj6e3pv-4xy18m88h';
 
 // 创建 3 个 AI Agent
 const agents = [

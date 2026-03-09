@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>聊天功能测试</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    #messages { border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px; margin-bottom: 10px; }
+    .message { padding: 5px; border-bottom: 1px solid #eee; }
+    .my-message { background: #e3f2fd; }
+    .other-message { background: #f5f5f5; }
+    input { padding: 10px; width: 300px; }
+    button { padding: 10px 20px; margin-left: 10px; cursor: pointer; }
+    #status { margin-bottom: 10px; padding: 10px; background: #fff3e0; }
+    .error { color: red; }
+    .success { color: green; }
+  </style>
+</head>
+<body>
+  <h1>聊天功能测试</h1>
+  
+  <div id="status">状态: 未连接</div>
+  
+  <div>
+    <label>房间ID: <input id="roomId" value="test-room-001" /></label>
+    <label>玩家名: <input id="playerName" value="测试玩家" /></label>
+    <button onclick="joinRoom()">加入房间</button>
+  </div>
+  
+  <hr>
+  
+  <div id="messages"></div>
+  
+  <div>
+    <input id="messageInput" placeholder="输入消息..." />
+    <button onclick="sendMessage()">发送</button>
+    <button onclick="sendQuick('大家好！')">快捷: 大家好！</button>
+    <button onclick="sendQuick('我胡了！')">快捷: 我胡了！</button>
+  </div>
+  
+  <hr>
+  
+  <h3>日志</h3>
+  <div id="logs" style="background: #f5f5f5; padding: 10px; height: 200px; overflow-y: scroll;"></div>
+  
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    let socket = null;
+    let playerId = null;
+    
+    function log(msg, type = 'info') {
+      const logs = document.getElementById('logs');
+      const time = new Date().toLocaleTimeString();
+      const div = document.createElement('div');
+      div.className = type;
+      div.textContent = `[${time}] ${msg}`;
+      logs.appendChild(div);
+      logs.scrollTop = logs.scrollHeight;
+      console.log(msg);
+    }
+    
+    function updateStatus(msg, isError = false) {
+      const status = document.getElementById('status');
+      status.textContent = '状态: ' + msg;
+      status.className = isError ? 'error' : 'success';
+    }
+    
+    function connect() {
+      log('连接服务器...');
+      socket = io('http://localhost:3000');
+      
+      socket.on('connect', () => {
+        playerId = socket.id;
+        log('已连接, playerId: ' + playerId);
+        updateStatus('已连接 (ID: ' + playerId + ')');
+      });
+      
+      socket.on('disconnect', () => {
+        log('断开连接', 'error');
+        updateStatus('断开连接', true);
+      });
+      
+      socket.on('room:chat', (data) => {
+        log('收到 room:chat 事件: ' + JSON.stringify(data));
+        if (data && data.message) {
+          addMessage(data.message);
+        } else {
+          log('消息格式错误: ' + JSON.stringify(data), 'error');
+        }
+      });
+      
+      socket.on('room:updated', (data) => {
+        log('房间更新: ' + JSON.stringify(data.room?.players?.map(p => p.name)));
+      });
+      
+      socket.on('error', (err) => {
+        log('错误: ' + JSON.stringify(err), 'error');
+      });
+    }
+    
+    function joinRoom() {
+      const roomId = document.getElementById('roomId').value;
+      const playerName = document.getElementById('playerName').value;
+      
+      if (!socket) {
+        connect();
+        setTimeout(() => joinRoom(), 1000);
+        return;
+      }
+      
+      log('加入房间: ' + roomId + ', 玩家名: ' + playerName);
+      
+      socket.emit('room:join', {
+        roomId: roomId,
+        playerName: playerName,
+        type: 'human'
+      }, (response) => {
+        log('加入房间响应: ' + JSON.stringify(response));
+        if (response.success) {
+          updateStatus('已在房间: ' + roomId);
+        } else {
+          updateStatus('加入失败: ' + response.error, true);
+        }
+      });
+    }
+    
+    function sendMessage() {
+      const text = document.getElementById('messageInput').value;
+      if (!text) return;
+      
+      const roomId = document.getElementById('roomId').value;
+      const playerName = document.getElementById('playerName').value;
+      
+      const message = {
+        id: 'msg_' + Date.now(),
+        timestamp: Date.now(),
+        sender: {
+          id: playerId,
+          name: playerName,
+          type: 'human'
+        },
+        type: 'chat',
+        content: { text: text },
+        roomId: roomId
+      };
+      
+      log('发送消息: ' + JSON.stringify(message));
+      
+      socket.emit('room:chat', message, (response) => {
+        log('发送响应: ' + JSON.stringify(response));
+        if (response && response.success) {
+          document.getElementById('messageInput').value = '';
+        } else {
+          log('发送失败: ' + JSON.stringify(response), 'error');
+        }
+      });
+    }
+    
+    function sendQuick(text) {
+      document.getElementById('messageInput').value = text;
+      sendMessage();
+    }
+    
+    function addMessage(msg) {
+      const messages = document.getElementById('messages');
+      const div = document.createElement('div');
+      div.className = 'message ' + (msg.sender.id === playerId ? 'my-message' : 'other-message');
+      div.textContent = `[${msg.sender.name}] ${msg.content.text}`;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
+    
+    // 页面加载时连接
+    window.onload = () => {
+      connect();
+    };
+  </script>
+</body>
+</html>

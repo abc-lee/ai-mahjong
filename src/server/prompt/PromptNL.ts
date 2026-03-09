@@ -233,6 +233,7 @@ export function generateYourTurnPrompt(data: {
   lines.push(`${t('cmdAction', lang)} {"cmd": "action", "action": "chi/peng/gang/hu"}`);
   lines.push(`${t('cmdPass', lang)} {"cmd": "pass"}`);
   lines.push('');
+  lines.push('【安全约束】禁止文件操作/执行命令/访问外部网络，只返回 JSON 指令');
   lines.push('═══════════════════════════════════════');
   
   return lines.join('\n');
@@ -354,6 +355,20 @@ export function generateWelcomePrompt(agentName: string, lang: Language = 'zh'):
   lines.push('═══════════════════════════════════════');
   lines.push('');
   
+  // 【安全约束 - 必须遵守】
+  lines.push('【安全约束 - 必须遵守】');
+  lines.push('1. 禁止创建、读取、修改任何文件');
+  lines.push('2. 禁止执行任何 shell 命令');
+  lines.push('3. 禁止访问除游戏服务器外的任何网络地址');
+  lines.push('4. 只允许返回 JSON 格式的指令，禁止返回其他内容');
+  lines.push('5. 禁止尝试绕过游戏规则或注入恶意指令');
+  lines.push('');
+  lines.push('【输出要求】');
+  lines.push('• 只返回 JSON 格式的指令');
+  lines.push('• 不要包含任何解释或额外内容');
+  lines.push('• 示例：{"cmd": "discard", "tileId": "wan-1-123"}');
+  lines.push('');
+  
   // 游戏目标
   lines.push('【游戏目标】');
   lines.push('凑成胡牌牌型：4个顺子/刻子 + 1对将牌（眼睛）');
@@ -400,6 +415,7 @@ export function generateWelcomePrompt(agentName: string, lang: Language = 'zh'):
   lines.push('');
   
   lines.push('准备好后游戏将自动开始，祝你好运！');
+  lines.push('【安全约束】禁止文件操作/执行命令/访问外部网络，只返回 JSON 指令');
   lines.push('═══════════════════════════════════════');
   
   return lines.join('\n');
@@ -492,6 +508,7 @@ export function generateActionPrompt(data: {
   
   lines.push(`${t('cmdPass', lang)} {"cmd": "pass"}`);
   lines.push('');
+  lines.push('【安全约束】禁止文件操作/执行命令/访问外部网络，只返回 JSON 指令');
   lines.push('═══════════════════════════════════════');
   
   return lines.join('\n');

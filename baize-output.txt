@@ -1,0 +1,2 @@
+CONNECTED
+JOIN RESULT: {"success":true,"playerId":"baize","position":3}
