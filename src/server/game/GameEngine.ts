@@ -306,14 +306,8 @@ export class GameEngine {
   }
 
   private checkSelfDrawActions(player: Player): void {
-    // 流局检查：牌墙耗尽时直接结束游戏
-    if (this.deck.getRemaining() === 0) {
-      console.log(`[GameEngine] checkSelfDrawActions: 牌墙耗尽，流局`);
-      this.state.pendingActions = [];
-      this.respondedPlayers.clear();
-      this.endGame(null);
-      return;
-    }
+    // 注意：流局检查已在 drawTile 中处理，这里不需要重复检查
+    // 如果牌墙为空但 draw() 返回了牌（最后一张），玩家仍然可以胡牌
     
     const actions = this.validator.getAvailableActions(player, null, true, -1, this.state.currentPlayerIndex);
     
