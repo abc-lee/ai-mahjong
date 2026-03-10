@@ -1,8 +1,9 @@
 # AI 玩家架构设计
 
-> 版本：v3.0
-> 更新时间：2026-03-04
+> 版本：v4.0
+> 更新时间：2026-03-10
 > 核心理念：AI Agent 作为真正的玩家，通过 WebSocket 连接游戏，享受娱乐陪伴体验
+> 使用场景：私人游戏，主Agent作为用户的个人AI助理
 
 ---
 
@@ -12,12 +13,13 @@
 
 **这个项目**：AI Agent 作为真正的玩家 → AI 有独立会话、独立性格、独立决策
 
-用户打开游戏时，我（OpenCode Agent）作为"游戏房老板"：
+用户说"准备打游戏"时，主Agent（如 OpenCode/OpenClaw）：
 1. 启动游戏服务器
-2. 发送网址给用户
-3. 派遣 AI Agent 加入游戏（紫璃、白泽、李瞳...）
-4. 每个 Agent 有独立的会话、独立的性格
-5. 他们会吵架、吐槽、情绪化
+2. 返回链接给用户
+3. 用户点击链接进入游戏，选择座位
+4. 用户可以通过独立通话渠道让主Agent派发AI（紫璃、白泽、李瞳...）
+5. 每个 AI Agent 有独立的会话、独立的性格
+6. 他们会吵架、吐槽、情绪化
 
 **用户获得的体验**：和 AI 一起玩，看他们互怼，享受娱乐陪伴的过程。
 
@@ -106,20 +108,18 @@ AI 需要的是：
 interface Player {
   id: string;
   name: string;
-  position: number;
+  position: 0 | 1 | 2 | 3;   // 座位：东南西北
   
-  // 核心字段：区分人类和 AI
-  type: 'human' | 'ai';
+  // 核心字段：区分三种玩家类型
+  type: 'human' | 'ai-agent' | 'npc';
   
   // 人类玩家
   socketId?: string;
   isOnline: boolean;
   
-  // AI 玩家
+  // AI Agent 玩家
+  agentId?: string;           // Agent ID
   aiConfig?: AIConfig;
-  
-  // 人类断线托管
-  aiFallback?: AIConfig;
   
   // 通用游戏数据
   hand: Tile[];
@@ -130,6 +130,14 @@ interface Player {
   isReady: boolean;
 }
 ```
+
+### 三种玩家类型
+
+| 类型 | 标识 | 来源 | 特点 |
+|------|------|------|------|
+| 人类玩家 | `human` | 浏览器连接 | 看图形界面，点按钮操作 |
+| AI Agent 玩家 | `ai-agent` | 主Agent派发的子Agent | 收 Prompt，发 JSON 指令，有性格会聊天 |
+| NPC | `npc` | 服务器内置 | 简单规则决策，只打牌不说话 |
 
 ---
 

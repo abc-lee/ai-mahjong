@@ -7,11 +7,15 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:server": "tsx watch src/server/index.ts",
     "dev:client": "vite",
+    "dev:client-new": "vite --config vite.client-new.config.ts",
+    "dev:new": "concurrently \"npm run dev:server\" \"npm run dev:client-new\"",
     "build": "npm run build:server && npm run build:client",
     "build:server": "tsc",
     "build:client": "vite build",
+    "build:client-new": "vite build --config vite.client-new.config.ts",
     "start": "node dist/server/index.js",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preview:new": "vite preview --config vite.client-new.config.ts"
   },
   "dependencies": {
     "cors": "^2.8.6",

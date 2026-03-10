@@ -206,19 +206,19 @@ export class RoomManager {
       throw new Error('房间不存在');
     }
 
-    if (room.state !== 'waiting') {
-      throw new Error('游戏已开始或已结束');
+    // 允许从 waiting 或 finished 状态开始新游戏
+    if (room.state !== 'waiting' && room.state !== 'finished') {
+      throw new Error('游戏进行中，无法开始新游戏');
     }
 
     if (room.players.length !== 4) {
       throw new Error('需要4名玩家才能开始游戏');
     }
 
-    // 检查所有玩家是否已准备
-    const allReady = room.players.every(p => p.isReady);
-    if (!allReady) {
-      throw new Error('还有玩家未准备');
-    }
+    // 保存上一局的分数
+    room.players.forEach(player => {
+      player.lastScore = player.score || 1000;
+    });
 
     // 初始化游戏引擎
     room.gameEngine = new GameEngine(roomId);
@@ -293,7 +293,7 @@ export class RoomManager {
       agentId?: string;
       name?: string;
       personality?: 'aggressive' | 'cautious' | 'balanced';
-      type?: 'ai-agent' | 'ai-auto';
+      type?: 'ai-agent' | 'npc';
     }
   ): Player {
     const room = this.rooms.get(roomId);
@@ -335,8 +335,8 @@ export class RoomManager {
         thinkTimeMax: 3000,
         maxRetries: 3,
       },
-      // 自动托管玩家初始化控制状态
-      aiControl: playerType === 'ai-auto' ? { mode: 'auto' } : { mode: 'agent' },
+      // NPC 玩家初始化控制状态
+      aiControl: playerType === 'npc' ? { mode: 'auto' } : { mode: 'agent' },
       hand: [],
       melds: [],
       discards: [],

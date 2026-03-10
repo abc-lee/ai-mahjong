@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>神州雀王 - AI麻将派对</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
+
+    :root {
+        --mj-bg: #1a4d2e;
+        --mj-table: #2d6a4f;
+        --mj-gold: #ffb703;
+    }
+
+    body {
+        background-color: #0f172a;
+        font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        overflow: hidden;
+    }
+
+    .mahjong-table {
+        background: radial-gradient(circle, var(--mj-table) 0%, var(--mj-bg) 100%);
+        border: 12px solid #3e2723;
+        box-shadow: inset 0 0 100px rgba(0,0,0,0.5), 0 25px 50px -12px rgba(0,0,0,0.5);
+    }
+
+    .tile {
+        perspective: 1000px;
+        transition: transform 0.2s;
+    }
+    .tile:hover {
+        transform: translateY(-10px);
+        cursor: pointer;
+    }
+
+    .glass-panel {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .chat-scroll::-webkit-scrollbar {
+        width: 4px;
+    }
+    .chat-scroll::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.2);
+        border-radius: 10px;
+    }
+
+    /* 可拖拽对话框样式 */
+    .resizable-chat {
+        min-height: 200px;
+        min-width: 250px;
+        max-height: 80vh;
+        max-width: 90vw;
+        position: relative;
+        z-index: 100;
+    }
+
+    .drag-handle {
+        cursor: move;
+        user-select: none;
+    }
+
+    .resize-handle {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        width: 20px;
+        height: 20px;
+        cursor: nwse-resize;
+        background: linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.3) 50%);
+        border-radius: 0 0 0.75rem 0;
+    }
+
+    /* 手机端适配优化 */
+    @media (max-width: 640px) {
+        .mobile-hidden { display: none; }
+        .tile { width: 30px; height: 42px; }
+        .chat-area { height: 120px; font-size: 12px; }
+    }
+</style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-center p-2 sm:p-4">
+
+<!-- 方位选择弹窗 -->
+<div id="position-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-[200]">
+  <div class="glass-panel rounded-2xl p-6 sm:p-8 max-w-sm w-full mx-4 text-center">
+    <h2 class="text-xl sm:text-2xl font-bold text-white mb-2">选择你的座位</h2>
+    <p class="text-white/60 text-sm mb-6">点击选择方位，先到先得</p>
+    
+    <!-- 座位图 -->
+    <div class="relative w-48 h-48 sm:w-56 sm:h-56 mx-auto mb-6">
+      <!-- 北 -->
+      <button id="pos-north" class="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-16 sm:w-20 sm:h-20 rounded-xl glass-panel flex flex-col items-center justify-center text-white hover:bg-white/20 transition-all" data-position="2">
+        <span class="text-lg font-bold">北</span>
+        <span class="text-xs text-white/50" id="pos-north-status">空</span>
+      </button>
+      
+      <!-- 西 -->
+      <button id="pos-west" class="absolute left-0 top-1/2 -translate-y-1/2 w-16 h-16 sm:w-20 sm:h-20 rounded-xl glass-panel flex flex-col items-center justify-center text-white hover:bg-white/20 transition-all" data-position="3">
+        <span class="text-lg font-bold">西</span>
+        <span class="text-xs text-white/50" id="pos-west-status">空</span>
+      </button>
+      
+      <!-- 东 -->
+      <button id="pos-east" class="absolute right-0 top-1/2 -translate-y-1/2 w-16 h-16 sm:w-20 sm:h-20 rounded-xl glass-panel flex flex-col items-center justify-center text-white hover:bg-white/20 transition-all" data-position="1">
+        <span class="text-lg font-bold">东</span>
+        <span class="text-xs text-white/50" id="pos-east-status">空</span>
+      </button>
+      
+      <!-- 南 -->
+      <button id="pos-south" class="absolute bottom-0 left-1/2 -translate-x-1/2 w-16 h-16 sm:w-20 sm:h-20 rounded-xl glass-panel flex flex-col items-center justify-center text-white hover:bg-white/20 transition-all" data-position="0">
+        <span class="text-lg font-bold">南</span>
+        <span class="text-xs text-white/50" id="pos-south-status">空</span>
+      </button>
+      
+      <!-- 中心装饰 -->
+      <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-yellow-600/50 flex items-center justify-center">
+        <span class="text-yellow-300 text-lg">🀄</span>
+      </div>
+    </div>
+    
+    <!-- 玩家名输入 -->
+    <div class="mb-4">
+      <input type="text" id="player-name-input" placeholder="输入你的昵称" class="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white text-center outline-none focus:border-yellow-500/50" maxlength="8" value="玩家"/>
+    </div>
+    
+    <p class="text-white/40 text-xs">选择座位后自动进入游戏</p>
+  </div>
+</div>
+
+<!-- 开始按钮（游戏开始前显示） -->
+<div id="start-button-container" class="fixed bottom-32 left-1/2 -translate-x-1/2 z-[150] hidden">
+  <button id="start-game-btn" class="px-8 py-3 bg-yellow-600 hover:bg-yellow-500 text-white font-bold rounded-full shadow-lg transition-all text-lg">
+    开始游戏
+  </button>
+</div>
+
+
+<!-- 顶栏状态 -->
+<div class="fixed top-0 left-0 w-full p-4 flex justify-between items-center z-50 pointer-events-none">
+<div class="glass-panel rounded-full px-4 py-2 flex items-center gap-4 text-white pointer-events-auto" id="player-info">
+<div class="flex items-center gap-2">
+<span class="iconify text-yellow-500" data-icon="mdi:gold"></span>
+<span class="font-bold">128,500</span>
+</div>
+<div class="h-4 w-[1px] bg-white/20"></div>
+<div class="flex items-center gap-2">
+<span class="iconify text-blue-400" data-icon="mdi:account"></span>
+<span>等待中...</span>
+</div>
+</div>
+<div class="glass-panel rounded-full px-6 py-2 text-white font-bold text-lg pointer-events-auto" id="game-info">
+    等待开始 <span class="text-yellow-400 ml-2"></span>
+</div>
+<div class="flex gap-2 pointer-events-auto">
+<button class="glass-panel p-2 rounded-full text-white hover:bg-white/20"><span class="iconify" data-icon="mdi:cog"></span></button>
+<button class="glass-panel p-2 rounded-full text-white hover:bg-white/20"><span class="iconify" data-icon="mdi:help-circle"></span></button>
+</div>
+</div>
+
+<!-- 游戏主桌面 -->
+<div class="relative w-full max-w-[1200px] aspect-square sm:aspect-video mahjong-table rounded-[40px] flex items-center justify-center overflow-hidden">
+
+<!-- 背景装饰纹理 -->
+<div class="absolute inset-0 opacity-10 pointer-events-none flex items-center justify-center">
+<span class="iconify text-[400px]" data-icon="mdi:yin-yang"></span>
+</div>
+
+<!-- 玩家：北 (上) -->
+<div class="absolute top-8 left-1/2 -translate-x-1/2 flex flex-col items-center" data-position="north" id="player-north">
+<div class="player-hand flex gap-1 mb-2">
+<!-- 动态渲染 -->
+</div>
+<div class="flex items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/10">
+<img alt="Player North" class="w-6 h-6 rounded-full border border-white/50" src="https://modao.cc/agent-py/media/generated_images/2026-03-10/f0db31c6d9e24d47bebd9f5cf58f7319.jpg"/>
+<span class="player-name text-white text-xs whitespace-nowrap">等待中</span>
+</div>
+</div>
+
+<!-- 玩家：西 (左) -->
+<div class="absolute left-4 top-1/2 -translate-y-1/2 flex flex-row items-center gap-4" data-position="west" id="player-west">
+<div class="flex flex-col items-center gap-2 bg-black/40 p-2 rounded-xl border border-white/10">
+<img alt="Player West" class="w-10 h-10 lg:w-16 lg:h-16 rounded-full border-2 border-white/30" src="https://modao.cc/agent-py/media/generated_images/2026-03-10/c5ef090b0c5f4d099669ffdd9c75df9b.jpg"/>
+<span class="player-name text-white text-xs font-bold">等待中</span>
+<div class="player-status text-yellow-400 text-[10px] sm:text-xs"></div>
+</div>
+<div class="player-hand flex flex-col gap-1 mobile-hidden">
+<!-- 动态渲染 -->
+</div>
+</div>
+
+<!-- 玩家：东 (右) -->
+<div class="absolute right-4 top-1/2 -translate-y-1/2 flex flex-row-reverse items-center gap-4" data-position="east" id="player-east">
+<div class="flex flex-col items-center gap-2 bg-black/40 p-2 rounded-xl border border-white/10">
+<img alt="Player East" class="w-10 h-10 lg:w-16 lg:h-16 rounded-full border-2 border-white/30" src="https://modao.cc/agent/placeholder.svg"/>
+<span class="player-name text-white text-xs font-bold">等待中</span>
+<span class="player-status text-green-400 text-xs"></span>
+</div>
+<div class="player-hand flex flex-col gap-1 mobile-hidden">
+<!-- 动态渲染 -->
+</div>
+</div>
+
+<!-- 中心区域：计时器与聊天对话框 -->
+<div class="w-full max-w-[1000px] flex flex-col items-center justify-center p-4 relative pointer-events-none">
+
+<!-- 计时指示灯 -->
+<div class="relative w-24 h-24 sm:w-32 sm:h-32 rounded-lg bg-[#1a1a1a] border-4 border-[#333] flex items-center justify-center p-2 shadow-2xl pointer-events-auto" id="timer">
+<div class="grid grid-cols-3 grid-rows-3 gap-1 w-full h-full text-[#555] font-bold text-center">
+<div class="flex items-center justify-center">北</div>
+<div class="flex items-center justify-center">
+<div class="indicator bg-gray-600 rounded-full w-2 h-2 mx-auto my-auto"></div>
+</div>
+<div class="flex items-center justify-center">东</div>
+<div class="flex items-center justify-center">
+<div class="indicator bg-gray-600 rounded-full w-2 h-2 mx-auto my-auto"></div>
+</div>
+<div class="flex items-center justify-center text-3xl sm:text-4xl text-yellow-400 col-span-1 row-span-1" style="font-family: 'ZCOOL KuaiLe'">--</div>
+<div class="flex items-center justify-center">
+<div class="indicator bg-gray-600 rounded-full w-2 h-2 mx-auto my-auto"></div>
+</div>
+<div class="flex items-center justify-center">西</div>
+<div class="flex items-center justify-center text-green-500">南</div>
+<div class="flex items-center justify-center">
+<div class="indicator bg-gray-600 rounded-full w-2 h-2 mx-auto my-auto"></div>
+</div>
+</div>
+</div>
+
+<!-- 群聊对话框区域 -->
+<div class="w-full sm:w-2/3 max-w-[500px] mt-4 resizable-chat glass-panel rounded-xl flex flex-col overflow-hidden shadow-2xl border border-white/20 pointer-events-auto" id="movable-chat">
+<div class="bg-black/40 px-3 py-2 flex items-center justify-between text-[10px] text-white/70 drag-handle" id="chat-header">
+<div class="flex items-center gap-2">
+<span class="iconify" data-icon="mdi:drag-variant"></span>
+<span class="font-bold">赛事聊天室 (4人)</span>
+</div>
+<span class="flex items-center gap-1"><span class="w-2 h-2 bg-green-500 rounded-full"></span> 在线</span>
+</div>
+<!-- 消息滚动区 -->
+<div class="flex-1 p-2 overflow-y-auto chat-scroll flex flex-col gap-2 chat-area" style="min-height: 180px;" id="chat-messages">
+<div class="flex flex-col gap-1 items-center">
+<span class="text-[10px] text-white/50">等待玩家加入...</span>
+</div>
+</div>
+<!-- 输入框 -->
+<div class="p-2 flex gap-2 chat-input-area">
+<input class="flex-1 bg-black/40 rounded px-3 py-1 text-white text-xs outline-none border border-white/10 focus:border-yellow-500/50" placeholder="与AI和牌友聊天..." type="text"/>
+<button class="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1 rounded text-xs transition-colors">发送</button>
+</div>
+<!-- 缩放手柄 -->
+<div class="resize-handle" id="chat-resizer"></div>
+</div>
+</div>
+
+<!-- 底部：手牌操作区 (我) -->
+<div class="absolute bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-[900px]" id="bottom-area">
+<!-- 操作按钮 - 动态渲染，默认隐藏 -->
+<div class="flex justify-center gap-3 mb-4 sm:mb-8" id="action-buttons">
+</div>
+<!-- 手牌展示 -->
+<div id="hand-area" class="flex justify-center items-end gap-1 px-4 sm:gap-2">
+<!-- 动态渲染手牌 -->
+<div class="text-white/50 text-sm">等待游戏开始...</div>
+</div>
+</div>
+</div>
+
+<!-- 底部功能栏 (移动端适配) -->
+<div class="fixed bottom-0 w-full glass-panel flex justify-around py-3 rounded-t-3xl sm:hidden">
+<button class="flex flex-col items-center text-white/70">
+<span class="iconify text-2xl" data-icon="mdi:trophy"></span>
+<span class="text-[10px]">排行榜</span>
+</button>
+<button class="flex flex-col items-center text-yellow-500">
+<span class="iconify text-2xl" data-icon="mdi:play-circle"></span>
+<span class="text-[10px]">对局中</span>
+</button>
+<button class="flex flex-col items-center text-white/70">
+<span class="iconify text-2xl" data-icon="mdi:wallet"></span>
+<span class="text-[10px]">商城</span>
+</button>
+<button class="flex flex-col items-center text-white/70">
+<span class="iconify text-2xl" data-icon="mdi:message-badge"></span>
+<span class="text-[10px]">社交</span>
+</button>
+</div>
+
+<script type="module">
+    // 主入口模块
+    import './js/main.js';
+    
+    // 聊天对话框拖拽与缩放功能
+    const movableChat = document.getElementById('movable-chat');
+    const chatHeader = document.getElementById('chat-header');
+    const chatResizer = document.getElementById('chat-resizer');
+
+    let isDragging = false;
+    let isResizing = false;
+    let startX, startY, startWidth, startHeight, startLeft, startTop;
+
+    // 辅助获取坐标（兼容触摸）
+    const getCoords = (e) => {
+        return e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY };
+    };
+
+    // 拖拽位置逻辑
+    const startDrag = (e) => {
+        if (e.target.closest('button')) return;
+        isDragging = true;
+        const coords = getCoords(e);
+        const rect = movableChat.getBoundingClientRect();
+        startX = coords.x - rect.left;
+        startY = coords.y - rect.top;
+        movableChat.style.position = 'fixed';
+        movableChat.style.left = rect.left + 'px';
+        movableChat.style.top = rect.top + 'px';
+        movableChat.style.margin = '0';
+    };
+
+    // 缩放大小逻辑
+    const startResize = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        isResizing = true;
+        const coords = getCoords(e);
+        movableChat.classList.remove('w-full', 'sm:w-2/3', 'max-w-[500px]');
+        startWidth = movableChat.offsetWidth;
+        startHeight = movableChat.offsetHeight;
+        startX = coords.x;
+        startY = coords.y;
+    };
+
+    const onMove = (e) => {
+        if (!isDragging && !isResizing) return;
+        const coords = getCoords(e);
+
+        if (isDragging) {
+            movableChat.style.left = (coords.x - startX) + 'px';
+            movableChat.style.top = (coords.y - startY) + 'px';
+        } else if (isResizing) {
+            const newWidth = startWidth + (coords.x - startX);
+            const newHeight = startHeight + (coords.y - startY);
+            movableChat.style.width = newWidth + 'px';
+            movableChat.style.height = newHeight + 'px';
+        }
+    };
+
+    const stopInteraction = () => {
+        isDragging = false;
+        isResizing = false;
+    };
+
+    // 绑定事件
+    chatHeader.addEventListener('mousedown', startDrag);
+    chatHeader.addEventListener('touchstart', startDrag, { passive: true });
+    chatResizer.addEventListener('mousedown', startResize);
+    chatResizer.addEventListener('touchstart', startResize, { passive: false });
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('mouseup', stopInteraction);
+    window.addEventListener('touchend', stopInteraction);
+</script>
+</body>
+</html>

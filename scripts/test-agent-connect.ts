@@ -15,7 +15,7 @@ const TEST_ROOM_ID = 'test-room';
 interface AgentConfig {
   id: string;
   name: string;
-  type: 'ai-agent' | 'ai-auto';
+  type: 'ai-agent' | 'npc';
 }
 
 // 创建测试 Agent
@@ -85,7 +85,7 @@ async function runTest() {
     { id: 'agent-1', name: '紫璃', type: 'ai-agent' },
     { id: 'agent-2', name: '白泽', type: 'ai-agent' },
     { id: 'agent-3', name: '李瞳', type: 'ai-agent' },
-    { id: 'agent-4', name: '自动托管', type: 'ai-auto' },
+    { id: 'agent-4', name: 'NPC', type: 'npc' },
   ];
 
   const sockets: Socket[] = [];
@@ -138,7 +138,7 @@ async function runTest() {
           roomId,
           agentId: 'agent-4',
           agentName: '自动托管',
-          type: 'ai-auto',
+          type: 'npc',
         }, (res: any) => {
           console.log('[自动托管] 加入结果:', res);
         });

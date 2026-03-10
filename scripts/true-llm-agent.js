@@ -272,7 +272,7 @@ async function main() {
         roomId: createRes.roomId,
         agentId: `npc-${i}`,
         agentName: `NPC-${i}`,
-        type: 'ai-auto'
+        type: 'npc'
       });
     }, 500 * i);
   }

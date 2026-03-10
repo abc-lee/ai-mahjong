@@ -40,7 +40,7 @@ class TestSetup {
       this.socket.emit('room:createAI', {
         agentId: 'ai-host-' + Date.now(),
         agentName: '紫璃',
-        type: 'ai-auto'
+        type: 'npc'
       }, (res) => {
         if (res.roomId) {
           this.roomId = res.roomId;
@@ -73,7 +73,7 @@ class TestSetup {
           roomId: this.roomId,
           agentId: agentId,
           agentName: name,
-          type: 'ai-auto'
+          type: 'npc'
         }, (res) => {
           console.log(`[Setup] AI ${name} 加入:`, res.success ? '成功' : res.error);
           resolve();

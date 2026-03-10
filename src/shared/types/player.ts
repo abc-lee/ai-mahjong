@@ -6,7 +6,7 @@ import { Tile } from './tile';
 import { Meld } from './meld';
 
 // 玩家类型
-export type PlayerType = 'human' | 'ai-agent' | 'ai-auto';
+export type PlayerType = 'human' | 'ai-agent' | 'npc';
 
 // 情绪状态
 export type Mood = 'confident' | 'happy' | 'normal' | 'upset' | 'angry' | 'devastated';

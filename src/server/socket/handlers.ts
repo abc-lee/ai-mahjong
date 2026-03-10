@@ -100,6 +100,7 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
         id: p.id,
         name: p.name,
         score: p.score,
+        scoreChange: (p.score || 0) - (p.lastScore || 1000),
       })),
     });
     return;
@@ -126,8 +127,12 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
     const yourTurn = room.gameEngine.isPlayerTurn(player.id);
     const lastDrawnTile = room.gameEngine.getLastDrawnTile(player.id);
     const turnPhase = room.gameEngine.getTurnPhase();
+    
+    // 检查玩家是否有待处理的 action（吃碰杠胡）
+    const playerActions = room.gameEngine.getAvailableActions(player.id);
+    const hasActions = playerActions.length > 0;
 
-    console.log(`[broadcastGameState] player=${player.name}(${player.id.slice(0,8)}), type=${player.type}, yourTurn=${yourTurn}, turnPhase=${turnPhase}`);
+    console.log(`[broadcastGameState] player=${player.name}(${player.id.slice(0,8)}), type=${player.type}, yourTurn=${yourTurn}, turnPhase=${turnPhase}, hasActions=${hasActions}`);
 
     if (player.type === 'human') {
       // 人类玩家：发送 game:state
@@ -156,15 +161,19 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
           yourTurn,
           lastDrawnTile,
           turnPhase,
+          availableActions: playerActions,
         });
+        console.log(`[broadcastGameState] 广播给 ${player.name}, availableActions=${playerActions.map(a => a.action).join(',')}`);
       } else {
-        console.log(`[broadcastGameState] 发送 game:state 给 ${player.name}`);
+        console.log(`[broadcastGameState] 发送 game:state 给 ${player.name}, availableActions=${playerActions.map(a => a.action).join(',')}`);
         foundSocket.emit('game:state', {
           state: publicState,
           yourHand: player.hand,
           yourTurn,
           lastDrawnTile,
           turnPhase,
+          // 添加可用操作信息
+          availableActions: playerActions,
         });
       }
     } else if (player.type === 'ai-agent') {
@@ -172,9 +181,10 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
       const agentSocket = Array.from(io.sockets.sockets.values())
         .find(s => s.data.playerId === player.id && s.data.clientType === 'ai-agent');
       
-      console.log(`[broadcastGameState] 查找 Agent socket: playerId=${player.id}, 找到=${!!agentSocket}, yourTurn=${yourTurn}`);
+      console.log(`[broadcastGameState] 查找 Agent socket: playerId=${player.id}, 找到=${!!agentSocket}, yourTurn=${yourTurn}, hasActions=${hasActions}`);
       
-      if (agentSocket && yourTurn) {
+      // 修改：yourTurn 或 hasActions 时都发送通知
+      if (agentSocket && (yourTurn || hasActions)) {
         // Agent 已连接：发送自然语言 Prompt
         console.log(`[broadcastGameState] 发送 agent:your_turn 给 ${player.name}, phase=${turnPhase}`);
         
@@ -183,10 +193,11 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
         
         // 生成自然语言 Prompt（包含情绪上下文）
         let prompt = generateYourTurnPrompt({
-          phase: turnPhase,
+          phase: hasActions ? 'action' : turnPhase,
           hand: player.hand,
           lastDrawnTile,
           gameState: publicState,
+          availableActions: hasActions ? playerActions : undefined,
         });
         
         // 添加情绪上下文
@@ -203,9 +214,10 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
         agentSocket.emit('agent:your_turn', {
           prompt,  // 自然语言文本
           // 同时保留结构化数据供脚本使用
-          phase: turnPhase,
+          phase: hasActions ? 'action' : turnPhase,
           hand: player.hand,
           lastDrawnTile,
+          actions: hasActions ? playerActions : undefined,
         });
         
         // 添加超时机制：如果 AI 5秒内没有响应，自动托管
@@ -272,17 +284,17 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
           forceExecutePlayerAction(room, player, turnPhase, io, roomId, roomManager);
         }
       }
-    } else if (player.type === 'ai-auto') {
-      // 自动托管玩家：使用 AIAdapter
+    } else if (player.type === 'npc') {
+      // NPC 玩家：使用 AIAdapter
       const adapter = aiManager.getAdapter(player.id);
-      console.log(`[broadcastGameState] ai-auto ${player.name}: adapter=${!!adapter}, yourTurn=${yourTurn}, phase=${turnPhase}`);
+      console.log(`[broadcastGameState] npc ${player.name}: adapter=${!!adapter}, yourTurn=${yourTurn}, phase=${turnPhase}`);
       if (adapter && yourTurn) {
         adapter.handleEvent({
           type: turnPhase === 'draw' ? 'YOUR_TURN_DRAW' : 'YOUR_TURN_DISCARD',
           lastDrawnTile,
           gameState: publicState,
         }).then(decision => {
-          console.log(`[broadcastGameState] ai-auto ${player.name} 决策:`, decision);
+          console.log(`[broadcastGameState] npc ${player.name} 决策:`, decision);
           if (decision) {
             executeAIDecision(roomId, player.id, decision, roomManager, io);
           }
@@ -293,7 +305,7 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
         });
       } else if (!adapter) {
         // 没有 adapter，强制执行
-        console.log(`[broadcastGameState] ai-auto ${player.name} 无 adapter，强制执行`);
+        console.log(`[broadcastGameState] npc ${player.name} 无 adapter，强制执行`);
         forceExecutePlayerAction(room, player, turnPhase, io, roomId, roomManager);
       }
     }
@@ -402,8 +414,8 @@ function handleAIActions(roomId: string, roomManager: RoomManager, io: Server): 
   for (const [playerId, actions] of playerActionsMap) {
     const player = room.players.find(p => p.id === playerId);
     
-    // 处理 ai-agent 和 ai-auto
-    if (player?.type === 'ai-agent' || player?.type === 'ai-auto') {
+    // 处理 ai-agent 和 npc
+    if (player?.type === 'ai-agent' || player?.type === 'npc') {
       const adapter = aiManager.getAdapter(playerId);
       console.log(`[handleAIActions] ${player.name}(${player.type}) 有待处理操作: ${actions.map(a => a.action).join(',')}, adapter=${!!adapter}`);
       
@@ -485,7 +497,7 @@ export async function handleCreateRoomAI(
   payload: {
     agentId: string;
     agentName: string;
-    type?: 'ai-agent' | 'ai-auto';
+    type?: 'ai-agent' | 'npc';
     personality?: 'aggressive' | 'cautious' | 'balanced';
   },
   callback: (response: { roomId: string; room: Room; playerId: string; position: number } | ErrorResponse) => void
@@ -520,7 +532,7 @@ export async function handleCreateRoomAI(
         thinkTimeMax: 3000,
         maxRetries: 3,
       };
-      hostPlayer.aiControl = { mode: playerType === 'ai-auto' ? 'auto' : 'agent' };
+      hostPlayer.aiControl = { mode: playerType === 'npc' ? 'auto' : 'agent' };
     }
     
     // 创建 AIAdapter
@@ -637,6 +649,8 @@ export async function handleLeaveRoom(
   }
 }
 
+
+
 export async function handleRoomList(
   roomManager: RoomManager,
   callback: (response: { rooms: Room[] }) => void
@@ -675,7 +689,7 @@ export async function handleReady(
       if (allReady) {
         const host = serverRoom.players.find(p => p.id === serverRoom.host);
         console.log(`[Server] 检查自动开始: 房主=${host?.name}, 类型=${host?.type}`);
-        // 修改：房主是 AI 类型（ai-agent 或 ai-auto）就自动开始
+        // 修改：房主是 AI 类型（ai-agent 或 npc）就自动开始
         if (host && host.type !== 'human') {
           console.log(`[Server] AI 房主 ${host.name} 检测到全员准备，自动开始游戏`);
           // 延迟 1 秒开始，让玩家看到准备状态
@@ -905,6 +919,9 @@ export async function handleAction(
     const room = roomManager.getRoom(roomId);
     if (!room?.gameEngine) throw new Error('游戏未开始');
     
+    // 调试日志
+    console.log(`[handleAction] action=${payload.action}, tiles=`, payload.tiles?.map(t => `${t.id}(${t.display})`));
+    
     const pendingAction: PendingAction = {
       playerId,
       action: payload.action,
@@ -953,6 +970,7 @@ export async function handleAction(
           id: p.id,
           name: p.name,
           score: p.score || 0,
+          scoreChange: (p.score || 0) - (p.lastScore || 1000),
         })),
       });
     } else {
@@ -1010,8 +1028,8 @@ export async function handleDisconnect(
       if (room) {
         const player = room.players.find(p => p.id === playerId);
         if (player) {
-          // 降级为自动托管模式
-          player.type = 'ai-auto';
+          // 降级为NPC模式
+          player.type = 'npc';
           player.aiControl = { mode: 'auto' };
           
           // 通知其他玩家
@@ -1058,7 +1076,7 @@ export async function handleJoinAI(
     agentId: string;
     agentName: string;
     personality?: 'aggressive' | 'cautious' | 'balanced';
-    type?: 'ai-agent' | 'ai-auto';
+    type?: 'ai-agent' | 'npc';
   },
   callback: (response: { success: boolean; playerId?: string; position?: number; error?: string }) => void
 ) {
@@ -1086,7 +1104,7 @@ export async function handleJoinAI(
     socket.join(roomId);
     
     // 只有 ai-agent 需要创建 AIAdapter
-    // ai-auto 由服务器内部托管
+    // npc 由服务器内部托管
     if (playerType === 'ai-agent') {
       aiManager.createAdapter(aiPlayer);
       
@@ -1326,8 +1344,8 @@ export async function handleAgentCommand(
         break;
         
       case 'add_auto_player':
-        // 添加自动托管玩家
-        const autoPlayer = roomManager.addAIPlayer(roomId, { type: 'ai-auto' });
+        // 添加NPC玩家
+        const autoPlayer = roomManager.addAIPlayer(roomId, { type: 'npc' });
         io.in(roomId).emit('room:updated', { room: toClientRoom(roomManager.getRoom(roomId)!) });
         console.log(`[Server] 添加自动托管玩家: ${autoPlayer.name}`);
         break;
@@ -1454,7 +1472,7 @@ export async function handleGetReconnectableRooms(
   
   for (const room of rooms) {
     const player = room.players.find(p => p.id === payload.agentId);
-    if (player && (player.type === 'ai-auto' || player.aiControl?.mode === 'auto')) {
+    if (player && (player.type === 'npc' || player.aiControl?.mode === 'auto')) {
       reconnectableRooms.push({
         roomId: room.id,
         roomName: room.name,

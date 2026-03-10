@@ -42,7 +42,7 @@ export class AIManager {
    */
   initGame(players: Player[]): void {
     for (const player of players) {
-      if ((player.type === 'ai-agent' || player.type === 'ai-auto') && player.aiConfig) {
+      if ((player.type === 'ai-agent' || player.type === 'npc') && player.aiConfig) {
         this.createAdapter(player);
       }
     }

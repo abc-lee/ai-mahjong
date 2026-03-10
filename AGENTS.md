@@ -10,6 +10,8 @@
 
 核心体验：AI Agent 作为真正的玩家，有独立性格、会发言、会思考，不是传统游戏的 NPC。
 
+**使用场景**：私人游戏，主Agent作为用户的个人AI助理，启动游戏、派发AI、管理对局。
+
 ---
 
 ## 2. 三种玩家角色
@@ -17,16 +19,76 @@
 | 类型 | 标识 | 来源 | 特点 |
 |------|------|------|------|
 | 人类玩家 | `human` | 浏览器连接 | 看图形界面，点按钮操作 |
-| AI Agent 玩家 | `ai-agent` | 外部 Agent 连接 | 收 Prompt，发 JSON 指令，有性格会聊天 |
-| 自动托管 | `ai-auto` | 服务器内置 | 简单规则决策，只打牌不说话 |
+| AI Agent 玩家 | `ai-agent` | 主Agent派发的子Agent | 收 Prompt，发 JSON 指令，有性格会聊天 |
+| NPC | `npc` | 服务器内置 | 简单规则决策，只打牌不说话 |
 
-**重要**：AI Agent 和自动托管是两回事！
+**重要**：AI Agent 和 NPC 是两回事！
 
 ---
 
-## 3. 架构核心理解
+## 3. 游戏流程
 
-### 3.1 游戏服务器不需要 LLM API Key
+### 3.1 用户打开页面
+1. 用户说"准备打游戏"
+2. 主Agent启动游戏服务器
+3. 主Agent返回链接给用户
+4. 用户点击链接进入游戏界面
+
+### 3.2 选择方位
+1. 游戏界面弹出方位选择弹窗
+2. 显示四个方位（东南西北）的座位图
+3. 已占用的位置灰显
+4. 点击选择自己的位置（先到先得）
+5. 冲突时提示"该位置已被占用，请选择其他位置"
+
+### 3.3 等待玩家
+1. 第一个进入的人有"开始"按钮
+2. 游戏开始前可以聊天
+3. 用户可通过独立通话渠道让主Agent派发AI
+
+### 3.4 开始游戏
+1. 用户点击"开始"或说"开始"
+2. 或4个位置都满了自动开始
+
+---
+
+## 4. 主Agent派发AI
+
+主Agent通过派发子Agent连接游戏服务器，不是调用服务器接口。
+
+### 4.1 派发方式
+```javascript
+// 子Agent连接游戏服务器
+const { io } = require('socket.io-client');
+const socket = io('http://localhost:3000');
+
+// 加入游戏
+socket.emit('room:joinAI', {
+  roomId: '当前游戏ID',
+  agentId: 'agent-xxx',
+  agentName: '紫璃',
+  type: 'ai-agent'  // 或 'npc'
+});
+
+// 收到轮次事件
+socket.on('agent:your_turn', (data) => {
+  // data.prompt 包含完整游戏状态
+  // 思考后发送决策
+  socket.emit('agent:command', {
+    cmd: 'discard',
+    tileId: 'wan-1-xxx'
+  });
+});
+```
+
+### 4.2 踢AI
+主Agent断开子Agent的WebSocket连接即可，不需要服务器接口。
+
+---
+
+## 5. 架构核心理解
+
+### 5.1 游戏服务器不需要 LLM API Key
 
 ```
 错误理解 ❌：
@@ -39,21 +101,20 @@ AI Agent（独立 LLM 会话）←WebSocket→ 游戏服务器（只做规则验
 - AI Agent 自己是 LLM 会话（比如 OpenCode、OpenClaw）
 - Agent 通过 WebSocket 连接游戏服务器
 - 服务器发送 Prompt，Agent 自己思考返回决策
-- "思考"发生在 Agent 的会话中，不在游戏服务器
 
-### 3.2 中间层的职责
+### 5.2 中间层的职责
 
 ```
 中间层（游戏服务器）：
 1. 接收 Agent 的 WebSocket 连接
-2. 识别玩家类型（human / ai-agent / ai-auto）
+2. 识别玩家类型（human / ai-agent / npc）
 3. 生成自然语言 Prompt（包含规则、指令、状态）
 4. 发送给 AI Agent
 5. 接收 Agent 的 JSON 决策
 6. 验证规则，执行操作
 ```
 
-### 3.3 Agent 收到的 Prompt 示例
+### 5.3 Agent 收到的 Prompt 示例
 
 ```
 ═══════════════════════════════════════
@@ -65,16 +126,6 @@ AI Agent（独立 LLM 会话）←WebSocket→ 游戏服务器（只做规则验
 ─── 你的手牌 ───
 【万】二万 四万 一万 四万
 【条】六条 二条 三条
-【筒】四筒 九筒 五筒
-【箭】白板 红中
-【风】东风 北风
-张: 14
-
-📥 刚摸到: 北风
-
-─── 牌局信息 ───
-剩余牌数: 82
-玩家1(紫璃): 弃牌0, 副露0
 ...
 
 ─── 可用指令 ───
@@ -86,254 +137,131 @@ AI Agent（独立 LLM 会话）←WebSocket→ 游戏服务器（只做规则验
 ═══════════════════════════════════════
 ```
 
-### 3.4 Agent 返回的决策格式
-
-```json
-// 摸牌
-{"cmd": "draw"}
-
-// 打牌
-{"cmd": "discard", "tileId": "feng-4-123"}
-
-// 吃碰杠胡
-{"cmd": "action", "action": "peng"}
-
-// 跳过
-{"cmd": "pass"}
-```
-
 ---
 
-## 4. Agent 行为约束规则
+## 6. Agent 行为约束规则
 
-### 4.1 MUST DO（必须遵守）
+### 6.1 MUST DO（必须遵守）
 
 | 规则 | 说明 |
 |------|------|
 | 使用轻量会话模式 | 麻将 Agent 只在对话中思考，不创建持久编程环境 |
 | 直连 WebSocket | Agent 通过 socket.io-client 直接连接游戏服务器 |
 | 使用预定义指令集 | 只发送服务器允许的 JSON 指令格式 |
-| 保持会话隔离 | 每个 Agent 独立会话，独立 WebSocket 连接 |
 
-### 4.2 MUST NOT DO（禁止事项）
+### 6.2 MUST NOT DO（禁止事项）
 
 | 规则 | 说明 |
 |------|------|
-| 禁止派发编程型 Agent | 不要用 task 或 sessions_spawn 创建麻将 Agent |
+| 禁止派发编程型 Agent | 麻将 Agent 不应再派发子 Agent |
 | 禁止文件系统访问 | 不要读取/写入游戏服务器的文件 |
 | 禁止 bash/process 执行 | 不要在游戏中执行系统命令 |
-| 禁止创建子 Agent | 麻将 Agent 不应再派发子 Agent |
-
-### 4.3 正确的调用模式
-
-**stdin/stdout 零延迟通信**（推荐）：
-
-```
-主 Agent (你)
-    │
-    │  1. 发送游戏状态 Prompt
-    ▼
-┌─────────────────────────────────────┐
-│  麻将 Agent（轻量对话会话）          │
-│  - 接收游戏状态                      │
-│  - 思考决策                          │
-│  - 返回 JSON 指令                    │
-└─────────────────────────────────────┘
-    │
-    │  2. 返回决策 JSON
-    ▼
-主 Agent (你)
-```
-
-**调用模板**：
-
-```markdown
-# 麻将游戏回合
-
-你是一个麻将玩家，请根据以下游戏状态做出决策。
-
-## 当前状态
-[粘贴游戏服务器发送的完整 Prompt]
-
-## 可用指令
-- 摸牌: {"cmd": "draw"}
-- 打牌: {"cmd": "discard", "tileId": "牌ID"}
-- 吃碰杠胡: {"cmd": "action", "action": "chi|peng|gang|hu"}
-- 跳过: {"cmd": "pass"}
-
-## 输出要求
-只返回 JSON 格式的指令，不要包含其他文字。
-```
-
-**WebSocket 直连模板**（适用于支持 WebSocket 的 Agent）：
-
-```javascript
-const { io } = require('socket.io-client');
-const socket = io('http://localhost:3000');
-
-// 连接并加入游戏
-socket.emit('room:createAI', {
-  agentId: 'your-agent-id',
-  agentName: '玩家名称',
-  type: 'ai-agent'
-});
-
-// 监听回合事件
-socket.on('agent:your_turn', (data) => {
-  // data.prompt 包含完整游戏状态
-  // 思考后发送决策
-  socket.emit('agent:command', {
-    cmd: 'discard',
-    tileId: 'wan-1-xxx'
-  });
-});
-```
-
-### 4.4 禁止事项清单
-
-以下行为**严格禁止**，违者将导致游戏异常或安全风险：
-
-- ❌ 尝试修改游戏服务器代码
-- ❌ 尝试读取服务器日志或配置文件
-- ❌ 发送非预定义的指令格式
-- ❌ 在游戏中执行 HTTP 请求到外部 API
-- ❌ 创建文件或目录
-- ❌ 尝试 SQL 注入或任何攻击行为
-- ❌ 多线程/并发操作游戏状态
-- ❌ 劫持其他玩家的会话
 
 ---
 
-## 5. 如何让 Agent 加入游戏
-
-### 方式一：文件桥接（scripts/true-llm-agent.js）
-
-```
-1. 运行桥接脚本：node scripts/true-llm-agent.js
-2. 脚本连接服务器，创建/加入房间
-3. 收到游戏状态后写入 pending-state.json
-4. AI Agent 读取 pending-state.json，思考决策
-5. AI Agent 写入 decision.json
-6. 脚本读取决策，发送给服务器
-```
-
-### 方式二：直接 WebSocket 连接
-
-```javascript
-const { io } = require('socket.io-client');
-const socket = io('http://localhost:3000');
-
-// 创建房间
-socket.emit('room:createAI', {
-  agentId: 'agent-1',
-  agentName: '紫璃',
-  type: 'ai-agent'
-}, (res) => {
-  console.log('房间ID:', res.roomId);
-});
-
-// 收到回合事件
-socket.on('agent:your_turn', (data) => {
-  console.log('Prompt:', data.prompt);
-  console.log('手牌:', data.hand);
-  
-  // 思考后发送决策
-  socket.emit('agent:command', { cmd: 'discard', tileId: 'xxx' });
-});
-```
-
-### 方式三：派发轻量对话 Agent
-
-```
-作为主 Agent，可以派发子 Agent 来参与游戏：
-1. 子 Agent 连接游戏服务器
-2. 收到 Prompt 后自己思考
-3. 返回决策 JSON
-
-这就是"OpenClaw 派发 AI Agent 去打麻将"的实现方式。
-```
-
----
-
-## 6. 已完成的功能
+## 7. 已完成的功能
 
 | 功能 | 状态 | 文件 |
 |------|------|------|
 | 麻将规则引擎 | ✅ | src/server/game/ |
-| 房间系统 | ✅ | src/server/room/ |
+| 游戏会话管理 | ✅ | src/server/room/ |
 | AI Agent 接入 | ✅ | src/server/socket/handlers.ts |
 | 自然语言 Prompt 生成 | ✅ | src/server/prompt/PromptNL.ts |
 | 发言/情绪系统 | ✅ | src/server/speech/ |
-| 前端 UI | ✅ | src/client/ |
+| 新前端 UI | ✅ | src/client-new/ |
 | 记忆/记仇系统 | ✅ | src/server/speech/MemoryManager.ts |
-| Agent 行为约束 | ✅ | AGENTS.md |
-| 游戏结束处理 | ✅ | src/server/socket/handlers.ts |
-| 战果显示 | ✅ | src/client/components/GameBoard/GameResult.tsx |
-
----
-
-## 7. 测试方法
-
-```bash
-# 1. 启动游戏服务器
-npm run dev:server
-# 或
-npx tsx src/server/index.ts
-
-# 2. 测试 4 AI 对局（随机出牌）
-node scripts/test-4-agents.js
-
-# 3. 真正的 LLM Agent 测试
-node scripts/true-llm-agent.js
-# 然后监控 pending-state.json，写入 decision.json
-```
+| 吃碰杠胡按钮交互 | ✅ | src/client-new/js/game.js |
+| 手牌排序显示 | ✅ | src/client-new/js/tiles.js |
+| 游戏结束弹窗 | ✅ | src/client-new/js/game.js |
+| 再来一局功能 | ✅ | src/server/room/RoomManager.ts |
 
 ---
 
 ## 8. 关键文件
 
 ```
+src/client-new/           # 新UI客户端
+├── index.html            # 主入口
+└── js/
+    ├── socket.js         # Socket.io客户端
+    ├── store.js          # 状态管理
+    ├── tiles.js          # 牌渲染、排序
+    ├── game.js           # 游戏逻辑、操作按钮
+    └── main.js           # 主入口
+
 src/server/
-├── socket/handlers.ts      # Socket 事件处理，区分 human/ai-agent/ai-auto
-├── prompt/PromptNL.ts      # 自然语言 Prompt 生成
+├── socket/handlers.ts    # Socket事件处理
+├── prompt/PromptNL.ts    # Prompt生成
 ├── speech/
-│   ├── SpeechManager.ts    # 发言、情绪管理
-│   └── MemoryManager.ts    # AI 记忆、记仇系统
+│   ├── SpeechManager.ts  # 发言、情绪管理
+│   └── MemoryManager.ts  # AI记忆、记仇系统
 ├── ai/
-│   ├── AIAdapter.ts        # AI 决策适配器（降级用）
-│   └── AIManager.ts        # AI 管理
-└── game/                   # 麻将规则引擎
+│   ├── AIAdapter.ts      # AI决策适配器（降级用）
+│   └── AIManager.ts      # AI管理
+└── game/                 # 麻将规则引擎
 
 scripts/
-├── test-4-agents.js        # 4 AI 测试脚本（随机出牌）
-├── true-llm-agent.js       # LLM Agent 桥接脚本
-├── pending-state.json      # 游戏状态文件（运行时生成）
-└── decision.json           # 决策文件（Agent 写入）
+├── join-player-room.js   # 派发AI加入玩家房间
+├── test-4-agents.js      # 4 AI测试脚本
+└── true-llm-agent.js     # LLM Agent桥接脚本
 ```
 
 ---
 
-## 9. 常见误解
+## 9. 运行命令
 
-| 理解 |
-|------误解 | 正确|----------|
-| 服务器需要配置 LLM API Key | 不需要，AI Agent 自己是 LLM 会话 |
-| AI Agent 和 ai-auto 是一回事 | 不是，ai-agent 是外部连接，ai-auto 是服务器内置 |
-| 要写脚本让 Agent 打牌 | Agent 直接连 WebSocket，中间层发完整 Prompt |
-| 可以派发编程型 Agent 打麻将 | 必须用轻量对话模式，stdin/stdout 通信 |
+```bash
+# 启动游戏服务器
+npx tsx src/server/index.ts
+
+# 启动新客户端
+npm run dev:new
+# 或
+npx vite --config vite.client-new.config.ts --port 5174
+
+# 测试 4 AI 对局
+node scripts/test-4-agents.js
+
+# 派发 AI 加入玩家房间
+node scripts/join-player-room.js <roomId>
+```
 
 ---
 
-## 10. 下一步
+## 10. 待修复问题
 
-- [x] Agent 行为约束规则文档化
-- [ ] 让多个 AI Agent（有 LLM 能力）真正参与游戏
-- [ ] 人类玩家加入测试
-- [ ] 接入语音/聊天功能
-- [ ] AI 好友系统
+| 问题 | 状态 | 说明 |
+|------|------|------|
+| 番型计算 | ⚠️ | 胡牌时番型为空，导致分数为0 |
+| 分数显示 | ⚠️ | 需要检查 ScoreCalculator |
 
 ---
 
-*文档版本: v1.1*
-*更新时间: 2026-03-09*
-*维护者: 项目经理 Agent*
+## 11. 本次会话改进记录
+
+### UI 改进
+- 新增纯 HTML/JS 客户端 (`src/client-new/`)
+- 手牌排序显示（万>条>筒>风>箭）
+- 操作按钮：摸、吃、碰、杠、胡、过
+- 吃牌交互：悬停时相关牌立起，点击执行吃牌
+- 游戏结束弹窗：显示赢家、番型、分数变化
+- 再来一局按钮
+
+### 服务器改进
+- 新增 `/api/rooms` 接口查询等待中的房间
+- 修复 AI 在 action 阶段（吃碰杠胡）没收到通知的问题
+- 修复 `game:state` 事件发送 `availableActions`
+- 允许从 `finished` 状态开始新游戏
+- 改进 AI 脚本保持连接、重连机制
+
+### Bug 修复
+- 修复 `prevState` 拼写错误
+- 修复 `room.players` undefined 问题
+- 修复箭牌（中发白）渲染（`jian` vs `dragon`）
+- 修复操作按钮不消失的问题
+- 修复流局显示"玩家胡牌"的问题
+
+---
+
+*文档版本: v2.1*
+*更新时间: 2026-03-10*

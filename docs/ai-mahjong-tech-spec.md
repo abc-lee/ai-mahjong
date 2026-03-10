@@ -1,8 +1,9 @@
 # 🀄 AI Mahjong Party - 技术方案文档
 
-> 文档版本：v3.0
-> 更新时间：2026-03-04
+> 文档版本：v4.0
+> 更新时间：2026-03-10
 > 核心理念：AI Agent 作为真正的玩家，提供娱乐陪伴体验
+> 使用场景：私人游戏，主Agent作为用户的个人AI助理
 
 ---
 
@@ -116,7 +117,8 @@
 | 情绪状态管理 | | ✅ |
 | 角色池管理 | | ✅ |
 | 记仇/穿帮逻辑 | | ✅ |
-| 房间管理 | ✅ | |
+| 游戏会话管理 | ✅ | |
+| 方位选择 | ✅ | |
 | 状态同步 | ✅ | |
 | 惩罚动画 | ✅ | |
 | 降级保底 | ✅ (AIAdapter) | |
@@ -144,9 +146,9 @@ interface Tile {
 interface Player {
   id: string;
   name: string;
-  position: 0 | 1 | 2 | 3;
-  type: 'human' | 'ai';
-  agentId?: string;      // OpenClaw Agent ID
+  position: 0 | 1 | 2 | 3;   // 座位：东南西北
+  type: 'human' | 'ai-agent' | 'npc';  // 玩家类型
+  agentId?: string;           // AI Agent ID（ai-agent类型）
   
   hand: Tile[];          // 手牌
   melds: Meld[];         // 副露
@@ -159,18 +161,22 @@ interface Player {
   mood: Mood;            // 情绪状态
 }
 
-type Mood = 'confident' | 'happy' | 'normal' | 'upset' | 'angry' | 'devastated';
+// 玩家类型说明：
+// - human: 人类玩家，通过浏览器连接
+// - ai-agent: AI Agent，由主Agent派发的子Agent，通过WebSocket连接，有性格会聊天
+// - npc: NPC，服务器内置的简单AI，只打牌不说话
 ```
 
-### 4.3 游戏状态 (GameState)
+### 4.3 游戏会话 (GameSession)
 
 ```typescript
-interface GameState {
-  roomId: string;
+interface GameSession {
+  id: string;            // 会话ID
   phase: 'waiting' | 'playing' | 'finished';
-  players: Player[];
-  currentPlayerIndex: number;
+  players: Player[];     // 4个玩家
+  host: string;          // 第一个进入的玩家ID（有开始按钮）
   
+  currentPlayerIndex: number;
   wall: Tile[];
   lastDiscard: Tile | null;
   lastDiscardPlayer: number;
@@ -183,6 +189,13 @@ interface GameState {
   winningHand: WinningHand | null;
 }
 ```
+
+### 4.4 方位选择
+
+玩家进入游戏时选择座位：
+- 位置：0=南(自己视角的下方), 1=东, 2=北, 3=西
+- 先到先得，已占用的位置灰显
+- 冲突时提示"该位置已被占用"
 
 ---
 

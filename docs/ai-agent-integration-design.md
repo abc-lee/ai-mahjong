@@ -1,8 +1,9 @@
 # AI Agent 接入设计方案
 
-> 版本：v1.0
-> 更新时间：2026-03-05
+> 版本：v2.0
+> 更新时间：2026-03-10
 > 目标：让 AI Agent 真正接入游戏参与打牌
+> 使用场景：私人游戏，主Agent通过派发子Agent连接游戏服务器
 
 ---
 
@@ -10,41 +11,32 @@
 
 ### 1.1 背景
 
-当前麻将游戏的基础功能已经跑通，但 AI Agent 从未真正接入过。现有代码中的 `AIAdapter` 是内置的降级逻辑，不是外部 Agent 连接。
+AI Agent 通过 WebSocket 连接游戏服务器，接收游戏状态（Prompt），发送决策指令，参与打牌。主Agent通过派发子Agent的方式让AI加入游戏。
 
 ### 1.2 目标
 
-实现外部 AI Agent 通过 WebSocket 连接游戏服务器，接收游戏状态（Prompt），发送决策指令，参与打牌。
+实现主Agent派发子Agent通过 WebSocket 连接游戏服务器，参与打牌。
 
 ### 1.3 三种玩家角色
 
 | 类型 | 标识 | 来源 | 特点 |
 |------|------|------|------|
 | 人类玩家 | `human` | 浏览器连接 | 看图形界面，点按钮操作 |
-| AI Agent 玩家 | `ai-agent` | 外部 Agent 连接 | 收 Prompt，发 JSON 指令，有性格会聊天 |
-| 自动托管 | `ai-auto` | 服务器内置 | 简单规则决策，只打牌不说话 |
+| AI Agent 玩家 | `ai-agent` | 主Agent派发的子Agent | 收 Prompt，发 JSON 指令，有性格会聊天 |
+| NPC | `npc` | 服务器内置 | 简单规则决策，只打牌不说话 |
 
 ---
 
-## 2. Player 类型定义改动
-
-### 2.1 当前定义
+## 2. Player 类型定义
 
 ```typescript
 // src/shared/types/player.ts
-export type PlayerType = 'human' | 'ai';
-```
-
-### 2.2 改为
-
-```typescript
-// src/shared/types/player.ts
-export type PlayerType = 'human' | 'ai-agent' | 'ai-auto';
+export type PlayerType = 'human' | 'ai-agent' | 'npc';
 
 export interface Player {
   id: string;
   name: string;
-  position: 0 | 1 | 2 | 3;
+  position: 0 | 1 | 2 | 3;  // 座位：东南西北
   type: PlayerType;
   
   // 人类玩家
@@ -52,12 +44,11 @@ export interface Player {
   
   // AI Agent 玩家
   agentId?: string;
-  agentSessionId?: string;  // Agent 会话 ID
   
-  // AI 控制（agent 和 auto 共用）
+  // NPC 和 AI Agent 控制
   aiControl?: {
-    mode: 'agent' | 'auto';           // 当前谁在控制
-    disconnectedAt?: number;          // Agent 断线时间
+    mode: 'agent' | 'auto';     // 当前谁在控制
+    disconnectedAt?: number;    // Agent 断线时间
   };
   
   // AI 配置
@@ -67,7 +58,7 @@ export interface Player {
 }
 ```
 
-### 2.3 AI Agent 断线降级
+### 2.1 AI Agent 断线降级
 
 ```
 AI Agent 正常连接:
@@ -75,8 +66,8 @@ AI Agent 正常连接:
   aiControl.mode: 'agent'
 
 AI Agent 断线后:
-  type: 'ai-agent' (不变)
-  aiControl.mode: 'auto' (切换为自动托管)
+  type: 'npc' (降级为NPC)
+  aiControl.mode: 'auto'
   aiControl.disconnectedAt: timestamp
 
 AI Agent 重连:
