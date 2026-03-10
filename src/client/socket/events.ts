@@ -76,6 +76,7 @@ export interface ActionsEvent {
 export interface GameEndedEvent {
   winner: number;
   winningHand: WinningHand | null;
+  players?: Array<{ id: string; name: string; score: number }>;
 }
 
 // ==================== 发言系统事件 ====================

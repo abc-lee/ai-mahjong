@@ -88,6 +88,23 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
   const room = roomManager.getRoom(roomId);
   if (!room?.gameEngine) return;
 
+  const state = room.gameEngine.getState();
+  
+  // 检查游戏是否结束
+  if (state.phase === 'finished') {
+    console.log(`[broadcastGameState] 游戏已结束，发送 game:ended`);
+    io.to(roomId).emit('game:ended', {
+      winner: state.winner,
+      winningHand: state.winningHand,
+      players: room.players.map(p => ({
+        id: p.id,
+        name: p.name,
+        score: p.score,
+      })),
+    });
+    return;
+  }
+
   // 获取发言管理器
   let speechManager: SpeechManager | null = null;
   try {
@@ -411,8 +428,20 @@ function handleAIActions(roomId: string, roomManager: RoomManager, io: Server): 
         setTimeout(() => {
           const currentRoom = roomManager.getRoom(roomId);
           if (currentRoom?.gameEngine) {
-            currentRoom.gameEngine.passAction(playerId);
-            broadcastGameState(io, roomId, roomManager);
+            const currentState = currentRoom.gameEngine.getState();
+            // 如果仍有 pendingActions，才执行跳过
+            if (currentState.pendingActions.some(p => p.playerId === playerId)) {
+              currentRoom.gameEngine.passAction(playerId);
+              // 如果跳过所有玩家后仍有 pendingActions，强制清除
+              if (currentState.pendingActions.length > 0) {
+                console.log(`[handleAIActions] ${player.name} 跳过后仍有 pendingActions，强制清除`);
+                currentState.pendingActions = [];
+                currentRoom.gameEngine['turnPhase'] = 'draw';
+                currentRoom.gameEngine['respondedPlayers'].clear();
+                currentRoom.gameEngine['nextTurn']();
+              }
+              broadcastGameState(io, roomId, roomManager);
+            }
           }
         }, 1000);
       }
@@ -749,6 +778,16 @@ export async function handleDraw(
     if (!room?.gameEngine) throw new Error('游戏未开始');
     
     const tile = room.gameEngine.drawTile(playerId);
+    
+    // 检查是否流局
+    const state = room.gameEngine.getState();
+    if (state.phase === 'finished') {
+      console.log(`[handleDraw] 游戏已结束（流局或胡牌），广播游戏结束`);
+      broadcastGameState(io, roomId, roomManager);
+      if (callback) callback({ error: '游戏已结束' });
+      return;
+    }
+    
     if (!tile) throw new Error('无法摸牌');
     
     socket.emit('game:draw', { tile });
@@ -829,9 +868,14 @@ export async function handleDiscard(
           if (currentRoom?.gameEngine) {
             const currentState = currentRoom.gameEngine.getState();
             if (currentState.pendingActions.length > 0) {
-              console.log(`[handleDiscard] 人类玩家超时，自动跳过所有待处理操作`);
-              // 清除所有 pendingActions
+              console.log(`[handleDiscard] 人类玩家超时，自动跳过所有待处理操作并推进回合`);
+              // 清除所有 pendingActions，并推进到下一回合
               currentState.pendingActions = [];
+              // 重置回合阶段为摸牌
+              currentRoom.gameEngine['turnPhase'] = 'draw';
+              currentRoom.gameEngine['respondedPlayers'].clear();
+              // 推进到下一玩家
+              currentRoom.gameEngine['nextTurn']();
               broadcastGameState(io, roomId, roomManager);
             }
           }
@@ -1131,9 +1175,8 @@ export async function handleAIDecision(
     switch (payload.action) {
       case 'draw':
         const tile = room.gameEngine.drawTile(playerId);
-        if (tile) {
-          broadcastGameState(io, roomId, roomManager);
-        }
+        // 无论是否摸到牌，都要广播状态（流局时 game:ended 会在这里发送）
+        broadcastGameState(io, roomId, roomManager);
         break;
         
       case 'discard':
@@ -1235,9 +1278,8 @@ export async function handleAgentCommand(
       case 'draw':
         // 摸牌
         const tile = room.gameEngine.drawTile(playerId);
-        if (tile) {
-          broadcastGameState(io, roomId, roomManager);
-        }
+        // 无论是否摸到牌，都要广播状态（流局时 game:ended 会在这里发送）
+        broadcastGameState(io, roomId, roomManager);
         break;
         
       case 'discard':

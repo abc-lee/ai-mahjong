@@ -306,6 +306,15 @@ export class GameEngine {
   }
 
   private checkSelfDrawActions(player: Player): void {
+    // 流局检查：牌墙耗尽时直接结束游戏
+    if (this.deck.getRemaining() === 0) {
+      console.log(`[GameEngine] checkSelfDrawActions: 牌墙耗尽，流局`);
+      this.state.pendingActions = [];
+      this.respondedPlayers.clear();
+      this.endGame(null);
+      return;
+    }
+    
     const actions = this.validator.getAvailableActions(player, null, true, -1, this.state.currentPlayerIndex);
     
     // 胡牌优先级最高，如果可以胡，就不检查杠
@@ -473,6 +482,9 @@ export class GameEngine {
       this.turnPhase = 'discard';
       this.checkSelfDrawActions(player);
     } else {
+      // 流局：清除所有待处理动作，结束游戏
+      this.state.pendingActions = [];
+      this.respondedPlayers.clear();
       this.endGame(null);
     }
     

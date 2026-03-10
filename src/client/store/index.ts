@@ -10,6 +10,7 @@ import {
   PendingAction,
   GameStatePublic,
   GamePhase,
+  WinningHand,
 } from '@shared/types';
 
 // 发言消息类型
@@ -36,6 +37,14 @@ export interface EmotionState {
   };
 }
 
+// 游戏结束状态
+export interface GameEndState {
+  ended: boolean;
+  winner: number | null;
+  winningHand: WinningHand | null;
+  players: Array<{ id: string; name: string; score: number }>;
+}
+
 // 初始状态常量
 const initialState = {
   // 连接状态
@@ -55,6 +64,9 @@ const initialState = {
   lastDrawnTile: null as Tile | null,
   turnPhase: null as 'draw' | 'discard' | 'action' | null,
   availableActions: [] as PendingAction[],
+
+  // 游戏结束状态
+  gameEndState: null as GameEndState | null,
 
   // 发言系统状态
   speechMessages: [] as SpeechMessage[],
@@ -83,6 +95,9 @@ interface GameState {
   lastDrawnTile: Tile | null;
   turnPhase: 'draw' | 'discard' | 'action' | null;
   availableActions: PendingAction[];
+
+  // 游戏结束状态
+  gameEndState: GameEndState | null;
 
   // 发言系统状态
   speechMessages: SpeechMessage[];
@@ -113,6 +128,8 @@ interface GameState {
   ) => void;
   setAvailableActions: (actions: PendingAction[]) => void;
   clearAvailableActions: () => void;
+  setGameEndState: (state: GameEndState | null) => void;
+  clearGameEndState: () => void;
 
   // Actions - 发言系统相关
   addSpeechMessage: (message: SpeechMessage) => void;
@@ -215,6 +232,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
+  setGameEndState: (state: GameEndState | null) => {
+    set({ gameEndState: state });
+  },
+
+  clearGameEndState: () => {
+    set({ gameEndState: null });
+  },
+
   // ==================== 发言系统相关 ====================
 
   addSpeechMessage: (message: SpeechMessage) => {
@@ -269,6 +294,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       showActionModal: false,
       speechMessages: [],
       playerEmotions: {},
+      gameEndState: null,
     });
   },
 }));

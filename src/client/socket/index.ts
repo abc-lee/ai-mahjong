@@ -20,6 +20,7 @@ import type {
   Room,
   SpeechMessageEvent,
   EmotionEvent,
+  WinningHand,
 } from './events';
 import { ClientEvents, ServerEvents } from './events';
 
@@ -224,7 +225,7 @@ export interface SocketListeners {
   onRoomUpdate: (room: Room) => void;
   onGameState: (state: GameStateEvent['state'], hand: Tile[], yourTurn: boolean, lastDrawn?: Tile, turnPhase?: 'draw' | 'discard' | 'action') => void;
   onActions: (actions: PendingAction[]) => void;
-  onGameEnd: (winnerId: string, winningHand: Tile[]) => void;
+  onGameEnd: (winnerId: number, winningHand: WinningHand | null, players?: Array<{ id: string; name: string; score: number }>) => void;
   onError: (message: string) => void;
   // 发言系统
   onPlayerSpeech?: (data: SpeechMessageEvent) => void;
@@ -271,7 +272,7 @@ export function setupSocketListeners(listeners: SocketListeners): () => void {
     onActions(data.actions);
   });
   socket.on(ServerEvents.GAME_ENDED, (data: GameEndedEvent) => {
-    onGameEnd(String(data.winner), data.winningHand?.tiles || []);
+    onGameEnd(data.winner, data.winningHand, data.players);
   });
   socket.on(ServerEvents.GAME_ERROR, (data: ErrorResponse) => {
     onError(data.message);

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>麻将牌型设计参考 - 136张基本牌</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
+<style>
+    :root {
+        --mj-gold: #ffb703;
+    }
+    body {
+        background-color: #0f172a;
+        font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    }
+    .ref-tile-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-bottom: 20px;
+    }
+    @media (min-width: 640px) {
+        .ref-tile-grid {
+            grid-template-columns: repeat(9, 1fr);
+            gap: 10px;
+        }
+    }
+    .ref-section-title {
+        font-size: 0.875rem;
+        color: var(--mj-gold);
+        margin-bottom: 10px;
+        border-bottom: 1px solid rgba(255,215,0,0.3);
+        padding-bottom: 4px;
+        font-weight: bold;
+    }
+    .ref-tile {
+        width: 30px;
+        height: 42px;
+        background: white;
+        border-radius: 4px;
+        border-bottom: 6px solid #d1d5db;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2px;
+        color: #1f2937;
+        transition: all 0.2s;
+        cursor: help;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    @media (min-width: 640px) {
+        .ref-tile {
+            width: 56px;
+            height: 80px;
+            border-radius: 6px;
+            border-bottom: 8px solid #d1d5db;
+            padding: 8px;
+        }
+    }
+    .ref-tile:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    .ref-tile .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+    @media (min-width: 640px) {
+        .ref-tile .dot {
+            width: 12px;
+            height: 12px;
+        }
+    }
+    .bamboo-stick {
+        width: 2px;
+        height: 8px;
+        background: #15803d;
+        border-radius: 1px;
+    }
+    @media (min-width: 640px) {
+        .bamboo-stick {
+            width: 4px;
+            height: 12px;
+        }
+    }
+</style>
+</head>
+<body class="min-h-screen p-4 sm:p-8">
+<div class="max-w-6xl mx-auto">
+    <!-- 标题 -->
+    <div class="flex items-center justify-between mb-8">
+        <h1 class="text-2xl sm:text-3xl font-bold text-white flex items-center gap-3">
+            <span class="iconify text-yellow-500 text-3xl sm:text-4xl" data-icon="mdi:book-open-page-variant"></span>
+            麻将牌型设计参考
+        </h1>
+        <span class="text-xs bg-yellow-600 px-3 py-1 rounded text-white font-bold">136张基本牌</span>
+    </div>
+
+    <!-- 万子 -->
+    <section class="mb-8">
+        <div class="ref-section-title">万子 (Characters) - 36张</div>
+        <div class="ref-tile-grid">
+            <div class="ref-tile"><span class="text-sm sm:text-xl font-bold border border-black px-0.5 mb-0.5">萬</span><span class="text-base sm:text-2xl font-bold text-red-600">一</span></div>
+            <div class="ref-tile"><span class="text-sm sm:text-xl font-bold border border-black px-0.5 mb-0.5">萬</span><span class="text-base sm:text-2xl font-bold text-red-600">二</span></div>
+            <div class="ref-tile"><span class="text-sm sm:text-xl font-bold border border-black px-0.5 mb-0.5">萬</span><span class="text-base sm:text-2xl font-bold text-red-600">三</span></div>
+            <div class="ref-tile"><span class="text-sm sm:text-xl font-bold border border-black px-0.5 mb-0.5">萬</span><span class="text-base sm:text-2xl font-bold text-red-600">四</span></div>
+            <div class="ref-tile"><span class="text-sm sm:text-xl font-bold border border-black px-0.5 mb-0.5">萬</span><span class="text-base sm:text-2xl font-bold text-red-600">五</span></div>
+            <div class="ref-tile"><span class="text-sm sm:text-xl font-bold border border-black px-0.5 mb-0.5">萬</span><span class="text-base sm:text-2xl font-bold text-red-600">六</span></div>
+            <div class="ref-tile"><span class="text-sm sm:text-xl font-bold border border-black px-0.5 mb-0.5">萬</span><span class="text-base sm:text-2xl font-bold text-red-600">七</span></div>
+            <div class="ref-tile"><span class="text-sm sm:text-xl font-bold border border-black px-0.5 mb-0.5">萬</span><span class="text-base sm:text-2xl font-bold text-red-600">八</span></div>
+            <div class="ref-tile"><span class="text-sm sm:text-xl font-bold border border-black px-0.5 mb-0.5">萬</span><span class="text-base sm:text-2xl font-bold text-red-600">九</span></div>
+        </div>
+        <p class="text-xs text-gray-400">每样4张，共36张。样式：黑色「萬」边框 + 红色数字</p>
+    </section>
+
+    <!-- 条子 -->
+    <section class="mb-8">
+        <div class="ref-section-title">条子 (Bamboos) - 36张</div>
+        <div class="ref-tile-grid">
+            <div class="ref-tile"><span class="iconify text-lg sm:text-3xl text-green-700" data-icon="material-symbols:nature-rounded"></span><span class="text-[8px] sm:text-[10px] text-green-700 mt-0.5">一条</span></div>
+            <div class="ref-tile"><div class="flex flex-col gap-0.5 sm:gap-1"><div class="bamboo-stick"></div><div class="bamboo-stick"></div></div></div>
+            <div class="ref-tile"><div class="flex flex-col gap-0.5 sm:gap-1"><div class="bamboo-stick"></div><div class="flex gap-0.5 sm:gap-1"><div class="bamboo-stick"></div><div class="bamboo-stick"></div></div></div></div>
+            <div class="ref-tile"><div class="grid grid-cols-2 gap-0.5 sm:gap-1 px-1"><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div></div></div>
+            <div class="ref-tile"><div class="grid grid-cols-2 gap-0.5 sm:gap-1"><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick col-span-2 mx-auto"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div></div></div>
+            <div class="ref-tile"><div class="grid grid-cols-2 gap-y-0.5 sm:gap-y-1 gap-x-1 sm:gap-x-2"><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div></div></div>
+            <div class="ref-tile"><div class="flex flex-col gap-0.5 sm:gap-1"><div class="bamboo-stick mx-auto"></div><div class="grid grid-cols-3 gap-0.5 sm:gap-1"><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div></div></div></div>
+            <div class="ref-tile"><div class="grid grid-cols-2 gap-y-0.5 sm:gap-y-1 gap-x-1 sm:gap-x-2"><div class="bamboo-stick rotate-[15deg]"></div><div class="bamboo-stick rotate-[-15deg]"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick rotate-[-15deg]"></div><div class="bamboo-stick rotate-[15deg]"></div></div></div>
+            <div class="ref-tile"><div class="grid grid-cols-3 gap-0.5 sm:gap-1"><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div><div class="bamboo-stick"></div></div></div>
+        </div>
+        <p class="text-xs text-gray-400">每样4张，共36张。样式：绿色竹节竖条图案</p>
+    </section>
+
+    <!-- 筒子 -->
+    <section class="mb-8">
+        <div class="ref-section-title">筒子 (Dots) - 36张</div>
+        <div class="ref-tile-grid">
+            <div class="ref-tile"><div class="dot w-4 h-4 sm:w-7 sm:h-7 bg-blue-700 ring-1 sm:ring-2 ring-blue-500 rounded-full"></div></div>
+            <div class="ref-tile"><div class="flex flex-col gap-1 sm:gap-2"><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div></div></div>
+            <div class="ref-tile"><div class="flex flex-col gap-0.5 sm:gap-1 items-center"><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div></div></div>
+            <div class="ref-tile"><div class="grid grid-cols-2 gap-1 sm:gap-2"><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div></div></div>
+            <div class="ref-tile"><div class="grid grid-cols-2 gap-1 sm:gap-2"><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div><div class="dot bg-red-600 scale-110 sm:scale-125 z-10"></div><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div></div></div>
+            <div class="ref-tile"><div class="grid grid-cols-2 gap-1 sm:gap-2"><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div><div class="dot bg-red-600"></div><div class="dot bg-red-600"></div><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div></div></div>
+            <div class="ref-tile"><div class="grid grid-cols-2 gap-x-1 sm:gap-x-2 gap-y-0.5 sm:gap-y-1"><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div><div class="dot bg-blue-700 col-span-2 mx-auto"></div><div class="dot bg-red-600"></div><div class="dot bg-red-600"></div><div class="dot bg-red-600"></div><div class="dot bg-red-600"></div></div></div>
+            <div class="ref-tile"><div class="grid grid-cols-2 gap-x-1 sm:gap-x-2 gap-y-0.5 sm:gap-y-1"><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div></div></div>
+            <div class="ref-tile"><div class="grid grid-cols-3 gap-0.5 sm:gap-1"><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div><div class="dot bg-red-600"></div><div class="dot bg-red-600"></div><div class="dot bg-red-600"></div><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div><div class="dot bg-blue-700"></div></div></div>
+        </div>
+        <p class="text-xs text-gray-400">每样4张，共36张。样式：蓝色圆点排列，中心红点点缀</p>
+    </section>
+
+    <!-- 风牌 -->
+    <section class="mb-8">
+        <div class="ref-section-title">风牌 (Winds) - 16张</div>
+        <div class="ref-tile-grid">
+            <div class="ref-tile flex flex-col items-center justify-center"><span class="text-xl sm:text-2xl font-bold text-gray-800">東</span><span class="text-[6px] sm:text-[8px] text-gray-400 mt-0.5">EAST</span></div>
+            <div class="ref-tile flex flex-col items-center justify-center"><span class="text-xl sm:text-2xl font-bold text-gray-800">南</span><span class="text-[6px] sm:text-[8px] text-gray-400 mt-0.5">SOUTH</span></div>
+            <div class="ref-tile flex flex-col items-center justify-center"><span class="text-xl sm:text-2xl font-bold text-gray-800">西</span><span class="text-[6px] sm:text-[8px] text-gray-400 mt-0.5">WEST</span></div>
+            <div class="ref-tile flex flex-col items-center justify-center"><span class="text-xl sm:text-2xl font-bold text-gray-800">北</span><span class="text-[6px] sm:text-[8px] text-gray-400 mt-0.5">NORTH</span></div>
+        </div>
+        <p class="text-xs text-gray-400">东南西北各4张。样式：灰色大字 + 英文小标</p>
+    </section>
+
+    <!-- 箭牌 -->
+    <section class="mb-8">
+        <div class="ref-section-title">箭牌 (Dragons) - 12张</div>
+        <div class="ref-tile-grid">
+            <div class="ref-tile flex flex-col items-center justify-center"><span class="text-xl sm:text-2xl font-bold text-red-600">中</span><span class="text-[6px] sm:text-[8px] text-red-400 opacity-50 mt-0.5">ZHONG</span></div>
+            <div class="ref-tile flex flex-col items-center justify-center"><span class="text-xl sm:text-2xl font-bold text-green-700">發</span><span class="text-[6px] sm:text-[8px] text-green-400 opacity-50 mt-0.5">FA</span></div>
+            <div class="ref-tile flex flex-col items-center justify-center"><div class="w-6 h-8 sm:w-10 sm:h-14 border-2 border-blue-200 rounded-sm"></div><span class="text-[6px] sm:text-[8px] text-blue-300 mt-1">BAI</span></div>
+        </div>
+        <p class="text-xs text-gray-400">中、發、白各4张。样式：红中、绿發、白板框</p>
+    </section>
+
+    <!-- 底部说明 -->
+    <div class="mt-12 pt-6 border-t border-white/10 text-center">
+        <p class="text-xs text-white/30 italic">© 2026 雀王设计标准指南 - 136张基本牌</p>
+        <p class="text-xs text-white/20 mt-2">开发时直接复用 .ref-tile 内的HTML结构</p>
+    </div>
+</div>
+</body>
+</html>

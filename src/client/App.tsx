@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { useGameStore, SpeechMessage, EmotionState } from './store';
+import { useGameStore, SpeechMessage, EmotionState, GameEndState } from './store';
 import { socket, setupSocketListeners, discardTile, drawTile, performAction, passAction, onPlayerSpeech, onPlayerEmotion } from './socket';
 import { Room, Tile } from '@shared/types';
 import Lobby from './components/Lobby/Lobby';
 import RoomComponent from './components/Room/Room';
 import GameBoard from './components/GameBoard/GameBoard';
+import GameResult from './components/GameBoard/GameResult';
 import './App.css';
 
 function App() {
@@ -19,8 +20,11 @@ function App() {
     setPlayerInfo,
     addSpeechMessage,
     setPlayerEmotion,
+    setGameEndState,
+    clearGameEndState,
     playerId,
     currentRoom,
+    gameEndState,
   } = useGameStore();
 
   useEffect(() => {
@@ -45,16 +49,17 @@ function App() {
         }
       },
       onActions: (actions) => setAvailableActions(actions),
-      onGameEnd: (winner, winningHand) => {
-        console.log('游戏结束', winner, winningHand);
+      onGameEnd: (winner, winningHand, players) => {
+        console.log('游戏结束', winner, winningHand, players);
         // 清除操作按钮
         setAvailableActions([]);
-        // 延迟返回房间页面
-        setTimeout(() => {
-          if (currentRoom) {
-            navigate(`/room/${currentRoom.id}`);
-          }
-        }, 1500);
+        // 设置游戏结束状态，显示战果
+        setGameEndState({
+          ended: true,
+          winner: winner,
+          winningHand: winningHand,
+          players: players || [],
+        });
       },
       onError: (message) => {
         alert(`错误: ${message}`);
@@ -87,6 +92,14 @@ function App() {
     navigate(`/room/${roomId}`);
   };
 
+  const handleCloseGameResult = () => {
+    clearGameEndState();
+    // 返回房间页面
+    if (currentRoom) {
+      navigate(`/room/${currentRoom.id}`);
+    }
+  };
+
   return (
     <div className="app">
       <Routes>
@@ -98,6 +111,16 @@ function App() {
         <Route path="/game/:roomId" element={<GameBoardWrapper />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      
+      {/* 游戏结束战果弹窗 */}
+      {gameEndState && gameEndState.ended && gameEndState.winningHand && (
+        <GameResult
+          winner={gameEndState.winner}
+          winningHand={gameEndState.winningHand}
+          players={gameEndState.players || []}
+          onClose={handleCloseGameResult}
+        />
+      )}
     </div>
   );
 }

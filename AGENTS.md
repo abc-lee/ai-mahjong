@@ -267,6 +267,8 @@ socket.on('agent:your_turn', (data) => {
 | 前端 UI | ✅ | src/client/ |
 | 记忆/记仇系统 | ✅ | src/server/speech/MemoryManager.ts |
 | Agent 行为约束 | ✅ | AGENTS.md |
+| 游戏结束处理 | ✅ | src/server/socket/handlers.ts |
+| 战果显示 | ✅ | src/client/components/GameBoard/GameResult.tsx |
 
 ---
 

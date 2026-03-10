@@ -1,0 +1,259 @@
+/* 游戏结束战果显示样式 */
+
+.game-result-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.game-result-modal {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 2px solid #ffd700;
+  border-radius: 16px;
+  padding: 32px;
+  min-width: 400px;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 0 40px rgba(255, 215, 0, 0.3);
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.result-title {
+  text-align: center;
+  font-size: 2rem;
+  color: #ffd700;
+  margin-bottom: 16px;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.winner-info {
+  text-align: center;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: rgba(255, 215, 0, 0.1);
+  border-radius: 8px;
+}
+
+.winner-name {
+  font-size: 1.5rem;
+  color: #fff;
+  font-weight: bold;
+  margin-right: 12px;
+}
+
+.winner-label {
+  font-size: 1rem;
+  color: #ff6b6b;
+  padding: 4px 12px;
+  background: rgba(255, 107, 107, 0.2);
+  border-radius: 4px;
+}
+
+.winning-hand {
+  margin-bottom: 24px;
+}
+
+.winning-hand h3 {
+  color: #fff;
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 8px;
+}
+
+.hand-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+
+.melds-section {
+  margin-top: 16px;
+}
+
+.melds-section h4 {
+  color: #aaa;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+
+.melds {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.meld {
+  display: flex;
+  gap: 2px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.fans-section {
+  margin-top: 16px;
+}
+
+.fans-section h4 {
+  color: #aaa;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+
+.fans {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fan-tag {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 0.85rem;
+}
+
+.total-score {
+  margin-top: 12px;
+  text-align: right;
+  color: #ffd700;
+  font-size: 1.2rem;
+}
+
+.players-scores {
+  margin-top: 24px;
+}
+
+.players-scores h3 {
+  color: #fff;
+  font-size: 1.1rem;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 8px;
+}
+
+.player-score {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  transition: background 0.2s;
+}
+
+.player-score:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.player-score.winner {
+  background: rgba(255, 215, 0, 0.15);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+.player-position {
+  width: 24px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #aaa;
+  font-size: 0.8rem;
+  margin-right: 12px;
+}
+
+.player-score.winner .player-position {
+  background: #ffd700;
+  color: #000;
+}
+
+.player-name {
+  flex: 1;
+  color: #fff;
+}
+
+.player-score-value {
+  font-weight: bold;
+  color: #fff;
+}
+
+.player-score.winner .player-score-value {
+  color: #ffd700;
+}
+
+.close-button {
+  display: block;
+  width: 100%;
+  padding: 16px;
+  margin-top: 24px;
+  background: linear-gradient(135deg, #ffd700 0%, #ffb700 100%);
+  color: #000;
+  font-size: 1.1rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.close-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4);
+}
+
+.close-button:active {
+  transform: translateY(0);
+}
+
+/* 响应式 */
+@media (max-width: 500px) {
+  .game-result-modal {
+    min-width: 90%;
+    padding: 20px;
+  }
+
+  .result-title {
+    font-size: 1.5rem;
+  }
+
+  .winner-name {
+    font-size: 1.2rem;
+  }
+}

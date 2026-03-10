@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>神州雀王 - 现代联机麻将</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
+
+        :root {
+            --mj-bg: #1a4d2e;
+            --mj-table: #2d6a4f;
+            --mj-gold: #ffb703;
+        }
+
+        body {
+            background-color: #0f172a;
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            overflow: hidden;
+        }
+
+        .mahjong-table {
+            background: radial-gradient(circle, var(--mj-table) 0%, var(--mj-bg) 100%);
+            border: 12px solid #3e2723;
+            box-shadow: inset 0 0 100px rgba(0,0,0,0.5), 0 25px 50px -12px rgba(0,0,0,0.5);
+        }
+
+        .tile {
+            perspective: 1000px;
+            transition: transform 0.2s;
+        }
+        .tile:hover {
+            transform: translateY(-10px);
+            cursor: pointer;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .chat-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .chat-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 10px;
+        }
+
+        /* 可拖拽对话框样式 */
+        .resizable-chat {
+            min-height: 200px;
+            min-width: 250px;
+            max-height: 80vh;
+            max-width: 90vw;
+            position: relative;
+            z-index: 100;
+        }
+
+        .drag-handle {
+            cursor: move;
+            user-select: none;
+        }
+
+        .resize-handle {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            width: 20px;
+            height: 20px;
+            cursor: nwse-resize;
+            background: linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.3) 50%);
+            border-radius: 0 0 0.75rem 0;
+        }
+
+        /* 手机端适配优化 */
+        @media (max-width: 640px) {
+            .mobile-hidden { display: none; }
+            .tile { width: 30px; height: 42px; }
+            .chat-area { height: 120px; font-size: 12px; }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-center p-2 sm:p-4">
+<!-- 顶栏状态 -->
+<div class="fixed top-0 left-0 w-full p-4 flex justify-between items-center z-50 pointer-events-none">
+<div class="glass-panel rounded-full px-4 py-2 flex items-center gap-4 text-white pointer-events-auto">
+<div class="flex items-center gap-2">
+<span class="iconify text-yellow-500" data-icon="mdi: gold"></span>
+<span class="font-bold">128,500</span>
+</div>
+<div class="h-4 w-[1px] bg-white/20"></div>
+<div class="flex items-center gap-2">
+<span class="iconify text-blue-400" data-icon="mdi:account"></span>
+<span>雀神·隐者</span>
+</div>
+</div>
+<div class="glass-panel rounded-full px-6 py-2 text-white font-bold text-lg pointer-events-auto">
+            东风圈 - 二局 <span class="text-yellow-400 ml-2">剩 72 张</span>
+</div>
+<div class="flex gap-2 pointer-events-auto">
+<button class="glass-panel p-2 rounded-full text-white hover:bg-white/20"><span class="iconify" data-icon="mdi:cog"></span></button>
+<button class="glass-panel p-2 rounded-full text-white hover:bg-white/20"><span class="iconify" data-icon="mdi:help-circle"></span></button>
+</div>
+</div>
+<!-- 游戏主桌面 -->
+<div class="relative w-full max-w-[1200px] aspect-square sm:aspect-video mahjong-table rounded-[40px] flex items-center justify-center overflow-hidden">
+<!-- 背景装饰纹理 -->
+<div class="absolute inset-0 opacity-10 pointer-events-none flex items-center justify-center">
+<span class="iconify text-[400px]" data-icon="mdi:yin-yang"></span>
+</div>
+<!-- 玩家：北 (上) -->
+<div class="absolute top-8 left-1/2 -translate-x-1/2 flex flex-col items-center">
+<div class="flex gap-1 mb-2">
+<div class="w-6 h-9 sm:w-8 sm:h-12 bg-gray-200 rounded-sm border-b-4 border-gray-400 shadow-md"></div>
+<div class="w-6 h-9 sm:w-8 sm:h-12 bg-gray-200 rounded-sm border-b-4 border-gray-400 shadow-md"></div>
+<div class="w-6 h-9 sm:w-8 sm:h-12 bg-gray-200 rounded-sm border-b-4 border-gray-400 shadow-md"></div>
+<div class="w-6 h-9 sm:w-8 sm:h-12 bg-gray-200 rounded-sm border-b-4 border-gray-400 shadow-md"></div>
+<div class="w-6 h-9 sm:w-8 sm:h-12 bg-gray-200 rounded-sm border-b-4 border-gray-400 shadow-md"></div>
+<div class="w-6 h-9 sm:w-8 sm:h-12 bg-gray-200 rounded-sm border-b-4 border-gray-400 shadow-md"></div>
+</div>
+<div class="flex items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/10">
+<img alt="Player North" class="w-6 h-6 rounded-full border border-white/50" src="https://modao.cc/agent-py/media/generated_images/2026-03-10/f0db31c6d9e24d47bebd9f5cf58f7319.jpg"/>
+<span class="text-white text-xs whitespace-nowrap">AI-零号机器人 (北)</span>
+</div>
+</div>
+<!-- 玩家：西 (左) -->
+<div class="absolute left-4 top-1/2 -translate-y-1/2 flex flex-row items-center gap-4">
+<div class="flex flex-col items-center gap-2 bg-black/40 p-2 rounded-xl border border-white/10">
+<img alt="Player West" class="w-10 h-10 lg:w-16 lg:h-16 rounded-full border-2 border-white/30" src="https://modao.cc/agent-py/media/generated_images/2026-03-10/c5ef090b0c5f4d099669ffdd9c75df9b.jpg"/>
+<span class="text-white text-xs font-bold">AI专家 (西)</span>
+<div class="text-yellow-400 text-[10px] sm:text-xs">思考中...</div>
+</div>
+<div class="flex flex-col gap-1 mobile-hidden">
+<div class="w-9 h-6 bg-gray-200 rounded-sm border-r-4 border-gray-400 shadow-md"></div>
+<div class="w-9 h-6 bg-gray-200 rounded-sm border-r-4 border-gray-400 shadow-md"></div>
+<div class="w-9 h-6 bg-gray-200 rounded-sm border-r-4 border-gray-400 shadow-md"></div>
+<div class="w-9 h-6 bg-gray-200 rounded-sm border-r-4 border-gray-400 shadow-md"></div>
+</div>
+</div>
+<!-- 玩家：东 (右) -->
+<div class="absolute right-4 top-1/2 -translate-y-1/2 flex flex-row-reverse items-center gap-4">
+<div class="flex flex-col items-center gap-2 bg-black/40 p-2 rounded-xl border border-white/10">
+<img alt="Player East" class="w-10 h-10 lg:w-16 lg:h-16 rounded-full border-2 border-white/30" src="https://modao.cc/agent/placeholder.svg"/>
+<span class="text-white text-xs font-bold">雀界老李 (东)</span>
+<span class="text-green-400 text-xs">准备就绪</span>
+</div>
+<div class="flex flex-col gap-1 mobile-hidden">
+<div class="w-9 h-6 bg-gray-200 rounded-sm border-l-4 border-gray-400 shadow-md"></div>
+<div class="w-9 h-6 bg-gray-200 rounded-sm border-l-4 border-gray-400 shadow-md"></div>
+<div class="w-9 h-6 bg-gray-200 rounded-sm border-l-4 border-gray-400 shadow-md"></div>
+<div class="w-9 h-6 bg-gray-200 rounded-sm border-l-4 border-gray-400 shadow-md"></div>
+</div>
+</div>
+<!-- 中心区域：计时器与聊天对话框 -->
+<div class="w-full max-w-[1000px] flex flex-col items-center justify-center p-4 relative pointer-events-none">
+<!-- 计时指示灯 (保持 pointer-events-auto) -->
+<div class="relative w-24 h-24 sm:w-32 sm:h-32 rounded-lg bg-[#1a1a1a] border-4 border-[#333] flex items-center justify-center p-2 shadow-2xl pointer-events-auto">
+<div class="grid grid-cols-3 grid-rows-3 gap-1 w-full h-full text-[#555] font-bold text-center">
+<div class="flex items-center justify-center">北</div>
+<div class="flex items-center justify-center bg-red-600 rounded-full w-2 h-2 mx-auto my-auto animate-pulse"></div>
+<div class="flex items-center justify-center">东</div>
+<div class="flex items-center justify-center"></div>
+<div class="flex items-center justify-center text-3xl sm:text-4xl text-yellow-400 col-span-1 row-span-1" style="font-family: 'ZCOOL KuaiLe'">15</div>
+<div class="flex items-center justify-center"></div>
+<div class="flex items-center justify-center">西</div>
+<div class="flex items-center justify-center text-green-500">南</div>
+<div class="flex items-center justify-center"></div>
+</div>
+</div>
+<!-- 群聊对话框区域 -->
+<div class="w-full sm:w-2/3 max-w-[500px] mt-4 resizable-chat glass-panel rounded-xl flex flex-col overflow-hidden shadow-2xl border border-white/20 pointer-events-auto" id="movable-chat">
+<div class="bg-black/40 px-3 py-2 flex items-center justify-between text-[10px] text-white/70 drag-handle" id="chat-header">
+<div class="flex items-center gap-2">
+<span class="iconify" data-icon="mdi:drag-variant"></span>
+<span class="font-bold">赛事聊天室 (4人)</span>
+</div>
+<span class="flex items-center gap-1"><span class="w-2 h-2 bg-green-500 rounded-full"></span> 延迟 25ms</span>
+</div>
+<!-- 消息滚动区 (默认高度调大) -->
+<div class="flex-1 p-2 overflow-y-auto chat-scroll flex flex-col gap-2 chat-area" style="min-height: 180px;">
+<div class="flex flex-col gap-1 items-start">
+<span class="text-[10px] text-white/50 ml-1">AI专家 (西)</span>
+<div class="bg-white/10 rounded-lg px-3 py-1 text-white max-w-[90%]">老李，你上一把是不是扣了我的发财？🙄</div>
+</div>
+<div class="flex flex-col gap-1 items-end">
+<span class="text-[10px] text-white/50 mr-1">雀界老李 (东)</span>
+<div class="bg-green-600/40 rounded-lg px-3 py-1 text-white max-w-[90%]">哪有，那是运气好正好摸到了。</div>
+</div>
+<div class="flex flex-col gap-1 items-start">
+<span class="text-[10px] text-blue-400 ml-1">AI-零号机器人 (北) [当前日期 2026.03.10]</span>
+<div class="bg-blue-600/20 rounded-lg px-2 py-1 text-blue-100 border border-blue-500/30">检测到当前牌局胜率的变化。建议玩家：关注下方三条。</div>
+</div>
+<div class="flex flex-col gap-1 items-start">
+<span class="text-[10px] text-white/50 ml-1">AI专家 (西)</span>
+<div class="bg-white/10 rounded-lg px-3 py-1 text-white max-w-[90%]">切，机器人的直觉准不准啊？</div>
+</div>
+</div>
+<!-- 输入框 -->
+<div class="p-2 flex gap-2">
+<input class="flex-1 bg-black/40 rounded px-3 py-1 text-white text-xs outline-none border border-white/10 focus:border-yellow-500/50" placeholder="与AI和牌友聊天..." type="text"/>
+<button class="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1 rounded text-xs transition-colors">发送</button>
+</div>
+<!-- 缩放手柄 -->
+<div class="resize-handle" id="chat-resizer"></div>
+</div>
+</div>
+<!-- 底部：手牌操作区 (我) -->
+<div class="absolute bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-[900px]">
+<!-- 操作按钮 -->
+<div class="flex justify-center gap-3 mb-4 sm:mb-8">
+<button class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blue-600 text-white font-bold border-4 border-blue-400 shadow-lg hover:scale-110 active:scale-95 transition-all text-sm sm:text-base flex items-center justify-center">吃</button>
+<button class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-green-600 text-white font-bold border-4 border-green-400 shadow-lg hover:scale-110 active:scale-95 transition-all text-sm sm:text-base flex items-center justify-center">碰</button>
+<button class="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-purple-600 text-white font-bold border-4 border-purple-400 shadow-lg hover:scale-110 active:scale-95 transition-all text-sm sm:text-base flex items-center justify-center">杠</button>
+<button class="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-red-600 text-white font-black border-4 border-red-400 shadow-lg hover:scale-110 active:scale-95 transition-all animate-bounce text-lg sm:text-xl flex items-center justify-center">胡</button>
+</div>
+<!-- 手牌展示 -->
+<div class="flex justify-center items-end gap-1 px-4 sm:gap-2">
+<!-- 这种复杂的渲染通常动态生成，这里手写展示具有代表性的牌 -->
+<div class="tile w-10 h-14 sm:w-14 sm:h-20 bg-white rounded-md border-b-8 border-gray-300 flex flex-col items-center justify-center p-1 sm:p-2" title="红中 Red Dragon">
+<span class="iconify text-red-600 text-2xl sm:text-4xl" data-icon="heroicons:sparkles-20-solid"></span>
+<span class="text-xs sm:text-sm font-bold text-red-600 mt-1">中</span>
+</div>
+<div class="tile w-10 h-14 sm:w-14 sm:h-20 bg-white rounded-md border-b-8 border-gray-300 flex flex-col items-center justify-between p-1 sm:p-2" title="三筒 Three of Dots">
+<div class="flex justify-center gap-1"><span class="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-blue-600"></span></div>
+<div class="flex justify-center gap-1"><span class="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-blue-600"></span><span class="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-blue-600"></span></div>
+<div class="text-[10px] text-gray-400">三筒</div>
+</div>
+<div class="tile w-10 h-14 sm:w-14 sm:h-20 bg-white rounded-md border-b-8 border-gray-300 flex flex-col items-center justify-between p-1 sm:p-2" title="一条 One of Bamboo">
+<span class="iconify text-green-700 text-2xl sm:text-4xl" data-icon="material-symbols:nature-rounded"></span>
+<div class="text-[10px] text-gray-400">一条</div>
+</div>
+<div class="tile w-10 h-14 sm:w-14 sm:h-20 bg-white rounded-md border-b-8 border-gray-300 flex flex-col items-center justify-center p-1 sm:p-2" title="九万 Nine of Characters">
+<span class="text-xl sm:text-2xl font-bold text-black border-2 border-black px-1">萬</span>
+<span class="text-lg sm:text-2xl font-bold text-red-600">九</span>
+</div>
+<div class="tile w-10 h-14 sm:w-14 sm:h-20 bg-white rounded-md border-b-8 border-gray-300 flex flex-col items-center justify-center p-1 sm:p-2" title="九万 Nine of Characters">
+<span class="text-xl sm:text-2xl font-bold text-black border-2 border-black px-1">萬</span>
+<span class="text-lg sm:text-2xl font-bold text-red-600">九</span>
+</div>
+<!-- 摸牌间隙 -->
+<div class="w-2 sm:w-4"></div>
+<!-- 刚摸到的牌 -->
+<div class="tile w-10 h-14 sm:w-14 sm:h-20 bg-yellow-50 rounded-md border-b-8 border-yellow-200 ring-2 ring-yellow-400 flex flex-col items-center justify-center p-1 sm:p-2" title="发财 Green Dragon">
+<span class="iconify text-green-700 text-2xl sm:text-4xl" data-icon="mdi:compass-outline"></span>
+<span class="text-xs sm:text-sm font-bold text-green-700 mt-1">发</span>
+</div>
+</div>
+</div>
+</div>
+<!-- 底部功能栏 (移动端适配) -->
+<div class="fixed bottom-0 w-full glass-panel flex justify-around py-3 rounded-t-3xl sm:hidden">
+<button class="flex flex-col items-center text-white/70">
+<span class="iconify text-2xl" data-icon="mdi:trophy"></span>
+<span class="text-[10px]">排行榜</span>
+</button>
+<button class="flex flex-col items-center text-yellow-500">
+<span class="iconify text-2xl" data-icon="mdi:play-circle"></span>
+<span class="text-[10px]">对局中</span>
+</button>
+<button class="flex flex-col items-center text-white/70">
+<span class="iconify text-2xl" data-icon="mdi:wallet"></span>
+<span class="text-[10px]">商城</span>
+</button>
+<button class="flex flex-col items-center text-white/70">
+<span class="iconify text-2xl" data-icon="mdi:message-badge"></span>
+<span class="text-[10px]">社交</span>
+</button>
+</div>
+<script>
+        // 模拟消息滚动逻辑
+        const chatBox = document.querySelector('.chat-scroll');
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        // 聊天对话框拖拽与缩放功能
+        const movableChat = document.getElementById('movable-chat');
+        const chatHeader = document.getElementById('chat-header');
+        const chatResizer = document.getElementById('chat-resizer');
+
+        let isDragging = false;
+        let isResizing = false;
+        let startX, startY, startWidth, startHeight, startLeft, startTop;
+
+        // 辅助获取坐标（兼容触摸）
+        const getCoords = (e) => {
+            return e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY };
+        };
+
+        // 拖拽位置逻辑
+        const startDrag = (e) => {
+            if (e.target.closest('button')) return; // 避免点击按钮触发拖拽
+            isDragging = true;
+            const coords = getCoords(e);
+            const rect = movableChat.getBoundingClientRect();
+            startX = coords.x - rect.left;
+            startY = coords.y - rect.top;
+            movableChat.style.position = 'fixed';
+            movableChat.style.left = rect.left + 'px';
+            movableChat.style.top = rect.top + 'px';
+            movableChat.style.margin = '0';
+        };
+
+        // 缩放大小逻辑
+        const startResize = (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            isResizing = true;
+            const coords = getCoords(e);
+            // 移除 Tailwind 宽度限制类，让 JS 的 inline style 生效
+            movableChat.classList.remove('w-full', 'sm:w-2/3', 'max-w-[500px]');
+            startWidth = movableChat.offsetWidth;
+            startHeight = movableChat.offsetHeight;
+            startX = coords.x;
+            startY = coords.y;
+        };
+
+        const onMove = (e) => {
+            if (!isDragging && !isResizing) return;
+            const coords = getCoords(e);
+
+            if (isDragging) {
+                movableChat.style.left = (coords.x - startX) + 'px';
+                movableChat.style.top = (coords.y - startY) + 'px';
+            } else if (isResizing) {
+                const newWidth = startWidth + (coords.x - startX);
+                const newHeight = startHeight + (coords.y - startY);
+                movableChat.style.width = newWidth + 'px';
+                movableChat.style.height = newHeight + 'px';
+            }
+        };
+
+        const stopInteraction = () => {
+            isDragging = false;
+            isResizing = false;
+        };
+
+        // 绑定事件
+        chatHeader.addEventListener('mousedown', startDrag);
+        chatHeader.addEventListener('touchstart', startDrag, { passive: true });
+        chatResizer.addEventListener('mousedown', startResize);
+        chatResizer.addEventListener('touchstart', startResize, { passive: false });
+
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('touchmove', onMove, { passive: false });
+        window.addEventListener('mouseup', stopInteraction);
+        window.addEventListener('touchend', stopInteraction);
+
+        // 简单的随机消息插入模拟动态感
+        const mockMessages = [
+            { name: 'AI专家', text: '我觉得你打这张牌不对。', pos: 'left' },
+            { name: '系统', text: '对手正在考虑胡牌的概率...', pos: 'center' },
+            { name: '雀界老李', text: '碰！不好意思各位。', pos: 'left' }
+        ];
+
+        let msgIdx = 0;
+        setInterval(() => {
+            if(msgIdx < mockMessages.length) {
+                const msg = mockMessages[msgIdx];
+                const div = document.createElement('div');
+                div.className = `flex flex-col gap-1 ${msg.pos === 'center' ? 'items-center' : 'items-start'}`;
+                div.innerHTML = `
+                    <span class="text-[10px] text-white/50">${msg.name}</span>
+                    <div class="${msg.pos === 'center' ? 'bg-black/40 text-[9px]' : 'bg-white/10'} rounded-lg px-3 py-1 text-white max-w-[90%]">${msg.text}</div>
+                `;
+                chatBox.appendChild(div);
+                chatBox.scrollTo({top: chatBox.scrollHeight, behavior: 'smooth'});
+                msgIdx++;
+            }
+        }, 8000);
+    </script></body>
+</html>
