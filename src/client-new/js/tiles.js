@@ -26,71 +26,100 @@ export function renderTile(tile, options = {}) {
   const { highlight = false, onClick = null, size = 'normal' } = options;
   const { suit, value, id } = tile;
   
-  const sizeClass = size === 'small' ? 'w-8 h-11' : 'w-10 h-14 sm:w-14 sm:h-20';
-  // 高亮牌保持白色，只加个轻微的阴影提示
-  const highlightClass = highlight ? 'bg-white border-b-8 border-gray-300 ring-2 ring-amber-400' : 'bg-white border-b-8 border-gray-300';
+  const isSmall = size === 'small';
+  const sizeClass = isSmall ? 'w-6 h-8' : 'w-10 h-14 sm:w-14 sm:h-20';
+  const highlightClass = highlight ? 'bg-white border-b-4 border-gray-300 ring-2 ring-amber-400' : 'bg-white border-b-4 sm:border-b-8 border-gray-300';
   const clickAttr = onClick ? `onclick="${onClick}"` : '';
   
   let content = '';
   
-  switch (suit) {
-    case 'wan':
-      content = `
-        <span class="text-sm sm:text-xl font-bold border border-black px-0.5 mb-0.5">萬</span>
-        <span class="text-base sm:text-2xl font-bold text-red-600">${TILE_NAMES.wan[value - 1]}</span>
-      `;
-      break;
-      
-    case 'tiao':
-      if (value === 1) {
-        // 一条：鸟
+  if (isSmall) {
+    // 小尺寸：简化的内容
+    switch (suit) {
+      case 'wan':
         content = `
-          <span class="iconify text-lg sm:text-3xl text-green-700" data-icon="material-symbols:nature-rounded"></span>
-          <span class="text-[8px] sm:text-[10px] text-green-700 mt-0.5">一条</span>
+          <span class="text-[6px] font-bold border border-black px-px">萬</span>
+          <span class="text-[10px] font-bold text-red-600">${TILE_NAMES.wan[value - 1]}</span>
         `;
-      } else {
-        // 条子：竹节图案
-        content = renderBambooPattern(value);
-      }
-      break;
-      
-    case 'tong':
-      content = renderDotPattern(value);
-      break;
-      
-    case 'feng':
-      content = `
-        <span class="text-xl sm:text-2xl font-bold text-gray-800">${['東', '南', '西', '北'][value - 1]}</span>
-        <span class="text-[6px] sm:text-[8px] text-gray-400 mt-0.5">${WIND_ENGLISH[value - 1]}</span>
-      `;
-      break;
-      
-    case 'jian':
-    case 'dragon':
-      if (value === 1) {
-        // 红中
+        break;
+      case 'tiao':
+        if (value === 1) {
+          content = `<span class="iconify text-xs text-green-700" data-icon="material-symbols:nature-rounded"></span>`;
+        } else {
+          // 条子小尺寸用汉字数字
+          content = `<span class="text-[10px] font-bold text-green-700">${TILE_NAMES.tiao[value - 1]}</span>`;
+        }
+        break;
+      case 'tong':
+        // 筒子小尺寸用汉字
+        content = `<span class="text-[10px] font-bold text-blue-700">${TILE_NAMES.tong[value - 1]}</span>`;
+        break;
+      case 'feng':
+        content = `<span class="text-[10px] font-bold text-gray-800">${['東', '南', '西', '北'][value - 1]}</span>`;
+        break;
+      case 'jian':
+      case 'dragon':
+        const colors = ['text-red-600', 'text-green-700', 'text-blue-600'];
+        const chars = ['中', '發', '白'];
+        content = `<span class="text-[10px] font-bold ${colors[value - 1]}">${chars[value - 1]}</span>`;
+        break;
+    }
+  } else {
+    // 正常尺寸
+    switch (suit) {
+      case 'wan':
         content = `
-          <span class="text-xl sm:text-2xl font-bold text-red-600">中</span>
-          <span class="text-[6px] sm:text-[8px] text-red-400 opacity-50 mt-0.5">ZHONG</span>
+          <span class="text-sm sm:text-xl font-bold border border-black px-0.5 mb-0.5">萬</span>
+          <span class="text-base sm:text-2xl font-bold text-red-600">${TILE_NAMES.wan[value - 1]}</span>
         `;
-      } else if (value === 2) {
-        // 绿发
+        break;
+        
+      case 'tiao':
+        if (value === 1) {
+          content = `
+            <span class="iconify text-lg sm:text-3xl text-green-700" data-icon="material-symbols:nature-rounded"></span>
+            <span class="text-[8px] sm:text-[10px] text-green-700 mt-0.5">一条</span>
+          `;
+        } else {
+          content = renderBambooPattern(value);
+        }
+        break;
+        
+      case 'tong':
+        content = renderDotPattern(value);
+        break;
+        
+      case 'feng':
         content = `
-          <span class="text-xl sm:text-2xl font-bold text-green-700">發</span>
-          <span class="text-[6px] sm:text-[8px] text-green-400 opacity-50 mt-0.5">FA</span>
+          <span class="text-xl sm:text-2xl font-bold text-gray-800">${['東', '南', '西', '北'][value - 1]}</span>
+          <span class="text-[6px] sm:text-[8px] text-gray-400 mt-0.5">${WIND_ENGLISH[value - 1]}</span>
         `;
-      } else {
-        // 白板
-        content = `
-          <div class="w-6 h-8 sm:w-10 sm:h-14 border-2 border-blue-200 rounded-sm"></div>
-          <span class="text-[6px] sm:text-[8px] text-blue-300 mt-1">BAI</span>
-        `;
-      }
-      break;
+        break;
+        
+      case 'jian':
+      case 'dragon':
+        if (value === 1) {
+          content = `
+            <span class="text-xl sm:text-2xl font-bold text-red-600">中</span>
+            <span class="text-[6px] sm:text-[8px] text-red-400 opacity-50 mt-0.5">ZHONG</span>
+          `;
+        } else if (value === 2) {
+          content = `
+            <span class="text-xl sm:text-2xl font-bold text-green-700">發</span>
+            <span class="text-[6px] sm:text-[8px] text-green-400 opacity-50 mt-0.5">FA</span>
+          `;
+        } else {
+          content = `
+            <div class="w-6 h-8 sm:w-10 sm:h-14 border-2 border-blue-200 rounded-sm"></div>
+            <span class="text-[6px] sm:text-[8px] text-blue-300 mt-1">BAI</span>
+          `;
+        }
+        break;
+    }
   }
   
   return `
-    <div class="tile ${sizeClass} ${highlightClass} rounded-md flex flex-col items-center justify-center p-1 sm:p-2 shadow-md hover:shadow-lg transition-shadow" 
+    <div class="tile ${sizeClass} ${highlightClass} rounded-md flex flex-col items-center justify-center p-1 ${isSmall ? '' : 'sm:p-2'} shadow-md hover:shadow-lg transition-shadow" 
          data-tile-id="${id}" 
          data-suit="${suit}" 
          data-value="${value}"

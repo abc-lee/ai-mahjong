@@ -5,7 +5,7 @@
 
 import * as socket from './socket.js';
 import * as store from './store.js';
-import { renderHand, renderActionButtons, renderHiddenHand, tileStyles } from './tiles.js';
+import { renderHand, renderActionButtons, renderHiddenHand, renderTile, renderMeld, tileStyles } from './tiles.js';
 
 // ==================== UI 更新函数 ====================
 
@@ -296,12 +296,29 @@ function updatePlayerAreas() {
       }
     }
     
-    // 更新副露
-    if (player.melds && player.melds.length > 0) {
-      const meldsEl = areaEl.querySelector('.player-melds');
-      if (meldsEl) {
-        meldsEl.innerHTML = player.melds.map(m => `<div class="text-xs text-white/50">${m.type}</div>`).join('');
-      }
+    // 更新弃牌区
+    const discardsEl = document.getElementById(`${direction}-discards`);
+    if (discardsEl && player.discards && player.discards.length > 0) {
+      let discardsHtml = '';
+      player.discards.forEach(tile => {
+        // 弃牌用小尺寸渲染
+        discardsHtml += renderTile(tile, { size: 'small' });
+      });
+      discardsEl.innerHTML = discardsHtml;
+    } else if (discardsEl) {
+      discardsEl.innerHTML = '';
+    }
+    
+    // 更新副露区
+    const meldsEl = document.getElementById(`${direction}-melds`);
+    if (meldsEl && player.melds && player.melds.length > 0) {
+      let meldsHtml = '';
+      player.melds.forEach(meld => {
+        meldsHtml += renderMeld(meld);
+      });
+      meldsEl.innerHTML = meldsHtml;
+    } else if (meldsEl) {
+      meldsEl.innerHTML = '';
     }
   });
 }

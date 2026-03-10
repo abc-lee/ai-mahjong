@@ -173,13 +173,17 @@
 
 <!-- 玩家：北 (上) -->
 <div class="absolute top-8 left-1/2 -translate-x-1/2 flex flex-col items-center" data-position="north" id="player-north">
-<div class="player-hand flex gap-1 mb-2">
-<!-- 动态渲染 -->
-</div>
-<div class="flex items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/10">
+<div class="flex items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/10 mb-2">
 <img alt="Player North" class="w-6 h-6 rounded-full border border-white/50" src="https://modao.cc/agent-py/media/generated_images/2026-03-10/f0db31c6d9e24d47bebd9f5cf58f7319.jpg"/>
 <span class="player-name text-white text-xs whitespace-nowrap">等待中</span>
 </div>
+<div class="player-hand flex gap-1 mb-1">
+<!-- 动态渲染 -->
+</div>
+<!-- 弃牌区 -->
+<div class="player-discards flex gap-0.5 mb-1" id="north-discards"></div>
+<!-- 副露区 (最靠近中心) -->
+<div class="player-melds flex gap-1" id="north-melds"></div>
 </div>
 
 <!-- 玩家：西 (左) -->
@@ -192,6 +196,10 @@
 <div class="player-hand flex flex-col gap-1 mobile-hidden">
 <!-- 动态渲染 -->
 </div>
+<!-- 弃牌区 (靠近中心) -->
+<div class="player-discards flex flex-col gap-0.5" id="west-discards"></div>
+<!-- 副露区 -->
+<div class="player-melds flex flex-col gap-1" id="west-melds"></div>
 </div>
 
 <!-- 玩家：东 (右) -->
@@ -204,6 +212,10 @@
 <div class="player-hand flex flex-col gap-1 mobile-hidden">
 <!-- 动态渲染 -->
 </div>
+<!-- 弃牌区 (靠近中心) -->
+<div class="player-discards flex flex-col gap-0.5" id="east-discards"></div>
+<!-- 副露区 -->
+<div class="player-melds flex flex-col gap-1" id="east-melds"></div>
 </div>
 
 <!-- 中心区域：计时器与聊天对话框 -->
@@ -258,6 +270,11 @@
 </div>
 
 <!-- 底部：手牌操作区 (我) -->
+<!-- 自己的弃牌区和副露区（独立定位，不影响手牌布局） -->
+<div class="absolute bottom-32 sm:bottom-40 left-1/2 -translate-x-1/2 flex flex-col items-center" id="player-south" data-position="south">
+<div class="flex justify-center gap-0.5 mb-1 flex-wrap max-w-[600px]" id="south-discards"></div>
+<div class="flex justify-center gap-1 mb-1" id="south-melds"></div>
+</div>
 <div class="absolute bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-[900px]" id="bottom-area">
 <!-- 操作按钮 - 动态渲染，默认隐藏 -->
 <div class="flex justify-center gap-3 mb-4 sm:mb-8" id="action-buttons">
