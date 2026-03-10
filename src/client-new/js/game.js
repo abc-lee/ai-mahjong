@@ -31,9 +31,16 @@ function updateGameInfo() {
     `;
   }
   
-  // 玩家信息
-  if (state.playerName) {
-    playerInfoEl.querySelector('span:last-child').textContent = state.playerName;
+  // 玩家名字
+  const nameEl = document.getElementById('player-name-display');
+  if (nameEl && state.playerName) {
+    nameEl.textContent = state.playerName;
+  }
+  
+  // 玩家分数
+  const scoreEl = document.getElementById('player-score');
+  if (scoreEl) {
+    scoreEl.textContent = store.getPlayerScore();
   }
 }
 
@@ -203,52 +210,100 @@ function setupChiHoverSelection(chiActions) {
   });
 }
 
+// 计时器状态
+let timerInterval = null;
+let lastPlayerIndex = -1;
+
 /**
  * 更新中央计时器
  */
 function updateTimer() {
   const state = store.getState();
   const timerEl = document.getElementById('timer');
+  const timerNumber = document.getElementById('timer-number');
+  const timerFan = document.getElementById('timer-fan');
   
   if (!timerEl || !state.gamePublicState) return;
   
   const currentPlayer = state.gamePublicState.currentPlayerIndex;
-  const myPosition = store.getMyPosition();
-  const isMyTurn = state.myTurn;
   
-  // 更新计时器显示
-  const timerValue = timerEl.querySelector('.text-yellow-400');
-  if (timerValue) {
-    timerValue.textContent = isMyTurn ? '15' : '--';
+  // 如果玩家换了，重置计时器
+  if (currentPlayer !== lastPlayerIndex) {
+    lastPlayerIndex = currentPlayer;
+    startCountdown(15);
   }
   
-  // 更新方位指示灯
-  updatePositionIndicator(currentPlayer);
+  // 如果不在游戏中，显示 -- 并停止
+  if (!state.gamePublicState || state.gamePhase !== 'playing') {
+    if (timerNumber) timerNumber.textContent = '--';
+    if (timerFan) timerFan.style.background = 'conic-gradient(from -90deg, rgba(245, 158, 11, 0.3) 0deg, transparent 0deg)';
+    stopCountdown();
+    lastPlayerIndex = -1;
+  }
+}
+
+/**
+ * 开始倒计时
+ */
+function startCountdown(seconds) {
+  stopCountdown();
+  
+  let remaining = seconds;
+  const timerNumber = document.getElementById('timer-number');
+  const timerFan = document.getElementById('timer-fan');
+  
+  // 立即显示初始值（完整扇面）
+  updateFanDisplay(remaining, seconds);
+  if (timerNumber) timerNumber.textContent = remaining;
+  
+  timerInterval = setInterval(() => {
+    remaining--;
+    
+    if (timerNumber) {
+      timerNumber.textContent = remaining;
+    }
+    
+    // 更新扇面
+    updateFanDisplay(remaining, seconds);
+    
+    // 时间到
+    if (remaining <= 0) {
+      stopCountdown();
+      if (timerNumber) timerNumber.textContent = '0';
+    }
+  }, 1000);
+}
+
+/**
+ * 更新扇面显示
+ */
+function updateFanDisplay(remaining, total) {
+  const timerFan = document.getElementById('timer-fan');
+  if (!timerFan) return;
+  
+  // 计算扇面角度（从12点位置顺时针）
+  const percentage = remaining / total;
+  const degrees = percentage * 360;
+  
+  // conic-gradient: from -90deg 让起点在12点位置
+  timerFan.style.background = `conic-gradient(from -90deg, rgba(245, 158, 11, 0.5) 0deg, rgba(245, 158, 11, 0.5) ${degrees}deg, transparent ${degrees}deg)`;
+}
+
+/**
+ * 停止倒计时
+ */
+function stopCountdown() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
 }
 
 /**
  * 更新方位指示灯
  */
 function updatePositionIndicator(currentPlayer) {
-  const positions = ['north', 'east', 'south', 'west'];
-  const positionMap = [0, 2, 1, 3]; // 北东南京 -> 0123
-  
-  // 清除所有活跃状态
-  positions.forEach(pos => {
-    const el = document.querySelector(`[data-position="${pos}"] .indicator`);
-    if (el) {
-      el.classList.remove('bg-green-500', 'animate-pulse');
-      el.classList.add('bg-gray-600');
-    }
-  });
-  
-  // 高亮当前玩家
-  const currentPos = positions[positionMap[currentPlayer]];
-  const indicator = document.querySelector(`[data-position="${currentPos}"] .indicator`);
-  if (indicator) {
-    indicator.classList.remove('bg-gray-600');
-    indicator.classList.add('bg-green-500', 'animate-pulse');
-  }
+  // 保留但不再使用指示灯
 }
 
 /**
@@ -662,6 +717,17 @@ function showGameEndDialog(winner, winningHand, players) {
   // 添加到页面
   document.body.insertAdjacentHTML('beforeend', modalHtml);
   
+  // 更新顶栏分数显示
+  const myId = state.playerId;
+  const myResult = scoreChanges.find(p => p.id === myId);
+  if (myResult && myResult.scoreChange) {
+    const newScore = (store.getPlayerScore() || 0) + myResult.scoreChange;
+    const scoreEl = document.getElementById('player-score');
+    if (scoreEl) {
+      scoreEl.textContent = newScore;
+    }
+  }
+  
   // 绑定按钮事件
   document.getElementById('play-again-btn')?.addEventListener('click', async () => {
     // 移除弹窗
@@ -765,7 +831,14 @@ function setupPositionModal() {
   positionButtons.forEach(btn => {
     btn.addEventListener('click', async () => {
       const position = parseInt(btn.dataset.position);
-      const playerName = nameInput?.value || '玩家';
+      const playerName = (nameInput?.value || '').trim();
+      
+      // 检查名字是否为空
+      if (!playerName) {
+        alert('请输入你的昵称');
+        nameInput?.focus();
+        return;
+      }
       
       // 检查位置是否已占用
       if (btn.classList.contains('opacity-50')) {
@@ -978,15 +1051,20 @@ function updateWaitingPlayers(room) {
     chatHeader.textContent = `赛事聊天室 (${room.players.length}人)`;
   }
   
-  // 更新顶栏玩家名称
+  // 更新顶栏玩家名称和分数
   const currentPlayer = room.players.find(p => p.id === state.playerId);
   if (currentPlayer) {
     const playerInfoEl = document.getElementById('player-info');
     if (playerInfoEl) {
-      const nameSpan = playerInfoEl.querySelector('span:last-child');
+      const nameSpan = document.getElementById('player-name-display');
       if (nameSpan) {
         nameSpan.textContent = currentPlayer.name;
       }
+    }
+    // 更新分数
+    const scoreEl = document.getElementById('player-score');
+    if (scoreEl) {
+      scoreEl.textContent = store.getPlayerScore();
     }
   }
   

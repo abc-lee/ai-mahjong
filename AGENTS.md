@@ -175,6 +175,10 @@ AI Agent（独立 LLM 会话）←WebSocket→ 游戏服务器（只做规则验
 | 游戏结束弹窗 | ✅ | src/client-new/js/game.js |
 | 再来一局功能 | ✅ | src/server/room/RoomManager.ts |
 | 弃牌区/副露区显示 | ✅ | src/client-new/js/tiles.js, game.js |
+| 动态方位显示系统 | ✅ | src/client-new/js/game.js |
+| 圆形倒计时时钟 | ✅ | src/client-new/index.html, game.js |
+| 玩家名字输入验证 | ✅ | src/client-new/js/game.js |
+| 顶栏分数/名字显示 | ✅ | src/client-new/js/game.js, store.js |
 
 ---
 
@@ -278,6 +282,11 @@ node scripts/join-player-room.js <roomId> &
 - **小牌尺寸调整**：按原UI设计稿，弃牌/副露牌尺寸为 24×36px（手机）/ 32×48px（桌面）
 - **小牌图形化渲染**：万、条、筒、风、箭牌在小尺寸下都能正确显示图形化内容
 - **一条小鸟图标**：小牌的一条显示小鸟图标
+- **牌悬停提示**：鼠标悬停显示中英文名称（如"九万 Nine of Characters"）
+- **动态方位显示**：头像改用字母+颜色+图标显示方位（E/S/W/N），根据用户选择的方位顺时针排列
+- **圆形倒计时时钟**：磨砂玻璃效果，扇面进度条转动，每换玩家重置15秒
+- **玩家名字输入验证**：必须输入名字才能进入游戏
+- **顶栏分数/名字显示**：正确显示玩家累计分数和名字
 
 ### 服务器改进
 - 新增 `/api/rooms` 接口查询等待中的房间
@@ -293,8 +302,10 @@ node scripts/join-player-room.js <roomId> &
 - 修复操作按钮不消失的问题
 - 修复流局显示"玩家胡牌"的问题
 - 修复南边容器缺失 `id="player-south"` 导致弃牌区不显示的问题
+- 修复相对方位计算错误（左右搞反）
+- 修复顶栏分数显示被名字覆盖的问题
 
 ---
 
-*文档版本: v2.2*
+*文档版本: v2.3*
 *更新时间: 2026-03-10*

@@ -10,6 +10,7 @@ const initialState = {
   playerId: null,
   playerName: null,
   selectedDirection: null, // 用户选择的方位：0=东, 1=南, 2=西, 3=北
+  playerScore: 0, // 累计分数
 
   // 房间状态
   currentRoom: null,
@@ -211,7 +212,28 @@ export function clearAvailableActions() {
  * @param {object|null} endState - 结束状态
  */
 export function setGameEndState(endState) {
-  setState({ gameEndState: endState });
+  let newScore = state.playerScore || 0;
+  
+  // 计算新的累计分数
+  if (endState && endState.players) {
+    const myId = state.playerId;
+    const myResult = endState.players.find(p => p.id === myId);
+    if (myResult && myResult.scoreChange) {
+      newScore = newScore + myResult.scoreChange;
+    }
+  }
+  
+  setState({ 
+    gameEndState: endState,
+    playerScore: newScore 
+  });
+}
+
+/**
+ * 获取玩家累计分数
+ */
+export function getPlayerScore() {
+  return state.playerScore || 0;
 }
 
 /**
@@ -317,5 +339,7 @@ export default {
   isPlaying,
   hasActions,
   getMyPosition,
+  getSelectedDirection,
+  getPlayerScore,
   isHost,
 };
