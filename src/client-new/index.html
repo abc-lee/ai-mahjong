@@ -174,7 +174,7 @@
 <!-- 玩家：北 (上) -->
 <div class="absolute top-8 left-1/2 -translate-x-1/2 flex flex-col items-center" data-position="north" id="player-north">
 <div class="flex items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-white/10 mb-2">
-<img alt="Player North" class="w-6 h-6 rounded-full border border-white/50" src="https://modao.cc/agent-py/media/generated_images/2026-03-10/f0db31c6d9e24d47bebd9f5cf58f7319.jpg"/>
+<div class="player-avatar w-6 h-6 rounded-full border border-white/50 flex items-center justify-center text-white text-xs font-bold"></div>
 <span class="player-name text-white text-xs whitespace-nowrap">等待中</span>
 </div>
 <div class="player-hand flex gap-1 mb-1">
@@ -189,7 +189,10 @@
 <!-- 玩家：西 (左) -->
 <div class="absolute left-4 top-1/2 -translate-y-1/2 flex flex-row items-center gap-4" data-position="west" id="player-west">
 <div class="flex flex-col items-center gap-2 bg-black/40 p-2 rounded-xl border border-white/10">
-<img alt="Player West" class="w-10 h-10 lg:w-16 lg:h-16 rounded-full border-2 border-white/30" src="https://modao.cc/agent-py/media/generated_images/2026-03-10/c5ef090b0c5f4d099669ffdd9c75df9b.jpg"/>
+<div class="player-avatar w-10 h-10 lg:w-16 lg:h-16 rounded-full border-2 border-white/30 flex items-center justify-center">
+<span class="avatar-letter text-xl lg:text-2xl font-bold"></span>
+<span class="avatar-icon text-sm lg:text-base"></span>
+</div>
 <span class="player-name text-white text-xs font-bold">等待中</span>
 <div class="player-status text-yellow-400 text-[10px] sm:text-xs"></div>
 </div>
@@ -205,7 +208,10 @@
 <!-- 玩家：东 (右) -->
 <div class="absolute right-4 top-1/2 -translate-y-1/2 flex flex-row-reverse items-center gap-4" data-position="east" id="player-east">
 <div class="flex flex-col items-center gap-2 bg-black/40 p-2 rounded-xl border border-white/10">
-<img alt="Player East" class="w-10 h-10 lg:w-16 lg:h-16 rounded-full border-2 border-white/30" src="https://modao.cc/agent/placeholder.svg"/>
+<div class="player-avatar w-10 h-10 lg:w-16 lg:h-16 rounded-full border-2 border-white/30 flex items-center justify-center">
+<span class="avatar-letter text-xl lg:text-2xl font-bold"></span>
+<span class="avatar-icon text-sm lg:text-base"></span>
+</div>
 <span class="player-name text-white text-xs font-bold">等待中</span>
 <span class="player-status text-green-400 text-xs"></span>
 </div>

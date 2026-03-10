@@ -266,21 +266,62 @@ function updatePlayerAreas() {
   }
   
   const myPosition = store.getMyPosition();
+  const selectedDirection = store.getSelectedDirection() ?? 0; // 默认南
   
-  // 位置映射：position 0=南(自己), 1=东, 2=北, 3=西
-  const positionToDirection = {
-    0: 'south', // 自己
-    1: 'east',
-    2: 'north',
-    3: 'west',
-  };
+  // 顺时针顺序：东(1) → 南(0) → 西(3) → 北(2)
+  const CLOCKWISE = [1, 0, 3, 2]; // 东、南、西、北对应的 direction 值
   
+  // 方向值对应的字母和颜色：0=南, 1=东, 2=北, 3=西
+  const DIRECTION_LETTERS = ['S', 'E', 'N', 'W'];
+  const DIRECTION_COLORS = ['#EF4444', '#F59E0B', '#3B82F6', '#8B5CF6'];
+  const DIRECTION_ICONS = ['🔥', '☀️', '❄️', '🌙'];
+  
+  // 找到用户选的方位在顺时针数组中的索引
+  const clockwiseIndex = CLOCKWISE.indexOf(selectedDirection);
+  
+  // 计算每个玩家的相对方位并更新对应区域
   players.forEach((player, index) => {
-    const direction = positionToDirection[player.position];
+    // 相对方位 = (theirPosition - myPosition + 4) % 4
+    // 0 = 自己，1 = 下家，2 = 对家，3 = 上家
+    const relativePosition = (player.position - myPosition + 4) % 4;
+    
+    // 根据相对位置确定容器
+    const relativeToDirection = {
+      0: 'south',  // 自己在下方
+      1: 'west',   // 下家在左边
+      2: 'north',  // 对家在上边
+      3: 'east',   // 上家在右边
+    };
+    const direction = relativeToDirection[relativePosition];
+    
+    // 计算显示的方位值：顺时针找第N个
+    const displayDirection = CLOCKWISE[(clockwiseIndex + relativePosition) % 4];
+    const letter = DIRECTION_LETTERS[displayDirection];
+    const color = DIRECTION_COLORS[displayDirection];
+    const icon = DIRECTION_ICONS[displayDirection];
+    
     const areaEl = document.querySelector(`[data-position="${direction}"]`) || 
                    document.getElementById(`player-${direction}`);
     
     if (!areaEl) return;
+    
+    // 更新头像
+    const avatarEl = areaEl.querySelector('.player-avatar');
+    if (avatarEl) {
+      avatarEl.style.backgroundColor = color;
+      const letterEl = avatarEl.querySelector('.avatar-letter');
+      if (letterEl) {
+        letterEl.textContent = letter;
+        letterEl.style.color = '#fff';
+      }
+      const iconEl = avatarEl.querySelector('.avatar-icon');
+      if (iconEl) {
+        iconEl.textContent = icon;
+      }
+      if (direction === 'north') {
+        avatarEl.textContent = letter;
+      }
+    }
     
     // 更新玩家名称
     const nameEl = areaEl.querySelector('.player-name');
@@ -301,8 +342,7 @@ function updatePlayerAreas() {
     if (discardsEl && player.discards && player.discards.length > 0) {
       let discardsHtml = '';
       player.discards.forEach(tile => {
-        // 弃牌用小尺寸渲染
-        discardsHtml += renderTile(tile, { size: 'small' });
+        discardsHtml += renderTile(tile, { size: 'small', position: direction });
       });
       discardsEl.innerHTML = discardsHtml;
     } else if (discardsEl) {
@@ -314,7 +354,7 @@ function updatePlayerAreas() {
     if (meldsEl && player.melds && player.melds.length > 0) {
       let meldsHtml = '';
       player.melds.forEach(meld => {
-        meldsHtml += renderMeld(meld);
+        meldsHtml += renderMeld(meld, direction);
       });
       meldsEl.innerHTML = meldsHtml;
     } else if (meldsEl) {
@@ -743,13 +783,13 @@ function setupPositionModal() {
           roomId = roomList.rooms[0].id;
           console.log('[Game] 加入现有房间:', roomId);
           const result = await socket.joinRoom(roomId, playerName);
-          store.setPlayerInfo(result.playerId || socket.socket.id, playerName);
+          store.setPlayerInfo(result.playerId || socket.socket.id, playerName, position);
           store.setCurrentRoom(result.room);
         } else {
           // 没有等待中的房间，创建新房间
           console.log('[Game] 创建新房间');
           const result = await socket.createRoom(playerName);
-          store.setPlayerInfo(result.playerId || socket.socket.id, playerName);
+          store.setPlayerInfo(result.playerId || socket.socket.id, playerName, position);
           store.setCurrentRoom(result.room);
           
           // 第一个进入的人显示开始按钮
@@ -761,7 +801,7 @@ function setupPositionModal() {
         // 隐藏弹窗
         modal.classList.add('hidden');
         
-        console.log('[Game] 选择座位成功');
+        console.log('[Game] 选择座位成功，方位:', position);
       } catch (e) {
         console.error('[Game] 加入游戏失败:', e.message);
         alert('加入游戏失败: ' + e.message);
@@ -835,15 +875,31 @@ function updatePositionStatus(room) {
 function updateWaitingPlayers(room) {
   if (!room || !room.players) return;
   
-  const positionMap = {
+  const state = store.getState();
+  const myPosition = store.getMyPosition();
+  const selectedDirection = store.getSelectedDirection() ?? 0;
+  
+  // 顺时针顺序：东(1) → 南(0) → 西(3) → 北(2)
+  const CLOCKWISE = [1, 0, 3, 2];
+  
+  // 方向值对应的字母和颜色：0=南, 1=东, 2=北, 3=西
+  const DIRECTION_LETTERS = ['S', 'E', 'N', 'W'];
+  const DIRECTION_COLORS = ['#EF4444', '#F59E0B', '#3B82F6', '#8B5CF6'];
+  const DIRECTION_ICONS = ['🔥', '☀️', '❄️', '🌙'];
+  
+  // 找到用户选的方位在顺时针数组中的索引
+  const clockwiseIndex = CLOCKWISE.indexOf(selectedDirection);
+  
+  // UI容器映射
+  const relativeToDirection = {
     0: 'south',
-    1: 'east',
+    1: 'west',
     2: 'north',
-    3: 'west',
+    3: 'east',
   };
   
   // 重置所有玩家区域
-  Object.entries(positionMap).forEach(([pos, dirName]) => {
+  Object.values(relativeToDirection).forEach(dirName => {
     const areaEl = document.querySelector(`[data-position="${dirName}"]`) || 
                    document.getElementById(`player-${dirName}`);
     if (areaEl) {
@@ -851,18 +907,55 @@ function updateWaitingPlayers(room) {
       if (nameEl) {
         nameEl.textContent = '等待中';
       }
+      const avatarEl = areaEl.querySelector('.player-avatar');
+      if (avatarEl) {
+        avatarEl.style.backgroundColor = '#374151';
+        const letterEl = avatarEl.querySelector('.avatar-letter');
+        const iconEl = avatarEl.querySelector('.avatar-icon');
+        if (letterEl) letterEl.textContent = '?';
+        if (iconEl) iconEl.textContent = '';
+        if (dirName === 'north') {
+          avatarEl.textContent = '?';
+        }
+      }
     }
   });
   
   // 更新已加入的玩家
   room.players.forEach(player => {
-    const dirName = positionMap[player.position];
-    const areaEl = document.querySelector(`[data-position="${dirName}"]`) || 
-                   document.getElementById(`player-${dirName}`);
+    // 相对方位 = (theirPosition - myPosition + 4) % 4
+    const relativePosition = (player.position - myPosition + 4) % 4;
+    const direction = relativeToDirection[relativePosition];
+    
+    // 计算显示的方位值：顺时针找第N个
+    const displayDirection = CLOCKWISE[(clockwiseIndex + relativePosition) % 4];
+    const letter = DIRECTION_LETTERS[displayDirection];
+    const color = DIRECTION_COLORS[displayDirection];
+    const icon = DIRECTION_ICONS[displayDirection];
+    
+    const areaEl = document.querySelector(`[data-position="${direction}"]`) || 
+                   document.getElementById(`player-${direction}`);
     if (areaEl) {
       const nameEl = areaEl.querySelector('.player-name');
       if (nameEl) {
         nameEl.textContent = player.name;
+      }
+      
+      // 更新头像
+      const avatarEl = areaEl.querySelector('.player-avatar');
+      if (avatarEl) {
+        avatarEl.style.backgroundColor = color;
+        const letterEl = avatarEl.querySelector('.avatar-letter');
+        if (letterEl) {
+          letterEl.textContent = letter;
+        }
+        const iconEl = avatarEl.querySelector('.avatar-icon');
+        if (iconEl) {
+          iconEl.textContent = icon;
+        }
+        if (direction === 'north') {
+          avatarEl.textContent = letter;
+        }
       }
       
       // 添加类型标识
@@ -886,7 +979,6 @@ function updateWaitingPlayers(room) {
   }
   
   // 更新顶栏玩家名称
-  const state = store.getState();
   const currentPlayer = room.players.find(p => p.id === state.playerId);
   if (currentPlayer) {
     const playerInfoEl = document.getElementById('player-info');

@@ -9,6 +9,7 @@ const initialState = {
   connected: false,
   playerId: null,
   playerName: null,
+  selectedDirection: null, // 用户选择的方位：0=东, 1=南, 2=西, 3=北
 
   // 房间状态
   currentRoom: null,
@@ -135,9 +136,17 @@ export function setConnected(connected) {
  * 设置玩家信息
  * @param {string} id - 玩家ID
  * @param {string} name - 玩家名称
+ * @param {number} direction - 用户选择的方位
  */
-export function setPlayerInfo(id, name) {
-  setState({ playerId: id, playerName: name });
+export function setPlayerInfo(id, name, direction = null) {
+  setState({ playerId: id, playerName: name, selectedDirection: direction });
+}
+
+/**
+ * 获取用户选择的方位
+ */
+export function getSelectedDirection() {
+  return state.selectedDirection;
 }
 
 /**

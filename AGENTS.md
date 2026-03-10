@@ -174,6 +174,7 @@ AI Agent（独立 LLM 会话）←WebSocket→ 游戏服务器（只做规则验
 | 手牌排序显示 | ✅ | src/client-new/js/tiles.js |
 | 游戏结束弹窗 | ✅ | src/client-new/js/game.js |
 | 再来一局功能 | ✅ | src/server/room/RoomManager.ts |
+| 弃牌区/副露区显示 | ✅ | src/client-new/js/tiles.js, game.js |
 
 ---
 
@@ -210,21 +211,48 @@ scripts/
 
 ## 9. 运行命令
 
+### 9.1 完整启动流程
+
 ```bash
-# 启动游戏服务器
-npx tsx src/server/index.ts
+# 第一步：启动游戏服务器（后台运行）
+cd E:/game/ai-mahjong
+npx tsx src/server/index.ts &
 
-# 启动新客户端
-npm run dev:new
-# 或
-npx vite --config vite.client-new.config.ts --port 5174
+# 第二步：启动客户端（后台运行）
+npx vite --config vite.client-new.config.ts --port 5174 &
 
-# 测试 4 AI 对局
-node scripts/test-4-agents.js
+# 第三步：告诉用户打开 http://localhost:5174
 
-# 派发 AI 加入玩家房间
-node scripts/join-player-room.js <roomId>
+# 第四步：用户进入后，查询房间ID
+curl -s http://localhost:3000/api/rooms
+
+# 第五步：派发AI加入（执行3次加入3个AI）
+node scripts/join-player-room.js <roomId> &
+node scripts/join-player-room.js <roomId> &
+node scripts/join-player-room.js <roomId> &
 ```
+
+### 9.2 快速命令参考
+
+```bash
+# 启动服务器
+npx tsx src/server/index.ts &
+
+# 启动客户端
+npx vite --config vite.client-new.config.ts --port 5174 &
+
+# 查询房间
+curl -s http://localhost:3000/api/rooms
+
+# 派发AI（需要替换roomId）
+node scripts/join-player-room.js <roomId> &
+```
+
+### 9.3 客户端地址
+
+- **新UI客户端**：http://localhost:5174
+- **服务器API**：http://localhost:3000
+- **房间列表**：http://localhost:3000/api/rooms
 
 ---
 
@@ -246,6 +274,10 @@ node scripts/join-player-room.js <roomId>
 - 吃牌交互：悬停时相关牌立起，点击执行吃牌
 - 游戏结束弹窗：显示赢家、番型、分数变化
 - 再来一局按钮
+- **弃牌区和副露区显示**：四个玩家位置都添加了弃牌区和副露区
+- **小牌尺寸调整**：按原UI设计稿，弃牌/副露牌尺寸为 24×36px（手机）/ 32×48px（桌面）
+- **小牌图形化渲染**：万、条、筒、风、箭牌在小尺寸下都能正确显示图形化内容
+- **一条小鸟图标**：小牌的一条显示小鸟图标
 
 ### 服务器改进
 - 新增 `/api/rooms` 接口查询等待中的房间
@@ -260,8 +292,9 @@ node scripts/join-player-room.js <roomId>
 - 修复箭牌（中发白）渲染（`jian` vs `dragon`）
 - 修复操作按钮不消失的问题
 - 修复流局显示"玩家胡牌"的问题
+- 修复南边容器缺失 `id="player-south"` 导致弃牌区不显示的问题
 
 ---
 
-*文档版本: v2.1*
+*文档版本: v2.2*
 *更新时间: 2026-03-10*
