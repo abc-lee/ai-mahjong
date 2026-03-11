@@ -141,10 +141,15 @@ function highlightActionTiles(actions) {
 }
 
 /**
- * 设置吃牌悬停选择交互
+ * 设置吃牌点击选择交互
  */
+let selectedChiCombo = null; // 当前选中的吃组合
+
 function setupChiHoverSelection(chiActions) {
   if (!chiActions || chiActions.length === 0) return;
+  
+  // 清除之前的选中状态
+  selectedChiCombo = null;
   
   // 构建牌ID到吃组合的映射
   const tileToCombos = new Map();
@@ -159,55 +164,57 @@ function setupChiHoverSelection(chiActions) {
     }
   });
   
-  // 为每张可吃的牌添加悬停事件
+  // 为每张可吃的牌添加点击事件
   tileToCombos.forEach((combos, tileId) => {
     const el = document.querySelector(`[data-tile-id="${tileId}"]`);
     if (!el) return;
-    
-    el.addEventListener('mouseenter', () => {
-      // 清除所有立起状态
-      document.querySelectorAll('.tile').forEach(t => {
-        t.classList.remove('-translate-y-2', 'bg-yellow-50');
-      });
-      
-      // 立起当前悬停牌所属的组合
-      combos.forEach(({ action }) => {
-        if (action.tiles) {
-          action.tiles.forEach(t => {
-            const tileEl = document.querySelector(`[data-tile-id="${t.id}"]`);
-            if (tileEl) {
-              tileEl.classList.add('-translate-y-2', 'bg-yellow-50');
-            }
-          });
-        }
-      });
-    });
-    
-    el.addEventListener('mouseleave', () => {
-      // 鼠标离开时恢复轻度高亮
-      document.querySelectorAll('.tile').forEach(t => {
-        t.classList.remove('-translate-y-2', 'bg-yellow-50');
-      });
-    });
     
     // 点击选择这组吃牌
     el.addEventListener('click', async (e) => {
       e.stopPropagation();
       
+      // 清除所有抬起状态
+      document.querySelectorAll('.tile').forEach(t => {
+        t.classList.remove('-translate-y-4', 'bg-yellow-50');
+      });
+      
       // 选择第一个包含这张牌的吃组合
       const firstCombo = combos[0];
       if (firstCombo && firstCombo.action) {
-        const tiles = firstCombo.action.tiles;
-        try {
-          await socket.performAction('chi', tiles);
-          console.log('[Game] 吃牌:', tiles?.map(t => t.display).join(','));
-          store.clearAvailableActions();
-        } catch (err) {
-          console.error('[Game] 吃牌失败:', err.message);
+        selectedChiCombo = firstCombo.action;
+        
+        // 抬起选中的组合牌
+        if (firstCombo.action.tiles) {
+          firstCombo.action.tiles.forEach(t => {
+            const tileEl = document.querySelector(`[data-tile-id="${t.id}"]`);
+            if (tileEl) {
+              tileEl.classList.add('-translate-y-4', 'bg-yellow-50');
+            }
+          });
         }
       }
     });
   });
+}
+
+/**
+ * 执行选中的吃牌操作
+ */
+async function executeSelectedChi() {
+  if (!selectedChiCombo) {
+    console.log('[Game] 没有选中吃牌组合');
+    return;
+  }
+  
+  const tiles = selectedChiCombo.tiles;
+  try {
+    await socket.performAction('chi', tiles);
+    console.log('[Game] 吃牌:', tiles?.map(t => t.display).join(','));
+    store.clearAvailableActions();
+    selectedChiCombo = null;
+  } catch (err) {
+    console.error('[Game] 吃牌失败:', err.message);
+  }
 }
 
 // 计时器状态
@@ -322,6 +329,7 @@ function updatePlayerAreas() {
   
   const myPosition = store.getMyPosition();
   const selectedDirection = store.getSelectedDirection() ?? 0; // 默认南
+  const currentPlayerIndex = state.gamePublicState.currentPlayerIndex; // 当前出牌玩家
   
   // 顺时针顺序：东(1) → 南(0) → 西(3) → 北(2)
   const CLOCKWISE = [1, 0, 3, 2]; // 东、南、西、北对应的 direction 值
@@ -330,6 +338,8 @@ function updatePlayerAreas() {
   const DIRECTION_LETTERS = ['S', 'E', 'N', 'W'];
   const DIRECTION_COLORS = ['#EF4444', '#F59E0B', '#3B82F6', '#8B5CF6'];
   const DIRECTION_ICONS = ['🔥', '☀️', '❄️', '🌙'];
+  // 方向值对应的头像图片：0=南(企鹅), 1=东(熊猫), 2=北(北极熊), 3=西(白头鹰)
+  const DIRECTION_AVATARS = ['./avatars/south.png', './avatars/east.png', './avatars/north.png', './avatars/west.png'];
   
   // 找到用户选的方位在顺时针数组中的索引
   const clockwiseIndex = CLOCKWISE.indexOf(selectedDirection);
@@ -354,27 +364,45 @@ function updatePlayerAreas() {
     const letter = DIRECTION_LETTERS[displayDirection];
     const color = DIRECTION_COLORS[displayDirection];
     const icon = DIRECTION_ICONS[displayDirection];
+    const avatarImg = DIRECTION_AVATARS[displayDirection];
     
     const areaEl = document.querySelector(`[data-position="${direction}"]`) || 
                    document.getElementById(`player-${direction}`);
     
     if (!areaEl) return;
     
-    // 更新头像
+    // 更新头像 - 使用图片
     const avatarEl = areaEl.querySelector('.player-avatar');
     if (avatarEl) {
-      avatarEl.style.backgroundColor = color;
+      // 设置背景图片
+      avatarEl.style.backgroundImage = `url('${avatarImg}')`;
+      avatarEl.style.backgroundSize = 'cover';
+      avatarEl.style.backgroundPosition = 'center';
+      avatarEl.style.backgroundColor = 'transparent';
+      
+      // 当前玩家闪动效果
+      const isCurrentPlayer = currentPlayerIndex === index;
+      if (isCurrentPlayer) {
+        avatarEl.classList.add('animate-pulse-avatar');
+        avatarEl.style.boxShadow = '0 0 20px 5px rgba(245, 158, 11, 0.8)';
+      } else {
+        avatarEl.classList.remove('animate-pulse-avatar');
+        avatarEl.style.boxShadow = '';
+      }
+      
+      // 隐藏文字和图标
       const letterEl = avatarEl.querySelector('.avatar-letter');
       if (letterEl) {
-        letterEl.textContent = letter;
-        letterEl.style.color = '#fff';
+        letterEl.style.display = 'none';
       }
       const iconEl = avatarEl.querySelector('.avatar-icon');
       if (iconEl) {
-        iconEl.textContent = icon;
+        iconEl.style.display = 'none';
       }
+      
+      // 北边特殊处理：清空文字内容
       if (direction === 'north') {
-        avatarEl.textContent = letter;
+        avatarEl.textContent = '';
       }
     }
     
@@ -395,9 +423,16 @@ function updatePlayerAreas() {
     // 更新弃牌区
     const discardsEl = document.getElementById(`${direction}-discards`);
     if (discardsEl && player.discards && player.discards.length > 0) {
+      // 检查是否是最后打出的牌
+      const lastDiscard = state.gamePublicState?.lastDiscard;
+      const lastDiscardPlayer = state.gamePublicState?.lastDiscardPlayer;
+      const isThisPlayerLastDiscard = lastDiscardPlayer === index;
+      
       let discardsHtml = '';
       player.discards.forEach(tile => {
-        discardsHtml += renderTile(tile, { size: 'small', position: direction });
+        // 判断这张牌是否是最后打出的牌
+        const isLastDiscard = isThisPlayerLastDiscard && lastDiscard && tile.id === lastDiscard.id;
+        discardsHtml += renderTile(tile, { size: 'small', position: direction, isLastDiscard });
       });
       discardsEl.innerHTML = discardsHtml;
     } else if (discardsEl) {
@@ -509,16 +544,16 @@ export async function handleAction(action) {
       console.log('[Game] 碰牌');
       store.clearAvailableActions();
     } else if (action === 'chi') {
-      // 可能有多种吃法，暂时选第一种
-      const chiOptions = window.chiOptions || [];
-      if (chiOptions.length > 0) {
-        const selectedChi = chiOptions[0];
-        const tiles = selectedChi.tiles;
+      // 使用选中的吃牌组合
+      if (selectedChiCombo) {
+        const tiles = selectedChiCombo.tiles;
         await socket.performAction('chi', tiles);
         console.log('[Game] 吃牌:', tiles?.map(t => t.display).join(','));
+        selectedChiCombo = null;
       } else {
-        await socket.performAction('chi');
-        console.log('[Game] 吃牌');
+        // 如果没有选中，提示用户先选择
+        console.log('[Game] 请先点击选择要吃的牌');
+        return;
       }
       store.clearAvailableActions();
     }
@@ -959,6 +994,8 @@ function updateWaitingPlayers(room) {
   const DIRECTION_LETTERS = ['S', 'E', 'N', 'W'];
   const DIRECTION_COLORS = ['#EF4444', '#F59E0B', '#3B82F6', '#8B5CF6'];
   const DIRECTION_ICONS = ['🔥', '☀️', '❄️', '🌙'];
+  // 方向值对应的头像图片：0=南(企鹅), 1=东(熊猫), 2=北(北极熊), 3=西(白头鹰)
+  const DIRECTION_AVATARS = ['./avatars/south.png', './avatars/east.png', './avatars/north.png', './avatars/west.png'];
   
   // 找到用户选的方位在顺时针数组中的索引
   const clockwiseIndex = CLOCKWISE.indexOf(selectedDirection);
@@ -982,11 +1019,21 @@ function updateWaitingPlayers(room) {
       }
       const avatarEl = areaEl.querySelector('.player-avatar');
       if (avatarEl) {
+        // 重置为默认状态
+        avatarEl.style.backgroundImage = '';
+        avatarEl.style.backgroundSize = '';
+        avatarEl.style.backgroundPosition = '';
         avatarEl.style.backgroundColor = '#374151';
         const letterEl = avatarEl.querySelector('.avatar-letter');
         const iconEl = avatarEl.querySelector('.avatar-icon');
-        if (letterEl) letterEl.textContent = '?';
-        if (iconEl) iconEl.textContent = '';
+        if (letterEl) {
+          letterEl.textContent = '?';
+          letterEl.style.display = '';
+        }
+        if (iconEl) {
+          iconEl.textContent = '';
+          iconEl.style.display = '';
+        }
         if (dirName === 'north') {
           avatarEl.textContent = '?';
         }
@@ -1005,6 +1052,7 @@ function updateWaitingPlayers(room) {
     const letter = DIRECTION_LETTERS[displayDirection];
     const color = DIRECTION_COLORS[displayDirection];
     const icon = DIRECTION_ICONS[displayDirection];
+    const avatarImg = DIRECTION_AVATARS[displayDirection];
     
     const areaEl = document.querySelector(`[data-position="${direction}"]`) || 
                    document.getElementById(`player-${direction}`);
@@ -1014,20 +1062,28 @@ function updateWaitingPlayers(room) {
         nameEl.textContent = player.name;
       }
       
-      // 更新头像
+      // 更新头像 - 使用图片
       const avatarEl = areaEl.querySelector('.player-avatar');
       if (avatarEl) {
-        avatarEl.style.backgroundColor = color;
+        // 设置背景图片
+        avatarEl.style.backgroundImage = `url('${avatarImg}')`;
+        avatarEl.style.backgroundSize = 'cover';
+        avatarEl.style.backgroundPosition = 'center';
+        avatarEl.style.backgroundColor = 'transparent';
+        
+        // 隐藏文字和图标
         const letterEl = avatarEl.querySelector('.avatar-letter');
         if (letterEl) {
-          letterEl.textContent = letter;
+          letterEl.style.display = 'none';
         }
         const iconEl = avatarEl.querySelector('.avatar-icon');
         if (iconEl) {
-          iconEl.textContent = icon;
+          iconEl.style.display = 'none';
         }
+        
+        // 北边特殊处理
         if (direction === 'north') {
-          avatarEl.textContent = letter;
+          avatarEl.textContent = '';
         }
       }
       

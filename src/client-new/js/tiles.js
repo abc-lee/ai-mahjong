@@ -59,7 +59,7 @@ function getTileTitle(suit, value) {
  * @returns {string} HTML 字符串
  */
 export function renderTile(tile, options = {}) {
-  const { highlight = false, onClick = null, size = 'normal', position = null } = options;
+  const { highlight = false, onClick = null, size = 'normal', position = null, isLastDiscard = false } = options;
   const { suit, value, id } = tile;
   
   // 获取悬停提示文字
@@ -78,7 +78,17 @@ export function renderTile(tile, options = {}) {
     sizeClass = 'w-6 h-9 sm:w-8 sm:h-12';
   }
   
-  const highlightClass = highlight ? 'bg-white border-b-4 border-gray-300 ring-2 ring-amber-400' : 'bg-white border-b-4 sm:border-b-8 border-gray-300';
+  // 高亮效果：普通高亮 vs 最后打出牌的高亮（黄框+闪烁）
+  let highlightClass;
+  if (isLastDiscard) {
+    // 最后打出的牌：黄框 + 脉冲闪烁动画
+    highlightClass = 'bg-white border-b-4 sm:border-b-8 border-gray-300 ring-4 ring-yellow-400 animate-pulse-last-discard';
+  } else if (highlight) {
+    // 普通高亮（摸到的牌）
+    highlightClass = 'bg-white border-b-4 border-gray-300 ring-2 ring-amber-400';
+  } else {
+    highlightClass = 'bg-white border-b-4 sm:border-b-8 border-gray-300';
+  }
   const clickAttr = onClick ? `onclick="${onClick}"` : '';
   const titleAttr = titleText ? `title="${titleText}"` : '';
   
@@ -541,6 +551,34 @@ export const tileStyles = `
     width: 6px;
     height: 6px;
   }
+}
+
+/* 最后打出牌的闪烁动画 */
+@keyframes pulse-last-discard {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7), 0 0 0 0 rgba(245, 158, 11, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 8px 4px rgba(245, 158, 11, 0.6), 0 0 16px 8px rgba(245, 158, 11, 0.3);
+  }
+}
+.animate-pulse-last-discard {
+  animation: pulse-last-discard 1.5s ease-in-out infinite;
+}
+
+/* 当前玩家头像闪动动画 */
+@keyframes pulse-avatar {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 10px 3px rgba(245, 158, 11, 0.6);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 0 25px 8px rgba(245, 158, 11, 0.9);
+  }
+}
+.animate-pulse-avatar {
+  animation: pulse-avatar 1s ease-in-out infinite;
 }
 `;
 
