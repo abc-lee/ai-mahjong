@@ -4,7 +4,7 @@ import { fileURLToPath, URL } from 'node:url';
 // 新客户端 Vite 配置（纯 HTML/JS，无 React）
 export default defineConfig({
   root: 'src/client-new',
-  publicDir: false,
+  publicDir: 'public',
   resolve: {
     alias: {
       '@shared': fileURLToPath(new URL('../shared', import.meta.url)),

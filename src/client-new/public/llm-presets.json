@@ -1,0 +1,60 @@
+{
+  "presets": [
+    {
+      "id": "openai-gpt4",
+      "name": "OpenAI GPT-4",
+      "type": "openai",
+      "apiBase": "https://api.openai.com/v1",
+      "model": "gpt-4-turbo",
+      "description": "OpenAI GPT-4 Turbo"
+    },
+    {
+      "id": "openai-gpt35",
+      "name": "OpenAI GPT-3.5",
+      "type": "openai",
+      "apiBase": "https://api.openai.com/v1",
+      "model": "gpt-3.5-turbo",
+      "description": "OpenAI GPT-3.5 Turbo"
+    },
+    {
+      "id": "anthropic-claude",
+      "name": "Anthropic Claude",
+      "type": "anthropic",
+      "apiBase": "https://api.anthropic.com/v1",
+      "model": "claude-3-sonnet",
+      "description": "Anthropic Claude 3 Sonnet"
+    },
+    {
+      "id": "minimax",
+      "name": "MiniMax",
+      "type": "openai",
+      "apiBase": "https://api.minimaxi.com/v1",
+      "model": "MiniMax-M2.5",
+      "description": "MiniMax M2.5"
+    },
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "type": "openai",
+      "apiBase": "https://api.deepseek.com/v1",
+      "model": "deepseek-chat",
+      "description": "DeepSeek Chat"
+    },
+    {
+      "id": "qwen",
+      "name": "Qwen",
+      "type": "openai",
+      "apiBase": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "model": "qwen-turbo",
+      "description": "Alibaba Qwen Turbo"
+    },
+    {
+      "id": "local-bge",
+      "name": "Local BGE (embedding only)",
+      "type": "openai",
+      "apiBase": "http://localhost:8080/v1",
+      "model": "BAAI/bge-large-zh-v1.5",
+      "description": "Local BGE embedding model"
+    }
+  ]
+}

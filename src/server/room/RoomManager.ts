@@ -16,6 +16,14 @@ export interface RoomSettings {
   baseScore: number;       // 基础分数
 }
 
+// 聊天消息
+export interface ChatMessage {
+  playerId: string;
+  playerName: string;
+  content: string;
+  timestamp: number;
+}
+
 // 房间信息
 export interface Room {
   id: string;
@@ -27,6 +35,7 @@ export interface Room {
   gameEngine?: GameEngine;
   createdAt: Date;
   settings: RoomSettings;
+  chatHistory: ChatMessage[];  // 发言历史
 }
 
 // 默认房间设置
@@ -97,6 +106,7 @@ export class RoomManager {
       state: 'waiting',
       createdAt: new Date(),
       settings: { ...DEFAULT_ROOM_SETTINGS, ...settings },
+      chatHistory: [],  // 初始化发言历史
     };
 
     this.rooms.set(roomId, room);
@@ -294,6 +304,7 @@ export class RoomManager {
       name?: string;
       personality?: 'aggressive' | 'cautious' | 'balanced';
       type?: 'ai-agent' | 'npc';
+      aiConfig?: Partial<Player['aiConfig']>;
     }
   ): Player {
     const room = this.rooms.get(roomId);
@@ -334,6 +345,7 @@ export class RoomManager {
         thinkTimeMin: 1000,
         thinkTimeMax: 3000,
         maxRetries: 3,
+        ...options?.aiConfig,  // 覆盖传入的配置
       },
       // NPC 玩家初始化控制状态
       aiControl: playerType === 'npc' ? { mode: 'auto' } : { mode: 'agent' },

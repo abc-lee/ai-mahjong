@@ -18,6 +18,10 @@
     "preview:new": "vite preview --config vite.client-new.config.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.58",
+    "@ai-sdk/openai": "^3.0.41",
+    "@ai-sdk/openai-compatible": "^2.0.35",
+    "ai": "^6.0.116",
     "cors": "^2.8.6",
     "express": "^4.18.2",
     "framer-motion": "^10.16.4",

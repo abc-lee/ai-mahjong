@@ -8,6 +8,9 @@ export interface LLMConfig {
   apiKey?: string;
   model?: string;
   baseUrl?: string;
+  // For convenience
+  type?: 'openai' | 'anthropic';
+  apiBase?: string;
 }
 
 export interface DecisionContext {
@@ -37,6 +40,53 @@ export class LLMClient {
 
   constructor(config: LLMConfig) {
     this.config = config;
+  }
+
+  /**
+   * 简单聊天接口（用于测试和名字生成）
+   */
+  async chat(prompt: string): Promise<string> {
+    const provider = this.config.type || this.config.provider;
+    const apiBase = this.config.apiBase || this.config.baseUrl || 
+      (provider === 'anthropic' ? 'https://api.anthropic.com/v1' : 'https://api.openai.com/v1');
+    
+    try {
+      if (provider === 'anthropic') {
+        const response = await fetch(`${apiBase}/messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': this.config.apiKey || '',
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: this.config.model || 'claude-3-haiku-20240307',
+            max_tokens: 100,
+            messages: [{ role: 'user', content: prompt }],
+          }),
+        });
+        const data = await response.json();
+        return data.content?.[0]?.text || '';
+      } else {
+        const response = await fetch(`${apiBase}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.config.apiKey || ''}`,
+          },
+          body: JSON.stringify({
+            model: this.config.model || 'gpt-3.5-turbo',
+            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 500,
+          }),
+        });
+        const data = await response.json();
+        return data.choices?.[0]?.message?.content || '';
+      }
+    } catch (e) {
+      console.error('[LLMClient] Chat error:', e);
+      throw e;
+    }
   }
 
   /**

@@ -6,6 +6,7 @@
 import * as game from './game.js';
 import * as socket from './socket.js';
 import * as store from './store.js';
+import * as settings from './settings.js';
 import { tileStyles } from './tiles.js';
 
 // 注入牌样式
@@ -50,6 +51,9 @@ async function init() {
   // 初始化游戏模块
   game.init();
   
+  // 初始化设置模块
+  await settings.init();
+  
   // 绑定 UI 事件
   bindUIEvents();
   
@@ -69,17 +73,21 @@ async function init() {
  * 绑定 UI 事件
  */
 function bindUIEvents() {
-  // 聊天输入框
-  const chatInput = document.querySelector('.chat-area input');
-  const chatButton = document.querySelector('.chat-area button');
+  // 聊天输入框（使用正确的 id）
+  const chatInput = document.getElementById('chat-input');
+  const chatButton = document.getElementById('chat-send-btn');
   
   if (chatInput && chatButton) {
-    const sendMessage = () => {
+    const sendMessage = async () => {
       const message = chatInput.value.trim();
       if (message) {
-        // TODO: 实现聊天发送
-        console.log('[Main] 发送消息:', message);
-        chatInput.value = '';
+        try {
+          await socket.sendSpeech(message);
+          chatInput.value = '';
+          console.log('[Main] 发送消息:', message);
+        } catch (e) {
+          console.error('[Main] 发送失败:', e.message);
+        }
       }
     };
     
@@ -87,6 +95,9 @@ function bindUIEvents() {
     chatInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') sendMessage();
     });
+    console.log('[Main] 聊天输入已绑定');
+  } else {
+    console.log('[Main] 未找到聊天输入元素');
   }
   
   // 操作按钮点击

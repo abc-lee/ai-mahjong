@@ -10,6 +10,8 @@
 
 核心体验：AI Agent 作为真正的玩家，有独立性格、会发言、会思考，不是传统游戏的 NPC。
 
+**游戏的灵魂**：AI 之间会互动、吵架、记仇。打麻将只是载体，真正的乐趣是和 AI 们社交。
+
 **使用场景**：私人游戏，主Agent作为用户的个人AI助理，启动游戏、派发AI、管理对局。
 
 ---
@@ -19,293 +21,283 @@
 | 类型 | 标识 | 来源 | 特点 |
 |------|------|------|------|
 | 人类玩家 | `human` | 浏览器连接 | 看图形界面，点按钮操作 |
-| AI Agent 玩家 | `ai-agent` | 主Agent派发的子Agent | 收 Prompt，发 JSON 指令，有性格会聊天 |
+| AI Agent 玩家 | `ai-agent` | 服务器调用 LLM | 有性格、会发言、会互动 |
 | NPC | `npc` | 服务器内置 | 简单规则决策，只打牌不说话 |
 
-**重要**：AI Agent 和 NPC 是两回事！
+**重要**：AI Agent 和 NPC 是两回事！AI Agent 用 LLM 做决策和发言，NPC 用规则引擎。
 
 ---
 
 ## 3. 游戏流程
 
-### 3.1 用户打开页面
-1. 用户说"准备打游戏"
-2. 主Agent启动游戏服务器
-3. 主Agent返回链接给用户
-4. 用户点击链接进入游戏界面
+### 3.1 启动游戏
+```bash
+# 启动游戏服务器
+npx tsx src/server/index.ts &
 
-### 3.2 选择方位
-1. 游戏界面弹出方位选择弹窗
-2. 显示四个方位（东南西北）的座位图
-3. 已占用的位置灰显
-4. 点击选择自己的位置（先到先得）
-5. 冲突时提示"该位置已被占用，请选择其他位置"
+# 启动前端
+npx vite --config vite.client-new.config.ts --port 5174 &
+```
 
-### 3.3 等待玩家
-1. 第一个进入的人有"开始"按钮
-2. 游戏开始前可以聊天
-3. 用户可通过独立通话渠道让主Agent派发AI
+### 3.2 用户进入游戏
+1. 打开 http://localhost:5174
+2. 输入名字，选择座位
+3. 点击设置⚙️配置 LLM 和 AI 玩家
+4. 点击"开始游戏"
+5. 系统自动根据配置添加 AI/NPC 玩家
 
-### 3.4 开始游戏
-1. 用户点击"开始"或说"开始"
-2. 或4个位置都满了自动开始
+### 3.3 设置 LLM
+- 选择预设提供商（MiniMax、DeepSeek、Qwen、OpenAI 等）
+- 填写 API Key
+- 测试连接
+- 保存
+
+### 3.4 配置 AI 玩家
+- 设置 AI 数量和 NPC 数量
+- 为每个 AI 设置名字、性别、性格
+- 可点击"AI生成名字"让 LLM 生成
 
 ---
 
-## 4. 主Agent派发AI
+## 4. AI Agent 架构
 
-主Agent通过派发子Agent连接游戏服务器，不是调用服务器接口。
+### 4.1 服务器直连 LLM 模式（当前实现）
 
-### 4.1 派发方式
-```javascript
-// 子Agent连接游戏服务器
-const { io } = require('socket.io-client');
-const socket = io('http://localhost:3000');
-
-// 加入游戏
-socket.emit('room:joinAI', {
-  roomId: '当前游戏ID',
-  agentId: 'agent-xxx',
-  agentName: '紫璃',
-  type: 'ai-agent'  // 或 'npc'
-});
-
-// 收到轮次事件
-socket.on('agent:your_turn', (data) => {
-  // data.prompt 包含完整游戏状态
-  // 思考后发送决策
-  socket.emit('agent:command', {
-    cmd: 'discard',
-    tileId: 'wan-1-xxx'
-  });
-});
+```
+游戏状态 → AIAdapter.callLLM() → LLM API → 解析响应 → 决策 + 发言
+                                              ↓
+                                        广播给所有玩家
 ```
 
-### 4.2 踢AI
-主Agent断开子Agent的WebSocket连接即可，不需要服务器接口。
+**关键文件**：
+- `src/server/ai/AIAdapter.ts` - AI 决策适配器
+- `src/server/ai/EventQueue.ts` - 事件队列系统
+- `src/server/llm/LLMClient.ts` - LLM 客户端
+
+### 4.2 提示词设计（参考 OpenClaw）
+
+```
+你是麻将玩家"{名字}"。
+性格：{性格特点}
+说话风格：{说话风格}
+
+思考后输出 JSON 决策和发言：
+<think>
+分析手牌，思考策略...
+</think>
+
+<final>
+{
+  "cmd": "discard",
+  "tile": "牌ID",
+  "message": "你想说的话"
+}
+</final>
+```
+
+### 4.3 事件队列系统
+
+每个 AI 有独立的事件队列，接收所有游戏事件：
+- `player_discard` - 玩家打牌
+- `player_action` - 玩家碰/杠/胡
+- `player_speak` - 玩家发言
+
+AI 在轮到自己时处理队列事件，可能产生反应/发言。
+
+**待改进**：AI 应该能在非轮次时发言（听到别人说话后立即回应）。
 
 ---
 
-## 5. 架构核心理解
+## 5. LLM 配置
 
-### 5.1 游戏服务器不需要 LLM API Key
+### 5.1 配置文件
+- `src/client-new/public/llm-presets.json` - 预设提供商
+- `llm-config.json` - 用户保存的配置
 
-```
-错误理解 ❌：
-游戏服务器调用 LLM API → AI 思考 → 返回决策
-
-正确理解 ✅：
-AI Agent（独立 LLM 会话）←WebSocket→ 游戏服务器（只做规则验证）
-```
-
-- AI Agent 自己是 LLM 会话（比如 OpenCode、OpenClaw）
-- Agent 通过 WebSocket 连接游戏服务器
-- 服务器发送 Prompt，Agent 自己思考返回决策
-
-### 5.2 中间层的职责
-
-```
-中间层（游戏服务器）：
-1. 接收 Agent 的 WebSocket 连接
-2. 识别玩家类型（human / ai-agent / npc）
-3. 生成自然语言 Prompt（包含规则、指令、状态）
-4. 发送给 AI Agent
-5. 接收 Agent 的 JSON 决策
-6. 验证规则，执行操作
+### 5.2 配置字段
+```typescript
+interface AIConfig {
+  llmEnabled: boolean;
+  llmEndpoint: string;      // API 端点
+  llmApiKey: string;        // API Key
+  llmProviderType: 'openai' | 'anthropic';
+  llmModel: string;         // 模型名
+  personality: 'aggressive' | 'cautious' | 'balanced' | 'chatty';
+}
 ```
 
-### 5.3 Agent 收到的 Prompt 示例
-
-```
-═══════════════════════════════════════
-【麻将游戏 - 你的回合】
-═══════════════════════════════════════
-
-🎴 轮到你打牌了。
-
-─── 你的手牌 ───
-【万】二万 四万 一万 四万
-【条】六条 二条 三条
-...
-
-─── 可用指令 ───
-摸牌: {"cmd": "draw"}
-打牌: {"cmd": "discard", "tileId": "id"}
-吃碰杠胡: {"cmd": "action", "action": "chi/peng/gang/hu"}
-跳过: {"cmd": "pass"}
-
-═══════════════════════════════════════
-```
+### 5.3 Temperature 设置
+- `chatty`: 1.2（话痨，最敢说话）
+- `aggressive`: 1.0
+- `balanced`: 0.9
+- `cautious`: 0.7
 
 ---
 
-## 6. Agent 行为约束规则
-
-### 6.1 MUST DO（必须遵守）
-
-| 规则 | 说明 |
-|------|------|
-| 使用轻量会话模式 | 麻将 Agent 只在对话中思考，不创建持久编程环境 |
-| 直连 WebSocket | Agent 通过 socket.io-client 直接连接游戏服务器 |
-| 使用预定义指令集 | 只发送服务器允许的 JSON 指令格式 |
-
-### 6.2 MUST NOT DO（禁止事项）
-
-| 规则 | 说明 |
-|------|------|
-| 禁止派发编程型 Agent | 麻将 Agent 不应再派发子 Agent |
-| 禁止文件系统访问 | 不要读取/写入游戏服务器的文件 |
-| 禁止 bash/process 执行 | 不要在游戏中执行系统命令 |
-
----
-
-## 7. 已完成的功能
+## 6. 已完成的功能
 
 | 功能 | 状态 | 文件 |
 |------|------|------|
 | 麻将规则引擎 | ✅ | src/server/game/ |
 | 游戏会话管理 | ✅ | src/server/room/ |
-| AI Agent 接入 | ✅ | src/server/socket/handlers.ts |
-| 自然语言 Prompt 生成 | ✅ | src/server/prompt/PromptNL.ts |
-| 发言/情绪系统 | ✅ | src/server/speech/ |
+| AI Agent LLM 集成 | ✅ | src/server/ai/AIAdapter.ts |
+| 事件队列系统 | ✅ | src/server/ai/EventQueue.ts |
+| 设置页面 UI | ✅ | src/client-new/js/settings.js |
+| LLM 配置保存 | ✅ | src/server/index.ts |
+| AI 名字生成 | ✅ | /api/ai/generate-name |
+| AI 发言系统 | ✅ | AIAdapter.callLLM() |
+| 发言历史传递 | ✅ | room.chatHistory |
+| 聊天输入框 | ✅ | index.html |
 | 新前端 UI | ✅ | src/client-new/ |
-| 记忆/记仇系统 | ✅ | src/server/speech/MemoryManager.ts |
-| 吃碰杠胡按钮交互 | ✅ | src/client-new/js/game.js |
+| 吃碰杠胡按钮 | ✅ | src/client-new/js/game.js |
 | 手牌排序显示 | ✅ | src/client-new/js/tiles.js |
 | 游戏结束弹窗 | ✅ | src/client-new/js/game.js |
 | 再来一局功能 | ✅ | src/server/room/RoomManager.ts |
-| 弃牌区/副露区显示 | ✅ | src/client-new/js/tiles.js, game.js |
-| 动态方位显示系统 | ✅ | src/client-new/js/game.js |
-| 圆形倒计时时钟 | ✅ | src/client-new/index.html, game.js |
-| 玩家名字输入验证 | ✅ | src/client-new/js/game.js |
-| 顶栏分数/名字显示 | ✅ | src/client-new/js/game.js, store.js |
+| 弃牌区/副露区 | ✅ | src/client-new/js/tiles.js |
+| 动态方位显示 | ✅ | src/client-new/js/game.js |
+| 圆形倒计时时钟 | ✅ | src/client-new/index.html |
 
 ---
 
-## 8. 关键文件
+## 7. 关键文件
 
 ```
 src/client-new/           # 新UI客户端
 ├── index.html            # 主入口
+├── public/
+│   └── llm-presets.json  # LLM 预设配置
 └── js/
     ├── socket.js         # Socket.io客户端
     ├── store.js          # 状态管理
     ├── tiles.js          # 牌渲染、排序
     ├── game.js           # 游戏逻辑、操作按钮
+    ├── settings.js       # 设置模块
     └── main.js           # 主入口
 
 src/server/
-├── socket/handlers.ts    # Socket事件处理
-├── prompt/PromptNL.ts    # Prompt生成
+├── index.ts              # Express 服务器 + API
+├── socket/
+│   ├── handlers.ts       # Socket 事件处理
+│   └── index.ts          # Socket.io 设置
+├── ai/
+│   ├── AIAdapter.ts      # AI 决策适配器
+│   ├── AIManager.ts      # AI 管理
+│   ├── EventQueue.ts     # 事件队列系统
+│   └── RuleEngine.ts     # 规则引擎（降级用）
+├── llm/
+│   └── LLMClient.ts      # LLM 客户端
 ├── speech/
 │   ├── SpeechManager.ts  # 发言、情绪管理
 │   └── MemoryManager.ts  # AI记忆、记仇系统
-├── ai/
-│   ├── AIAdapter.ts      # AI决策适配器（降级用）
-│   └── AIManager.ts      # AI管理
+├── prompt/
+│   └── PromptNL.ts       # Prompt 生成
+├── room/
+│   └── RoomManager.ts    # 房间管理
 └── game/                 # 麻将规则引擎
 
 scripts/
 ├── join-player-room.js   # 派发AI加入玩家房间
-├── test-4-agents.js      # 4 AI测试脚本
-└── true-llm-agent.js     # LLM Agent桥接脚本
+└── bridge.js             # AI Agent 桥接脚本
+
+llm-config.json           # 用户 LLM 配置
 ```
+
+---
+
+## 8. API 接口
+
+| 接口 | 方法 | 说明 |
+|------|------|------|
+| `/api/rooms` | GET | 获取房间列表 |
+| `/api/config` | GET | 获取配置 |
+| `/api/llm/test` | POST | 测试 LLM 连接 |
+| `/api/ai/generate-name` | POST | AI 生成名字 |
+| `/api/room/add-player` | POST | 添加 AI/NPC 玩家 |
 
 ---
 
 ## 9. 运行命令
 
-### 9.1 完整启动流程
-
 ```bash
-# 第一步：启动游戏服务器（后台运行）
-cd E:/game/ai-mahjong
+# 启动游戏服务器
 npx tsx src/server/index.ts &
 
-# 第二步：启动客户端（后台运行）
-npx vite --config vite.client-new.config.ts --port 5174 &
-
-# 第三步：告诉用户打开 http://localhost:5174
-
-# 第四步：用户进入后，查询房间ID
-curl -s http://localhost:3000/api/rooms
-
-# 第五步：派发AI加入（执行3次加入3个AI）
-node scripts/join-player-room.js <roomId> &
-node scripts/join-player-room.js <roomId> &
-node scripts/join-player-room.js <roomId> &
-```
-
-### 9.2 快速命令参考
-
-```bash
-# 启动服务器
-npx tsx src/server/index.ts &
-
-# 启动客户端
+# 启动前端
 npx vite --config vite.client-new.config.ts --port 5174 &
 
 # 查询房间
 curl -s http://localhost:3000/api/rooms
 
-# 派发AI（需要替换roomId）
-node scripts/join-player-room.js <roomId> &
+# 客户端地址
+# http://localhost:5174
 ```
-
-### 9.3 客户端地址
-
-- **新UI客户端**：http://localhost:5174
-- **服务器API**：http://localhost:3000
-- **房间列表**：http://localhost:3000/api/rooms
 
 ---
 
-## 10. 待修复问题
+## 10. 待改进问题
 
-| 问题 | 状态 | 说明 |
-|------|------|------|
-| 番型计算 | ⚠️ | 胡牌时番型为空，导致分数为0 |
-| 分数显示 | ⚠️ | 需要检查 ScoreCalculator |
+| 问题 | 优先级 | 说明 |
+|------|--------|------|
+| AI 非轮次发言 | 高 | AI 应该能在任何时候说话，不只是打牌时 |
+| 番型计算 | 中 | 胡牌时番型为空，导致分数为0 |
+| 分数显示 | 中 | 需要检查 ScoreCalculator |
 
 ---
 
 ## 11. 本次会话改进记录
 
-### UI 改进
-- 新增纯 HTML/JS 客户端 (`src/client-new/`)
-- 手牌排序显示（万>条>筒>风>箭）
-- 操作按钮：摸、吃、碰、杠、胡、过
-- 吃牌交互：悬停时相关牌立起，点击执行吃牌
-- 游戏结束弹窗：显示赢家、番型、分数变化
-- 再来一局按钮
-- **弃牌区和副露区显示**：四个玩家位置都添加了弃牌区和副露区
-- **小牌尺寸调整**：按原UI设计稿，弃牌/副露牌尺寸为 24×36px（手机）/ 32×48px（桌面）
-- **小牌图形化渲染**：万、条、筒、风、箭牌在小尺寸下都能正确显示图形化内容
-- **一条小鸟图标**：小牌的一条显示小鸟图标
-- **牌悬停提示**：鼠标悬停显示中英文名称（如"九万 Nine of Characters"）
-- **动态方位显示**：头像改用字母+颜色+图标显示方位（E/S/W/N），根据用户选择的方位顺时针排列
-- **圆形倒计时时钟**：磨砂玻璃效果，扇面进度条转动，每换玩家重置15秒
-- **玩家名字输入验证**：必须输入名字才能进入游戏
-- **顶栏分数/名字显示**：正确显示玩家累计分数和名字
+### 2026-03-12 - AI Agent LLM 集成
 
-### 服务器改进
-- 新增 `/api/rooms` 接口查询等待中的房间
-- 修复 AI 在 action 阶段（吃碰杠胡）没收到通知的问题
-- 修复 `game:state` 事件发送 `availableActions`
-- 允许从 `finished` 状态开始新游戏
-- 改进 AI 脚本保持连接、重连机制
+**核心改进**：
+1. **设置系统** - 前端设置页面，配置 LLM 和 AI 玩家
+2. **LLM 集成** - AI 通过 LLM 做决策并发言
+3. **事件队列** - AI 接收所有游戏事件，按自己节奏处理
+4. **思考链处理** - 兼容 MiniMax thinking 模型的输出格式
 
-### Bug 修复
-- 修复 `prevState` 拼写错误
-- 修复 `room.players` undefined 问题
-- 修复箭牌（中发白）渲染（`jian` vs `dragon`）
-- 修复操作按钮不消失的问题
-- 修复流局显示"玩家胡牌"的问题
-- 修复南边容器缺失 `id="player-south"` 导致弃牌区不显示的问题
-- 修复相对方位计算错误（左右搞反）
-- 修复顶栏分数显示被名字覆盖的问题
+**关键修复**：
+- 使用 Vercel AI SDK 调用 LLM
+- 提示词格式参考 OpenClaw（`<think>` + `<final>`）
+- 响应解析兼容多种格式
+- `buildDecision` 兼容 `cmd/action` 和 `tile/tileId`
+
+**测试结果**：
+- 思雨: "老板，你要北风我是没有的哇...发财反正也没人要，我先打了"
+- 东风: "老板刚才要北风要得那么凶，我先打张孤一万探探路"
+- AI 们记住了玩家要5条，互相呼应吐槽
+
+### 2026-03-10 - UI 完善和 Bug 修复
+
+**UI 改进**：
+- 新增纯 HTML/JS 客户端
+- 手牌排序显示、吃碰杠胡按钮
+- 游戏结束弹窗、再来一局
+- 弃牌区/副露区显示
+- 动态方位显示、圆形倒计时
+
+**Bug 修复**：
+- 修复箭牌渲染、操作按钮不消失等问题
+- 修复相对方位计算、分数显示覆盖等问题
 
 ---
 
-*文档版本: v2.3*
-*更新时间: 2026-03-10*
+## 12. 架构决策记录
+
+### ADR-001: 服务器直连 LLM
+- **决策**：游戏服务器直接调用 LLM API，而非 Agent 通过 WebSocket 连接
+- **原因**：Agent 是请求-响应模型，无法被外部事件唤醒
+- **后果**：AI 玩家由服务器托管，不需要独立进程
+
+### ADR-002: 事件队列异步解耦
+- **决策**：每个 AI 有独立事件队列，广播和队列处理异步
+- **原因**：LLM 调用可能很慢，不能阻塞游戏
+- **后果**：AI 按自己节奏处理事件，互不影响
+
+### ADR-003: Vercel AI SDK
+- **决策**：使用 Vercel AI SDK 调用 LLM
+- **原因**：统一接口，支持多种提供商
+- **后果**：代码更简洁，兼容性更好
+
+---
+
+*文档版本: v3.0*
+*更新时间: 2026-03-12*

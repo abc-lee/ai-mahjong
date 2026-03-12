@@ -13,127 +13,162 @@ if (!ROOM_ID) {
   process.exit(1);
 }
 
-const agents = [
+// 从后端获取配置
+async function getConfig() {
+  try {
+    const res = await fetch(`${SERVER_URL}/api/config`);
+    return await res.json();
+  } catch (e) {
+    console.log('[Config] 无法获取后端配置，使用默认');
+    return null;
+  }
+}
+
+// 默认AI名字（降级用）
+const DEFAULT_AGENTS = [
   { id: 'agent-zi', name: '紫璃' },
   { id: 'agent-bai', name: '白泽' },
   { id: 'agent-li', name: '李瞳' }
 ];
 
-const sockets = [];
+async function main() {
+  // 获取配置
+  const config = await getConfig();
+  
+  // 从配置中获取AI玩家信息，或使用默认
+  let agents;
+  if (config?.players?.aiPlayers && config.players.aiPlayers.length > 0) {
+    agents = config.players.aiPlayers.map((ai, i) => ({
+      id: ai.id || `agent-${i}`,
+      name: ai.name || `AI${i + 1}`,
+      personality: ai.personality,
+      gender: ai.gender
+    }));
+    console.log(`[Config] 使用配置的AI: ${agents.map(a => a.name).join(', ')}`);
+  } else {
+    agents = DEFAULT_AGENTS;
+    console.log(`[Config] 使用默认AI: ${agents.map(a => a.name).join(', ')}`);
+  }
 
-agents.forEach(agent => {
-  const socket = io(SERVER_URL, {
-    transports: ['websocket'],
-    reconnection: true
-  });
-  
-  sockets.push(socket);
-  
-  socket.on('connect', () => {
-    console.log(`[${agent.name}] 连接成功`);
-    socket.emit('room:joinAI', {
-      roomId: ROOM_ID,
-      agentId: agent.id,
-      agentName: agent.name,
-      type: 'ai-agent'
-    }, (res) => {
-      if (res.success) {
-        console.log(`[${agent.name}] 加入成功, 位置: ${res.position}`);
-      } else {
-        console.log(`[${agent.name}] 加入失败: ${res.error}`);
-      }
+  const sockets = [];
+
+  agents.forEach(agent => {
+    const socket = io(SERVER_URL, {
+      transports: ['websocket'],
+      reconnection: true
     });
-  });
-  
-  // 监听轮次事件
-  socket.on('agent:your_turn', (data) => {
-    console.log(`[${agent.name}] 轮次: ${data.phase}`);
     
-    setTimeout(() => {
-      if (data.phase === 'draw') {
-        socket.emit('agent:command', { cmd: 'draw' }, (res) => {
-          console.log(`[${agent.name}] 摸牌: ${res.success ? '成功' : res.error}`);
-        });
-      } else if (data.phase === 'discard' && data.hand && data.hand.length > 0) {
-        const tile = data.hand[Math.floor(Math.random() * data.hand.length)];
-        console.log(`[${agent.name}] 打出: ${tile.display}`);
-        socket.emit('agent:command', { cmd: 'discard', tileId: tile.id }, (res) => {
-          if (!res?.success) {
-            // 重试打第一张
-            const retry = data.hand[0];
-            socket.emit('agent:command', { cmd: 'discard', tileId: retry.id });
+    sockets.push(socket);
+    
+    socket.on('connect', () => {
+      console.log(`[${agent.name}] 连接成功`);
+      socket.emit('room:joinAI', {
+        roomId: ROOM_ID,
+        agentId: agent.id,
+        agentName: agent.name,
+        type: 'ai-agent',
+        personality: agent.personality
+      }, (res) => {
+        if (res.success) {
+          console.log(`[${agent.name}] 加入成功, 位置: ${res.position}`);
+        } else {
+          console.log(`[${agent.name}] 加入失败: ${res.error}`);
+        }
+      });
+    });
+    
+    // 监听轮次事件
+    socket.on('agent:your_turn', (data) => {
+      console.log(`[${agent.name}] 轮次: ${data.phase}`);
+      
+      setTimeout(() => {
+        if (data.phase === 'draw') {
+          socket.emit('agent:command', { cmd: 'draw' }, (res) => {
+            console.log(`[${agent.name}] 摸牌: ${res.success ? '成功' : res.error}`);
+          });
+        } else if (data.phase === 'discard' && data.hand && data.hand.length > 0) {
+          const tile = data.hand[Math.floor(Math.random() * data.hand.length)];
+          console.log(`[${agent.name}] 打出: ${tile.display}`);
+          socket.emit('agent:command', { cmd: 'discard', tileId: tile.id }, (res) => {
+            if (!res?.success) {
+              // 重试打第一张
+              const retry = data.hand[0];
+              socket.emit('agent:command', { cmd: 'discard', tileId: retry.id });
+            }
+          });
+        } else if (data.phase === 'action' && data.actions && data.actions.length > 0) {
+          // 处理吃碰杠胡
+          const actions = data.actions;
+          console.log(`[${agent.name}] 可用操作: ${actions.map(a => a.action).join(',')}`);
+          
+          if (actions.some(a => a.action === 'hu')) {
+            console.log(`[${agent.name}] 胡!`);
+            socket.emit('agent:command', { cmd: 'action', action: 'hu' });
+          } else if (actions.some(a => a.action === 'gang')) {
+            console.log(`[${agent.name}] 杠`);
+            socket.emit('agent:command', { cmd: 'action', action: 'gang' });
+          } else if (actions.some(a => a.action === 'peng')) {
+            console.log(`[${agent.name}] 碰`);
+            socket.emit('agent:command', { cmd: 'action', action: 'peng' });
+          } else if (actions.some(a => a.action === 'chi')) {
+            console.log(`[${agent.name}] 吃`);
+            socket.emit('agent:command', { cmd: 'action', action: 'chi' });
+          } else {
+            console.log(`[${agent.name}] 过`);
+            socket.emit('agent:command', { cmd: 'pass' });
           }
-        });
-      } else if (data.phase === 'action' && data.actions && data.actions.length > 0) {
-        // 处理吃碰杠胡
-        const actions = data.actions;
-        console.log(`[${agent.name}] 可用操作: ${actions.map(a => a.action).join(',')}`);
-        
+        }
+      }, 800);
+    });
+    
+    // 监听可用操作
+    socket.on('game:actions', (data) => {
+      const actions = data.actions || [];
+      console.log(`[${agent.name}] 可用操作: ${actions.map(a => a.action).join(',')}`);
+      
+      setTimeout(() => {
         if (actions.some(a => a.action === 'hu')) {
-          console.log(`[${agent.name}] 胡!`);
           socket.emit('agent:command', { cmd: 'action', action: 'hu' });
         } else if (actions.some(a => a.action === 'gang')) {
-          console.log(`[${agent.name}] 杠`);
           socket.emit('agent:command', { cmd: 'action', action: 'gang' });
         } else if (actions.some(a => a.action === 'peng')) {
-          console.log(`[${agent.name}] 碰`);
           socket.emit('agent:command', { cmd: 'action', action: 'peng' });
-        } else if (actions.some(a => a.action === 'chi')) {
-          console.log(`[${agent.name}] 吃`);
-          socket.emit('agent:command', { cmd: 'action', action: 'chi' });
         } else {
-          console.log(`[${agent.name}] 过`);
           socket.emit('agent:command', { cmd: 'pass' });
         }
-      }
-    }, 800);
-  });
-  
-  // 监听可用操作
-  socket.on('game:actions', (data) => {
-    const actions = data.actions || [];
-    console.log(`[${agent.name}] 可用操作: ${actions.map(a => a.action).join(',')}`);
+      }, 500);
+    });
     
-    setTimeout(() => {
-      if (actions.some(a => a.action === 'hu')) {
-        socket.emit('agent:command', { cmd: 'action', action: 'hu' });
-      } else if (actions.some(a => a.action === 'gang')) {
-        socket.emit('agent:command', { cmd: 'action', action: 'gang' });
-      } else if (actions.some(a => a.action === 'peng')) {
-        socket.emit('agent:command', { cmd: 'action', action: 'peng' });
-      } else {
-        socket.emit('agent:command', { cmd: 'pass' });
-      }
-    }, 500);
+    // 监听游戏结束
+    socket.on('game:ended', (data) => {
+      console.log(`[${agent.name}] 游戏结束, 赢家: ${data.winner}`);
+    });
+    
+    // 监听新一局开始
+    socket.on('game:started', () => {
+      console.log(`[${agent.name}] 新一局开始`);
+    });
+    
+    socket.on('disconnect', (reason) => {
+      console.log(`[${agent.name}] 断开连接: ${reason}`);
+    });
+    
+    socket.on('reconnect', () => {
+      console.log(`[${agent.name}] 重新连接`);
+    });
   });
-  
-  // 监听游戏结束
-  socket.on('game:ended', (data) => {
-    console.log(`[${agent.name}] 游戏结束, 赢家: ${data.winner}`);
-  });
-  
-  // 监听新一局开始
-  socket.on('game:started', () => {
-    console.log(`[${agent.name}] 新一局开始`);
-  });
-  
-  socket.on('disconnect', (reason) => {
-    console.log(`[${agent.name}] 断开连接: ${reason}`);
-  });
-  
-  socket.on('reconnect', () => {
-    console.log(`[${agent.name}] 重新连接`);
-  });
-});
 
-// 保持进程运行，每30秒检查一次连接状态
-setInterval(() => {
-  const connectedCount = sockets.filter(s => s.connected).length;
-  if (connectedCount === 0) {
-    console.log('所有 AI 已断开，退出脚本');
-    process.exit(0);
-  }
-}, 30000);
+  // 保持进程运行，每30秒检查一次连接状态
+  setInterval(() => {
+    const connectedCount = sockets.filter(s => s.connected).length;
+    if (connectedCount === 0) {
+      console.log('所有 AI 已断开，退出脚本');
+      process.exit(0);
+    }
+  }, 30000);
 
-console.log(`正在派发 3 个 AI 加入房间: ${ROOM_ID}`);
-console.log('AI 将保持连接直到所有断开');
+  console.log(`正在派发 ${agents.length} 个 AI 加入房间: ${ROOM_ID}`);
+  console.log('AI 将保持连接直到所有断开');
+}
+
+main().catch(console.error);

@@ -18,8 +18,10 @@ export type AIPersonality = 'aggressive' | 'cautious' | 'balanced';
 export interface AIConfig {
   personality: AIPersonality;    // 性格
   llmEnabled: boolean;           // 是否使用大模型
+  llmProviderType?: 'openai' | 'anthropic';  // API 格式类型
   llmEndpoint?: string;          // 大模型 API 地址
   llmApiKey?: string;            // API Key
+  llmModel?: string;             // 模型名称
   timeout: number;               // 超时时间（毫秒）
   thinkTimeMin: number;          // 思考时间下限（毫秒）
   thinkTimeMax: number;          // 思考时间上限（毫秒）

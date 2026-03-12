@@ -31,13 +31,17 @@ import {
   handleAddFriend,
   handleRemoveFriend,
   handleGetFriends,
+  handlePlayerSpeak,
+  toClientRoom,
 } from './handlers';
 
-// 全局 RoomManager 实例
+// 全局实例
 let roomManagerInstance: RoomManager | null = null;
+let ioInstance: Server | null = null;
 
 export function setupSocket(io: Server): void {
   roomManagerInstance = new RoomManager();
+  ioInstance = io;
   
   io.on('connection', (socket) => {
     console.log(`玩家连接: ${socket.id}`);
@@ -66,6 +70,7 @@ export function setupSocket(io: Server): void {
     socket.on('agent:requestState', (callback) => handleAgentRequestState(io, socket, roomManagerInstance!, callback));
     
     // 发言系统事件
+    socket.on('player:speak', (data, callback) => handlePlayerSpeak(io, socket, roomManagerInstance!, data, callback));
     socket.on('agent:speak', (data, callback) => handleAgentSpeak(io, socket, roomManagerInstance!, data, callback));
     socket.on('agent:stimulusResponse', (data, callback) => handleStimulusResponse(io, socket, roomManagerInstance!, data, callback));
     socket.on('agent:getEmotion', (data, callback) => handleGetEmotion(io, socket, roomManagerInstance!, data, callback));
@@ -85,4 +90,8 @@ export function getRoomManager(): RoomManager | null {
   return roomManagerInstance;
 }
 
-export { broadcastGameState };
+export function getIO(): Server | null {
+  return ioInstance;
+}
+
+export { broadcastGameState, toClientRoom };

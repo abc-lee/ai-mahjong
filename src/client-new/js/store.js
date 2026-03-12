@@ -241,6 +241,18 @@ export function getPlayerScore() {
  * @param {object} message - 发言消息
  */
 export function addSpeechMessage(message) {
+  // 去重：检查是否已存在相同消息
+  const exists = state.speechMessages.some(m => 
+    m.playerId === message.playerId && 
+    m.content === message.content &&
+    Math.abs((m.timestamp || 0) - (message.timestamp || 0)) < 2000
+  );
+  
+  if (exists) {
+    console.log('[Store] 消息去重:', message.content?.substring(0, 20));
+    return;
+  }
+  
   const messages = [...state.speechMessages, message].slice(-20); // 保留最近20条
   setState({ speechMessages: messages });
 }

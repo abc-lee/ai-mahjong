@@ -7,6 +7,7 @@ import { RoomManager, Room as ServerRoom } from '../room/RoomManager';
 import { Player, PendingAction, Tile, GameStatePublic, Room, PlayerPublic, toPublicPlayer } from '../../shared/types';
 import { aiManager } from '../ai/AIManager';
 import { getSpeechManager, removeSpeechManager, SpeechManager } from '../speech/SpeechManager';
+import { eventQueueManager, GameEvent } from '../ai/EventQueue';
 
 // Socket 数据类型
 interface SocketData {
@@ -44,7 +45,7 @@ interface ErrorResponse {
 /**
  * 将服务端 Room 转换为客户端 Room（可序列化）
  */
-function toClientRoom(serverRoom: ServerRoom): Room {
+export function toClientRoom(serverRoom: ServerRoom): Room {
   return {
     id: serverRoom.id,
     name: serverRoom.name,
@@ -176,100 +177,181 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
           availableActions: playerActions,
         });
       }
-    } else if (player.type === 'ai-agent') {
-      // AI Agent 玩家：检查是否有连接的 socket
+    } else if (player.type === 'ai-agent' || player.type === 'npc') {
+      // AI Agent / NPC：实时通知所有游戏事件
       const agentSocket = Array.from(io.sockets.sockets.values())
         .find(s => s.data.playerId === player.id && s.data.clientType === 'ai-agent');
       
-      console.log(`[broadcastGameState] 查找 Agent socket: playerId=${player.id}, 找到=${!!agentSocket}, yourTurn=${yourTurn}, hasActions=${hasActions}`);
+      // 获取当前轮到谁
+      const currentPlayerIndex = room.gameEngine.getState().currentPlayerIndex;
+      const currentPlayer = room.players[currentPlayerIndex];
+      const lastDiscard = room.gameEngine.getState().lastDiscard;
       
-      // 修改：yourTurn 或 hasActions 时都发送通知
-      if (agentSocket && (yourTurn || hasActions)) {
-        // Agent 已连接：发送自然语言 Prompt
-        console.log(`[broadcastGameState] 发送 agent:your_turn 给 ${player.name}, phase=${turnPhase}`);
-        
-        // 导入 Prompt 生成器
-        const { generateYourTurnPrompt } = require('../prompt/PromptNL');
-        
-        // 生成自然语言 Prompt（包含情绪上下文）
-        let prompt = generateYourTurnPrompt({
-          phase: hasActions ? 'action' : turnPhase,
-          hand: player.hand,
-          lastDrawnTile,
-          gameState: publicState,
-          availableActions: hasActions ? playerActions : undefined,
-        });
-        
-        // 添加情绪上下文
-        if (speechManager) {
-          const emotionPrompt = speechManager.generateEmotionPrompt(player.id, player.name);
-          prompt = emotionPrompt + '\n' + prompt;
-          
-          // 触发 AI 发言（30% 概率）
-          if (Math.random() < 0.3) {
-            speechManager.triggerProactiveSpeech(player.id, player.name, 'turn_start');
+      // 实时事件通知：不管是不是自己的回合
+      // 1. 有人打牌
+      if (lastDiscard && !yourTurn) {
+        // 通知 AI 有人打了什么牌
+        const adapter = aiManager.getAdapter(player.id);
+        if (adapter && speechManager) {
+          // 10% 概率对别人的打牌发表评论
+          if (Math.random() < 0.1) {
+            speechManager.triggerProactiveSpeech(player.id, player.name, 'someone_pong');
           }
         }
-        
-        agentSocket.emit('agent:your_turn', {
-          prompt,  // 自然语言文本
-          // 同时保留结构化数据供脚本使用
-          phase: hasActions ? 'action' : turnPhase,
-          hand: player.hand,
-          lastDrawnTile,
-          actions: hasActions ? playerActions : undefined,
-        });
-        
-        // 添加超时机制：如果 AI 5秒内没有响应，自动托管
-        const timeoutKey = `ai_timeout_${player.id}`;
-        if (global[timeoutKey]) clearTimeout(global[timeoutKey]);
-        
-        global[timeoutKey] = setTimeout(() => {
-          // 检查是否还在等待这个玩家
-          const currentRoom = roomManager.getRoom(roomId);
-          if (!currentRoom || !currentRoom.gameEngine) return;
+      }
+      
+      // 2. 等待时可能抱怨
+      if (!yourTurn && !hasActions && speechManager && Math.random() < 0.08) {
+        speechManager.triggerProactiveSpeech(player.id, player.name, 'waiting');
+      }
+      
+      // 3. 轮到自己或有操作时，做决策
+      if (yourTurn || hasActions) {
+        // 检查 agentSocket 是否存在
+        if (agentSocket) {
+          // Agent 已连接：发送自然语言 Prompt
+          console.log(`[broadcastGameState] 发送 agent:your_turn 给 ${player.name}, phase=${turnPhase}`);
           
-          const isStillWaiting = currentRoom.gameEngine.isPlayerTurn(player.id);
-          const currentPhase = currentRoom.gameEngine.getTurnPhase();
+          // 导入 Prompt 生成器
+          const { generateYourTurnPrompt } = require('../prompt/PromptNL');
           
-          if (isStillWaiting && currentPhase === turnPhase) {
-            console.log(`[AI Timeout] ${player.name} 超时，自动托管处理`);
+          // 生成自然语言 Prompt（包含情绪上下文）
+          let prompt = generateYourTurnPrompt({
+            phase: hasActions ? 'action' : turnPhase,
+            hand: player.hand,
+            lastDrawnTile,
+            gameState: publicState,
+            availableActions: hasActions ? playerActions : undefined,
+          });
+          
+          // 添加情绪上下文
+          if (speechManager) {
+            const emotionPrompt = speechManager.generateEmotionPrompt(player.id, player.name);
+            prompt = emotionPrompt + '\n' + prompt;
             
-            // 执行自动决策
-            const adapter = aiManager.getAdapter(player.id);
-            if (adapter) {
-              adapter.handleEvent({
-                type: turnPhase === 'draw' ? 'YOUR_TURN_DRAW' : 'YOUR_TURN_DISCARD',
-                lastDrawnTile,
-                gameState: publicState,
-              }).then(decision => {
-                if (decision) {
-                  executeAIDecision(roomId, player.id, decision, roomManager, io);
-                }
-              }).catch(err => {
-                console.error(`[AI Timeout] 自动决策失败:`, err);
-                // 强制摸牌或打牌（使用 helper 函数）
-                forceExecutePlayerAction(currentRoom, player, turnPhase, io, roomId, roomManager);
-              });
-            } else {
-              // 没有 adapter，强制执行
-              console.log(`[AI Timeout] ${player.name} 无 adapter，强制执行`);
-              forceExecutePlayerAction(currentRoom, player, turnPhase, io, roomId, roomManager);
+            // 触发 AI 发言（30% 概率）
+            if (Math.random() < 0.3) {
+              speechManager.triggerProactiveSpeech(player.id, player.name, 'turn_start');
             }
           }
-        }, 5000); // 5秒超时
+          
+          agentSocket.emit('agent:your_turn', {
+            prompt,  // 自然语言文本
+            // 同时保留结构化数据供脚本使用
+            phase: hasActions ? 'action' : turnPhase,
+            hand: player.hand,
+            lastDrawnTile,
+            actions: hasActions ? playerActions : undefined,
+          });
+          
+          // 添加超时机制：如果 AI 5秒内没有响应，自动托管
+          const timeoutKey = `ai_timeout_${player.id}`;
+          if (global[timeoutKey]) clearTimeout(global[timeoutKey]);
+          
+          global[timeoutKey] = setTimeout(() => {
+            // 检查是否还在等待这个玩家
+            const currentRoom = roomManager.getRoom(roomId);
+            if (!currentRoom || !currentRoom.gameEngine) return;
+            
+            const isStillWaiting = currentRoom.gameEngine.isPlayerTurn(player.id);
+            const currentPhase = currentRoom.gameEngine.getTurnPhase();
+            
+            if (isStillWaiting && currentPhase === turnPhase) {
+              console.log(`[AI Timeout] ${player.name} 超时，自动托管处理`);
+              
+              // 执行自动决策
+              const adapter = aiManager.getAdapter(player.id);
+              if (adapter) {
+                adapter.handleEvent({
+                  type: turnPhase === 'draw' ? 'YOUR_TURN_DRAW' : 'YOUR_TURN_DISCARD',
+                  lastDrawnTile,
+                  gameState: publicState,
+                }, currentRoom.chatHistory).then(decision => {
+                  if (decision) {
+                    executeAIDecision(roomId, player.id, decision, roomManager, io);
+                  }
+                }).catch(err => {
+                  console.error(`[AI Timeout] 自动决策失败:`, err);
+                  // 强制摸牌或打牌（使用 helper 函数）
+                  forceExecutePlayerAction(currentRoom, player, turnPhase, io, roomId, roomManager);
+                });
+              } else {
+                // 没有 adapter，强制执行
+                console.log(`[AI Timeout] ${player.name} 无 adapter，强制执行`);
+                forceExecutePlayerAction(currentRoom, player, turnPhase, io, roomId, roomManager);
+              }
+            }
+          }, 5000); // 5秒超时
+        } else {
+          // Agent 没有连接 socket：使用 AIAdapter
+          const adapter = aiManager.getAdapter(player.id);
+          console.log(`[broadcastGameState] ${player.name}(ai-agent, 无socket) 使用 adapter: ${!!adapter}, yourTurn=${yourTurn}`);
+          
+          // 处理事件队列，可能产生反应/发言
+          const queueEvents = eventQueueManager.getRecentEvents(player.id, 5);
+          if (adapter && queueEvents.length > 0) {
+            adapter.processQueueEvents(queueEvents).then(result => {
+              if (result.reaction) {
+                // 广播 AI 的反应
+                io.in(roomId).emit('player:speech', {
+                  playerId: player.id,
+                  playerName: player.name,
+                  content: result.reaction,
+                  timestamp: Date.now(),
+                });
+                console.log(`[AI] ${player.name} 反应: ${result.reaction}`);
+              }
+            }).catch(e => console.log(`[AI] ${player.name} 反应失败:`, e.message));
+          }
+          
+          if (adapter && yourTurn) {
+            adapter.handleEvent({
+              type: turnPhase === 'draw' ? 'YOUR_TURN_DRAW' : 'YOUR_TURN_DISCARD',
+              lastDrawnTile,
+              gameState: publicState,
+            }, room.chatHistory).then(decision => {
+              if (decision) {
+                executeAIDecision(roomId, player.id, decision, roomManager, io);
+              }
+            }).catch(err => {
+              console.error(`[AIAdapter] 决策失败:`, err);
+              // 失败时强制执行
+              forceExecutePlayerAction(room, player, turnPhase, io, roomId, roomManager);
+            });
+          } else if (!adapter) {
+            // 没有 adapter，强制执行
+            console.log(`[broadcastGameState] ${player.name} 无 adapter，强制执行`);
+            forceExecutePlayerAction(room, player, turnPhase, io, roomId, roomManager);
+          }
+        }
       } else if (!agentSocket || player.aiControl?.mode === 'auto') {
         // Agent 没有连接 socket 或 mode 为 auto：使用 AIAdapter
-        // 修复：确保无论 mode 是什么，只要没有 socket 就使用 adapter
         const adapter = aiManager.getAdapter(player.id);
         console.log(`[broadcastGameState] ${player.name}(ai-agent, 无socket或auto) 使用 adapter: ${!!adapter}, yourTurn=${yourTurn}`);
+        
+        // 处理事件队列，可能产生反应/发言
+        const queueEvents = eventQueueManager.getRecentEvents(player.id, 5);
+        if (adapter && queueEvents.length > 0) {
+          adapter.processQueueEvents(queueEvents).then(result => {
+            if (result.reaction) {
+              // 广播 AI 的反应
+              io.in(roomId).emit('player:speech', {
+                playerId: player.id,
+                playerName: player.name,
+                content: result.reaction,
+                timestamp: Date.now(),
+              });
+              console.log(`[AI] ${player.name} 反应: ${result.reaction}`);
+            }
+          }).catch(e => console.log(`[AI] ${player.name} 反应失败:`, e.message));
+        }
         
         if (adapter && yourTurn) {
           adapter.handleEvent({
             type: turnPhase === 'draw' ? 'YOUR_TURN_DRAW' : 'YOUR_TURN_DISCARD',
             lastDrawnTile,
             gameState: publicState,
-          }).then(decision => {
+          }, room.chatHistory).then(decision => {
             if (decision) {
               executeAIDecision(roomId, player.id, decision, roomManager, io);
             }
@@ -288,12 +370,29 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
       // NPC 玩家：使用 AIAdapter
       const adapter = aiManager.getAdapter(player.id);
       console.log(`[broadcastGameState] npc ${player.name}: adapter=${!!adapter}, yourTurn=${yourTurn}, phase=${turnPhase}`);
+      
+      // 处理事件队列，可能产生反应/发言
+      const queueEvents = eventQueueManager.getRecentEvents(player.id, 5);
+      if (adapter && queueEvents.length > 0) {
+        adapter.processQueueEvents(queueEvents).then(result => {
+          if (result.reaction) {
+            io.in(roomId).emit('player:speech', {
+              playerId: player.id,
+              playerName: player.name,
+              content: result.reaction,
+              timestamp: Date.now(),
+            });
+            console.log(`[NPC] ${player.name} 反应: ${result.reaction}`);
+          }
+        }).catch(e => console.log(`[NPC] ${player.name} 反应失败:`, e.message));
+      }
+      
       if (adapter && yourTurn) {
         adapter.handleEvent({
           type: turnPhase === 'draw' ? 'YOUR_TURN_DRAW' : 'YOUR_TURN_DISCARD',
           lastDrawnTile,
           gameState: publicState,
-        }).then(decision => {
+        }, room.chatHistory).then(decision => {
           console.log(`[broadcastGameState] npc ${player.name} 决策:`, decision);
           if (decision) {
             executeAIDecision(roomId, player.id, decision, roomManager, io);
@@ -318,14 +417,35 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
 function executeAIDecision(
   roomId: string,
   playerId: string,
-  decision: { action: string; tileId?: string; tiles?: string[] },
+  decision: { 
+    action: string; 
+    tileId?: string; 
+    tiles?: string[];
+    message?: string;      // AI 发言
+    emotion?: string;      // 情绪
+    targetPlayer?: string; // 说话对象
+  },
   roomManager: RoomManager,
   io: Server
 ): void {
   const room = roomManager.getRoom(roomId);
   if (!room?.gameEngine) return;
 
-  console.log(`[AI] 玩家 ${playerId.slice(0,4)} 执行决策: ${decision.action}`);
+  const player = room.players.find(p => p.id === playerId);
+  console.log(`[AI] 玩家 ${player?.name || playerId.slice(0,4)} 执行决策: ${decision.action}`);
+
+  // 如果 AI 有发言，广播给所有玩家
+  if (decision.message && player) {
+    io.in(roomId).emit('player:speech', {
+      playerId,
+      playerName: player.name,
+      content: decision.message,
+      emotion: decision.emotion,
+      targetPlayer: decision.targetPlayer,
+      timestamp: Date.now(),
+    });
+    console.log(`[AI] ${player.name} 说: ${decision.message}`);
+  }
 
   switch (decision.action) {
     case 'draw':
@@ -360,7 +480,6 @@ function executeAIDecision(
     case 'gang':
     case 'hu':
       // 从玩家手牌中获取完整的 Tile 对象
-      const player = room.players.find(p => p.id === playerId);
       const fullTiles = decision.tiles?.map(id => 
         player?.hand.find(t => t.id === id)
       ).filter(Boolean) as Tile[] | undefined;
@@ -425,7 +544,7 @@ function handleAIActions(roomId: string, roomManager: RoomManager, io: Server): 
           availableActions: actions,
           lastDiscard: state.lastDiscard!,
           gameState: publicState,
-        }).then(decision => {
+        }, room.chatHistory).then(decision => {
           console.log(`[handleAIActions] ${player.name} 决策:`, decision);
           if (decision) {
             executeAIDecision(roomId, playerId, decision, roomManager, io);
@@ -837,6 +956,34 @@ export async function handleDiscard(
     const success = room.gameEngine.discardTile(playerId, payload.tileId);
     if (!success) throw new Error('无法出牌');
     
+    // 获取打牌信息，广播给所有 AI
+    const player = room.players.find(p => p.id === playerId);
+    const discardedTile = player?.hand.find(t => t.id === payload.tileId) || 
+                          room.gameEngine.getState().lastDiscard;
+    
+    if (player && discardedTile) {
+      // 广播打牌事件给所有 AI
+      const discardEvent: GameEvent = {
+        type: 'player_discard',
+        timestamp: Date.now(),
+        data: {
+          playerId,
+          playerName: player.name,
+          tile: discardedTile,
+          tileDisplay: discardedTile.display,
+        }
+      };
+      
+      // 推送给所有 AI（排除打牌者自己）
+      for (const p of room.players) {
+        if ((p.type === 'ai-agent' || p.type === 'npc') && p.id !== playerId) {
+          eventQueueManager.pushTo(p.id, discardEvent);
+        }
+      }
+      
+      console.log(`[EventQueue] ${player.name} 打牌: ${discardedTile.display}，已通知所有 AI`);
+    }
+    
     broadcastGameState(io, roomId, roomManager);
     
     // 向有操作权的玩家发送可用操作
@@ -931,6 +1078,30 @@ export async function handleAction(
     
     const success = room.gameEngine.performAction(playerId, pendingAction);
     if (!success) throw new Error('无法执行操作');
+    
+    // 广播碰/杠/胡事件给所有 AI
+    const player = room.players.find(p => p.id === playerId);
+    if (player && payload.action) {
+      const actionEvent: GameEvent = {
+        type: 'player_action',
+        timestamp: Date.now(),
+        data: {
+          playerId,
+          playerName: player.name,
+          action: payload.action,
+          tiles: payload.tiles,
+        }
+      };
+      
+      // 推送给所有 AI（排除自己）
+      for (const p of room.players) {
+        if ((p.type === 'ai-agent' || p.type === 'npc') && p.id !== playerId) {
+          eventQueueManager.pushTo(p.id, actionEvent);
+        }
+      }
+      
+      console.log(`[EventQueue] ${player.name} ${payload.action}，已通知所有 AI`);
+    }
     
     // 检查游戏是否结束
     const gameState = room.gameEngine.getState();
@@ -1485,6 +1656,84 @@ export async function handleGetReconnectableRooms(
 }
 
 // ==================== 发言系统事件 ====================
+
+/**
+ * 处理人类玩家发言
+ */
+export async function handlePlayerSpeak(
+  io: Server,
+  socket: Socket,
+  roomManager: RoomManager,
+  payload: {
+    content: string;
+  },
+  callback?: (response: { success: boolean; error?: string }) => void
+) {
+  try {
+    const roomId = socket.data.roomId;
+    const playerId = socket.data.playerId;
+    const playerName = socket.data.playerName;
+
+    if (!roomId || !playerId) {
+      callback?.({ success: false, error: '未加入房间' });
+      return;
+    }
+
+    const room = roomManager.getRoom(roomId);
+    if (!room) {
+      callback?.({ success: false, error: '房间不存在' });
+      return;
+    }
+
+    console.log(`[Speech] 玩家 ${playerName} 发言: ${payload.content}`);
+
+    // 保存到发言历史
+    const message = {
+      playerId,
+      playerName,
+      content: payload.content,
+      timestamp: Date.now(),
+    };
+    room.chatHistory.push(message);
+    
+    // 只保留最近20条
+    if (room.chatHistory.length > 20) {
+      room.chatHistory.shift();
+    }
+
+    // 广播给房间内所有人
+    io.in(roomId).emit('player:speech', {
+      playerId,
+      playerName,
+      content: payload.content,
+      timestamp: message.timestamp,
+    });
+
+    // 推送发言事件给所有 AI
+    const speakEvent: GameEvent = {
+      type: 'player_speak',
+      timestamp: message.timestamp,
+      data: {
+        playerId,
+        playerName,
+        content: payload.content,
+      }
+    };
+    
+    for (const p of room.players) {
+      if ((p.type === 'ai-agent' || p.type === 'npc') && p.id !== playerId) {
+        eventQueueManager.pushTo(p.id, speakEvent);
+      }
+    }
+    
+    console.log(`[EventQueue] ${playerName} 发言，已通知所有 AI`);
+
+    callback?.({ success: true });
+  } catch (error) {
+    console.error(`[Speech] 发言处理失败:`, error);
+    callback?.({ success: false, error: error instanceof Error ? error.message : '发言失败' });
+  }
+}
 
 /**
  * 处理 AI 发言

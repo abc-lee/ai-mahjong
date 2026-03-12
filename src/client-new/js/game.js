@@ -595,6 +595,45 @@ export async function handleDraw() {
   }
 }
 
+// ==================== 聊天功能 ====================
+
+/**
+ * 设置聊天输入监听
+ */
+function setupChatInput() {
+  const chatInput = document.getElementById('chat-input');
+  const chatSendBtn = document.getElementById('chat-send-btn');
+  
+  if (!chatInput) return;
+  
+  // 发送发言
+  const sendChat = async () => {
+    const content = chatInput.value.trim();
+    if (!content) return;
+    
+    try {
+      await socket.sendSpeech(content);
+      chatInput.value = '';
+      console.log('[Game] 发言成功:', content);
+    } catch (e) {
+      console.error('[Game] 发言失败:', e.message);
+    }
+  };
+  
+  // 发送按钮点击
+  if (chatSendBtn) {
+    chatSendBtn.addEventListener('click', sendChat);
+  }
+  
+  // 回车发送
+  chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      sendChat();
+    }
+  });
+}
+
 // ==================== 事件监听设置 ====================
 
 /**
@@ -611,6 +650,9 @@ export function setupGameListeners() {
     console.log('[Game] 与服务器断开连接');
     store.setConnected(false);
   });
+  
+  // 设置聊天发送功能
+  setupChatInput();
   
   // 房间事件
   socket.onRoomUpdated((data) => {
@@ -921,6 +963,57 @@ function setupPositionModal() {
   if (startBtn) {
     startBtn.addEventListener('click', async () => {
       try {
+        // 先根据配置添加 AI/NPC 玩家
+        const configRes = await fetch('/api/config');
+        const config = await configRes.json();
+        
+        if (config?.players) {
+          const { aiCount, npcCount, aiPlayers } = config.players;
+          const state = store.getState();
+          const roomId = state.currentRoom?.id;
+          
+          console.log('[Game] 配置:', { aiCount, npcCount, aiPlayers });
+          
+          // 当前房间里只有 1 个人类玩家
+          const currentPlayers = state.currentRoom?.players?.length || 1;
+          
+          // 添加 AI 玩家（使用配置的名字）
+          for (let i = 0; i < aiCount; i++) {
+            const aiConfig = aiPlayers?.[i] || { name: `AI${i + 1}`, personality: 'balanced' };
+            
+            const addRes = await fetch('/api/room/add-player', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                roomId,
+                name: aiConfig.name,
+                personality: aiConfig.personality,
+                type: 'ai-agent'  // AI Agent 类型
+              })
+            });
+            
+            const addResult = await addRes.json();
+            console.log('[Game] 添加 AI Agent:', addResult);
+          }
+          
+          // 添加 NPC 玩家
+          for (let i = 0; i < npcCount; i++) {
+            const addRes = await fetch('/api/room/add-player', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                roomId,
+                name: `NPC${i + 1}`,
+                type: 'npc'  // NPC 类型
+              })
+            });
+            
+            const addResult = await addRes.json();
+            console.log('[Game] 添加 NPC:', addResult);
+          }
+        }
+        
+        // 开始游戏
         await socket.startGame();
         startBtnContainer.classList.add('hidden');
         console.log('[Game] 游戏开始');
@@ -1091,9 +1184,9 @@ function updateWaitingPlayers(room) {
       const statusEl = areaEl.querySelector('.player-status');
       if (statusEl) {
         if (player.type === 'ai-agent') {
-          statusEl.textContent = 'AI Agent';
+          statusEl.textContent = '🤖 AI';
         } else if (player.type === 'npc') {
-          statusEl.textContent = 'NPC';
+          statusEl.textContent = '💻 NPC';
         } else {
           statusEl.textContent = player.isReady ? '已准备' : '';
         }

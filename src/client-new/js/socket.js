@@ -46,7 +46,7 @@ const socket = io(SOCKET_URL, {
 // 错误响应检测
 function isErrorResponse(response) {
   if (typeof response !== 'object' || response === null) return false;
-  return 'message' in response && !('roomId' in obj) && !('success' in obj);
+  return 'message' in response && !('roomId' in response) && !('success' in response);
 }
 
 // ==================== 连接管理 ====================
@@ -162,14 +162,38 @@ export function setReady(ready) {
  * @returns {Promise<{success: boolean}>}
  */
 export function startGame() {
+  console.log('[Socket] startGame 调用, socket=', socket, 'connected=', socket?.connected);
   return new Promise((resolve, reject) => {
-    socket.emit(ClientEvents.GAME_START, (response) => {
-      if (response.message && response.success === undefined) {
-        reject(new Error(response.message));
-      } else {
-        resolve(response);
+    const doEmit = () => {
+      console.log('[Socket] doEmit, socket=', socket);
+      if (!socket) {
+        reject(new Error('socket 未初始化'));
+        return;
       }
-    });
+      socket.emit(ClientEvents.GAME_START, (response) => {
+        if (response.message && response.success === undefined) {
+          reject(new Error(response.message));
+        } else {
+          resolve(response);
+        }
+      });
+    };
+
+    // 确保已连接
+    if (!socket || !socket.connected) {
+      console.log('[Socket] 需要先连接...');
+      if (!socket) {
+        reject(new Error('socket 未初始化'));
+        return;
+      }
+      socket.connect();
+      socket.once('connect', doEmit);
+      socket.once('connect_error', (err) => {
+        reject(new Error('连接失败: ' + err.message));
+      });
+    } else {
+      doEmit();
+    }
   });
 }
 
@@ -229,6 +253,23 @@ export function passAction() {
         reject(new Error(response.message));
       } else {
         resolve(response);
+      }
+    });
+  });
+}
+
+/**
+ * 发送发言
+ * @param {string} content - 发言内容
+ * @returns {Promise<{success: boolean}>}
+ */
+export function sendSpeech(content) {
+  return new Promise((resolve, reject) => {
+    socket.emit('player:speak', { content }, (response) => {
+      if (response && response.success === false) {
+        reject(new Error(response.error || '发言失败'));
+      } else {
+        resolve(response || { success: true });
       }
     });
   });

@@ -158,9 +158,116 @@
     等待开始 <span class="text-yellow-400 ml-2"></span>
 </div>
 <div class="flex gap-2 pointer-events-auto">
-<button class="glass-panel p-2 rounded-full text-white hover:bg-white/20"><span class="iconify" data-icon="mdi:cog"></span></button>
+<button id="settings-btn" class="glass-panel p-2 rounded-full text-white hover:bg-white/20"><span class="iconify" data-icon="mdi:cog"></span></button>
 <button class="glass-panel p-2 rounded-full text-white hover:bg-white/20"><span class="iconify" data-icon="mdi:help-circle"></span></button>
 </div>
+</div>
+
+<!-- 设置弹窗 -->
+<div id="settings-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[300] hidden">
+  <div class="bg-gradient-to-b from-slate-800 to-slate-900 rounded-2xl w-[90%] max-w-lg max-h-[80vh] overflow-hidden border border-white/10">
+    <!-- Tab 导航 -->
+    <div class="flex border-b border-white/10">
+      <button id="tab-llm" class="flex-1 py-3 text-white font-bold border-b-2 border-yellow-500">大模型配置</button>
+      <button id="tab-player" class="flex-1 py-3 text-white/60 hover:text-white">玩家配置</button>
+    </div>
+    
+    <!-- Tab 1: LLM 配置 -->
+    <div id="panel-llm" class="p-4 overflow-y-auto" style="max-height: calc(80vh - 120px);">
+      <!-- 预设选择 -->
+      <div class="mb-4">
+        <label class="text-white font-bold mb-2 block">选择大模型</label>
+        <select id="llm-preset-select" class="w-full bg-slate-700 rounded-lg px-4 py-3 text-white border border-white/20">
+          <option value="">-- 选择预设或自定义 --</option>
+        </select>
+      </div>
+      
+      <!-- 配置表单 -->
+      <div id="llm-form" class="bg-black/30 rounded-lg p-4 mb-4">
+        <input type="hidden" id="llm-edit-id">
+        <div class="mb-3">
+          <label class="text-white/60 text-sm block mb-1">名称</label>
+          <input type="text" id="llm-name" class="w-full bg-slate-700 rounded px-3 py-2 text-white" placeholder="如: 我的GPT-4">
+        </div>
+        <div class="mb-3">
+          <label class="text-white/60 text-sm block mb-1">类型</label>
+          <select id="llm-type" class="w-full bg-slate-700 rounded px-3 py-2 text-white">
+            <option value="openai">OpenAI 兼容</option>
+            <option value="anthropic">Anthropic</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="text-white/60 text-sm block mb-1">API 地址</label>
+          <input type="text" id="llm-api-base" class="w-full bg-slate-700 rounded px-3 py-2 text-white" placeholder="https://api.openai.com/v1">
+        </div>
+        <div class="mb-3">
+          <label class="text-white/60 text-sm block mb-1">模型名称</label>
+          <input type="text" id="llm-model" class="w-full bg-slate-700 rounded px-3 py-2 text-white" placeholder="gpt-4-turbo">
+        </div>
+        <div class="mb-3">
+          <label class="text-white/60 text-sm block mb-1">API Key</label>
+          <input type="password" id="llm-api-key" class="w-full bg-slate-700 rounded px-3 py-2 text-white" placeholder="sk-...">
+        </div>
+        <div class="flex gap-2">
+          <button id="llm-test-btn" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg">测试连接</button>
+        </div>
+      </div>
+      
+      <!-- 已保存的自定义配置 -->
+      <div class="mb-4">
+        <h3 class="text-white/60 text-sm mb-2">已保存的配置</h3>
+        <div id="llm-saved-list" class="space-y-2">
+          <!-- 动态加载 -->
+        </div>
+      </div>
+    </div>
+    
+    <!-- Tab 2: 玩家配置 -->
+    <div id="panel-player" class="p-4 overflow-y-auto hidden" style="max-height: calc(80vh - 120px);">
+      <!-- 玩家数量选择 -->
+      <div class="mb-6">
+        <h3 class="text-white font-bold mb-3">玩家配置</h3>
+        <div class="grid grid-cols-3 gap-4 mb-2">
+          <div class="text-center">
+            <label class="text-white/60 text-sm block mb-1">真人玩家</label>
+            <div class="flex items-center justify-center gap-2">
+              <button class="player-num-btn w-8 h-8 bg-white/10 rounded text-white hover:bg-yellow-600" data-type="human" data-action="dec">-</button>
+              <span id="human-count" class="text-white text-xl font-bold w-8">1</span>
+              <button class="player-num-btn w-8 h-8 bg-white/10 rounded text-white hover:bg-yellow-600" data-type="human" data-action="inc">+</button>
+            </div>
+          </div>
+          <div class="text-center">
+            <label class="text-white/60 text-sm block mb-1">AI玩家</label>
+            <div class="flex items-center justify-center gap-2">
+              <button class="player-num-btn w-8 h-8 bg-white/10 rounded text-white hover:bg-yellow-600" data-type="ai" data-action="dec">-</button>
+              <span id="ai-count" class="text-white text-xl font-bold w-8">0</span>
+              <button class="player-num-btn w-8 h-8 bg-white/10 rounded text-white hover:bg-yellow-600" data-type="ai" data-action="inc">+</button>
+            </div>
+          </div>
+          <div class="text-center">
+            <label class="text-white/60 text-sm block mb-1">NPC</label>
+            <div class="flex items-center justify-center gap-2">
+              <button class="player-num-btn w-8 h-8 bg-white/10 rounded text-white hover:bg-yellow-600" data-type="npc" data-action="dec">-</button>
+              <span id="npc-count" class="text-white text-xl font-bold w-8">0</span>
+              <button class="player-num-btn w-8 h-8 bg-white/10 rounded text-white hover:bg-yellow-600" data-type="npc" data-action="inc">+</button>
+            </div>
+          </div>
+        </div>
+        <p class="text-white/40 text-xs text-center">总数不超过 4 人</p>
+      </div>
+      
+      <!-- AI 配置列表 -->
+      <div id="ai-config-list" class="space-y-4">
+        <!-- 动态生成 -->
+      </div>
+    </div>
+    
+    <!-- 底部按钮 -->
+    <div class="border-t border-white/10 p-4 flex gap-2">
+      <button id="settings-save-btn" class="flex-1 py-3 bg-yellow-600 hover:bg-yellow-500 text-white font-bold rounded-lg">保存</button>
+      <button id="settings-close-btn" class="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg">取消</button>
+    </div>
+  </div>
 </div>
 
 <!-- 游戏主桌面 -->
@@ -250,15 +357,15 @@
 <span class="flex items-center gap-1"><span class="w-2 h-2 bg-green-500 rounded-full"></span> 在线</span>
 </div>
 <!-- 消息滚动区 -->
-<div class="flex-1 p-2 overflow-y-auto chat-scroll flex flex-col gap-2 chat-area" style="min-height: 180px;" id="chat-messages">
+<div class="flex-1 p-2 overflow-y-auto chat-scroll flex flex-col gap-2" id="chat-messages">
 <div class="flex flex-col gap-1 items-center">
 <span class="text-[10px] text-white/50">等待玩家加入...</span>
 </div>
 </div>
 <!-- 输入框 -->
 <div class="p-2 flex gap-2 chat-input-area">
-<input class="flex-1 bg-black/40 rounded px-3 py-1 text-white text-xs outline-none border border-white/10 focus:border-yellow-500/50" placeholder="与AI和牌友聊天..." type="text"/>
-<button class="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1 rounded text-xs transition-colors">发送</button>
+<input id="chat-input" class="flex-1 bg-black/40 rounded px-3 py-1 text-white text-xs outline-none border border-white/10 focus:border-yellow-500/50" placeholder="与AI和牌友聊天..." type="text"/>
+<button id="chat-send-btn" class="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1 rounded text-xs transition-colors">发送</button>
 </div>
 <!-- 缩放手柄 -->
 <div class="resize-handle" id="chat-resizer"></div>
