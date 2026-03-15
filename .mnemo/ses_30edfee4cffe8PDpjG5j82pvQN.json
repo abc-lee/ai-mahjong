@@ -1,0 +1,27 @@
+{
+  "tools": {},
+  "messageCount": 0,
+  "archiveBlocks": [
+    {
+      "blockId": 1,
+      "topic": "Anthropic支持和MiniMax思考链调试",
+      "summary": "修复了Anthropic支持（API key传递方式、provider缓存key）、调试MiniMax思考链问题。发现SDK的extractReasoningMiddleware只支持`<think>`标签，MiniMax使用`莱斯...CLE>`格式。最终确认MiniMax使用Anthropic端点时会自动分离thinking/text block。修复了发言截断问题：移除\"只取第一行\"逻辑，maxTokens从500改为2000，maxLength从50改为200。",
+      "toolCount": 0
+    },
+    {
+      "blockId": 2,
+      "topic": "LLM适配修复和胡牌问题调试",
+      "summary": "修复了LLM适配问题：Anthropic API key传递、provider缓存key。调试MiniMax思考链问题，发现SDK的extractReasoningMiddleware只支持`<tool_call>`标签。修复发言截断：移除\"只取第一行\"逻辑，maxTokens改为2000，maxLength改为200。修复设置页面：底部只显示选中配置，下拉框选择联动。修复胡牌后房间状态未更新导致\"再来一局\"失败。修复AI发言频率：使用personalityType而非playerName查找chatFrequency配置。修复分数显示：直接使用服务端同步的分数。修复庄家轮换：每局庄家应该是上一局庄家的下家。",
+      "toolCount": 0
+    }
+  ],
+  "messages": {
+    "byMessageId": {},
+    "activeByAnchorMessageId": {},
+    "activeBlockIds": [
+      1,
+      2
+    ],
+    "nextBlockId": 3
+  }
+}

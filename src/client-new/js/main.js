@@ -73,11 +73,12 @@ async function init() {
  * 绑定 UI 事件
  */
 function bindUIEvents() {
-  // 聊天输入框（使用正确的 id）
+  // 聊天输入框已在 game.js 中绑定，这里不再重复
+  // 如果 game.js 没有绑定，才在这里处理
   const chatInput = document.getElementById('chat-input');
   const chatButton = document.getElementById('chat-send-btn');
   
-  if (chatInput && chatButton) {
+  if (chatInput && chatButton && !window.chatInputBound) {
     const sendMessage = async () => {
       const message = chatInput.value.trim();
       if (message) {
@@ -95,9 +96,8 @@ function bindUIEvents() {
     chatInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') sendMessage();
     });
+    window.chatInputBound = true;
     console.log('[Main] 聊天输入已绑定');
-  } else {
-    console.log('[Main] 未找到聊天输入元素');
   }
   
   // 操作按钮点击

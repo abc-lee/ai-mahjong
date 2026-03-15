@@ -233,6 +233,9 @@ export class RoomManager {
     // 初始化游戏引擎
     room.gameEngine = new GameEngine(roomId);
     
+    // 清空聊天历史（新一局）
+    room.chatHistory = [];
+    
     // 重置玩家状态
     room.players.forEach(player => {
       player.hand = [];

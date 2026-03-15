@@ -239,12 +239,57 @@ curl -s http://localhost:3000/api/rooms
 | 问题 | 优先级 | 说明 |
 |------|--------|------|
 | AI 非轮次发言 | 高 | AI 应该能在任何时候说话，不只是打牌时 |
-| 番型计算 | 中 | 胡牌时番型为空，导致分数为0 |
-| 分数显示 | 中 | 需要检查 ScoreCalculator |
+| 番型计算 | 中 | 平胡等番型检测需要进一步调试 |
+| 再来一局 | 中 | 需要进一步测试 |
+| 分数计算 | 中 | 番型检测有时不正确，导致分数为0 |
 
 ---
 
 ## 11. 本次会话改进记录
+
+### 2026-03-15 - LLM 适配重构与游戏逻辑修复
+
+**核心改进**：
+
+1. **Anthropic 支持修复**
+   - 修复 `llm-presets.json` 中 Anthropic type 从 `openai` 改为 `anthropic`
+   - 修复 `LLMService.ts` 中 API key 传递方式（Anthropic 需要 `apiKey` 参数，不是 headers）
+   - 修复 provider 缓存 key 包含 apiKey，避免空 key 被缓存
+
+2. **发言系统改进**
+   - 移除"只取第一行"的截断逻辑，允许多行发言
+   - `maxTokens` 从 500 增加到 2000
+   - `maxLength` 从 50 增加到 200
+
+3. **设置页面重构**
+   - 底部只显示当前选中的一个配置（不再显示全部）
+   - 新增 `selectedLlmId` 状态，下拉框选择联动
+   - 初始时显示已选用的配置
+
+4. **胡牌逻辑修复**
+   - 修复 `room.state` 未更新为 `finished` 导致"再来一局"失败
+   - 修复 `canFormMentsu` 顺子检测 bug（原来只检查以第一张牌开头的顺子）
+   - 实现平胡、对对胡、七对子番型检测
+
+5. **庄家轮换**
+   - 修改 `GameEngine.startGame` 实现庄家轮换（上一局庄家的下家成为新庄家）
+
+6. **分数显示**
+   - 修复初始积分没显示的问题
+   - 客户端直接使用服务端同步的分数
+
+7. **AI 发言频率**
+   - 新增 `PERSONALITY_BY_TYPE` 配置，按 personalityType 查找 chatFrequency
+   - `chatty` 类型 chatFrequency = 0.8，发言更积极
+
+**关键文件修改**：
+- `src/server/llm/LLMService.ts` - LLM 服务层重构
+- `src/server/game/HandAnalyzer.ts` - 胡牌检测修复
+- `src/server/game/GameEngine.ts` - 庄家轮换、胡牌日志
+- `src/server/speech/SpeechManager.ts` - AI 发言频率配置
+- `src/client-new/js/settings.js` - 设置页面重构
+- `src/client-new/js/game.js` - 分数显示修复
+- `src/shared/fanTypes.ts` - 番型检测实现
 
 ### 2026-03-12 - AI Agent LLM 集成
 
@@ -297,7 +342,24 @@ curl -s http://localhost:3000/api/rooms
 - **原因**：统一接口，支持多种提供商
 - **后果**：代码更简洁，兼容性更好
 
+### 2026-03-13 - 思考链处理改进
+
+**核心问题**：MiniMax M2.5 等 thinking 模型返回思考链（`莱斯...`）而不是实际 JSON 决策。
+
+**解决方案**（参考 OpenClaw）：
+1. **提示词使用 `<final>` 标签**：让模型把实际输出放在标签内
+2. **响应解析优先提取 `<final>` 内容**：过滤思考链
+3. **过滤思考链词汇**：检测"用户让我"、"扮演"等分析词汇
+
+**关键代码**：
+- `src/server/ai/AIAdapter.ts`: callLLM(), parseLLMResponse()
+- `src/server/speech/ConversationManager.ts`: generateResponse()
+
+**消息重复发送修复**：
+- main.js 和 game.js 都绑定了聊天发送 → 去重
+- 事件队列处理后清空 → 避免重复处理
+
 ---
 
-*文档版本: v3.0*
-*更新时间: 2026-03-12*
+*文档版本: v3.2*
+*更新时间: 2026-03-15*

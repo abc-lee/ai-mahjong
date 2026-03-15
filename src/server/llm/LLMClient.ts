@@ -3,6 +3,8 @@
  * 让 AI 真正"思考"决策
  */
 
+import { quickChat } from './LLMService';
+
 export interface LLMConfig {
   provider: 'openai' | 'anthropic' | 'local';
   apiKey?: string;
@@ -34,6 +36,7 @@ export interface LLMDecision {
 
 /**
  * LLM 客户端
+ * 使用统一的 LLMService (SDK)
  */
 export class LLMClient {
   private config: LLMConfig;
@@ -44,45 +47,22 @@ export class LLMClient {
 
   /**
    * 简单聊天接口（用于测试和名字生成）
+   * 使用 SDK 统一处理
    */
   async chat(prompt: string): Promise<string> {
-    const provider = this.config.type || this.config.provider;
-    const apiBase = this.config.apiBase || this.config.baseUrl || 
-      (provider === 'anthropic' ? 'https://api.anthropic.com/v1' : 'https://api.openai.com/v1');
+    const apiBase = this.config.apiBase || this.config.baseUrl || 'https://api.openai.com/v1';
     
     try {
-      if (provider === 'anthropic') {
-        const response = await fetch(`${apiBase}/messages`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': this.config.apiKey || '',
-            'anthropic-version': '2023-06-01',
-          },
-          body: JSON.stringify({
-            model: this.config.model || 'claude-3-haiku-20240307',
-            max_tokens: 100,
-            messages: [{ role: 'user', content: prompt }],
-          }),
-        });
-        const data = await response.json();
-        return data.content?.[0]?.text || '';
-      } else {
-        const response = await fetch(`${apiBase}/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.config.apiKey || ''}`,
-          },
-          body: JSON.stringify({
-            model: this.config.model || 'gpt-3.5-turbo',
-            messages: [{ role: 'user', content: prompt }],
-            max_tokens: 500,
-          }),
-        });
-        const data = await response.json();
-        return data.choices?.[0]?.message?.content || '';
-      }
+      return await quickChat(
+        {
+          provider: this.config.type || this.config.provider || 'openai',
+          apiKey: this.config.apiKey || '',
+          baseURL: apiBase.replace('/chat/completions', ''),
+          model: this.config.model || 'gpt-3.5-turbo',
+        },
+        prompt,
+        { maxTokens: 100 }
+      );
     } catch (e) {
       console.error('[LLMClient] Chat error:', e);
       throw e;
@@ -95,16 +75,21 @@ export class LLMClient {
   async getDecision(context: DecisionContext): Promise<LLMDecision> {
     const systemPrompt = this.buildSystemPrompt(context);
     const userPrompt = context.prompt;
+    const apiBase = this.config.apiBase || this.config.baseUrl || 'https://api.openai.com/v1';
 
     try {
-      if (this.config.provider === 'openai') {
-        return await this.callOpenAI(systemPrompt, userPrompt);
-      } else if (this.config.provider === 'anthropic') {
-        return await this.callAnthropic(systemPrompt, userPrompt);
-      } else {
-        // 本地模式：使用启发式算法
-        return this.localDecision(context);
-      }
+      const result = await quickChat(
+        {
+          provider: this.config.type || this.config.provider || 'openai',
+          apiKey: this.config.apiKey || '',
+          baseURL: apiBase.replace('/chat/completions', ''),
+          model: this.config.model || 'gpt-3.5-turbo',
+        },
+        `${systemPrompt}\n\n${userPrompt}`,
+        { maxTokens: 500, temperature: 0.7 }
+      );
+      
+      return this.parseDecision(result);
     } catch (error) {
       console.error('LLM 调用失败，使用本地决策:', error);
       return this.localDecision(context);
@@ -147,60 +132,6 @@ ${personality}
 ## 注意
 - 只返回 JSON，不要其他文字
 - tileId 必须是你手牌中存在的 ID`;
-  }
-
-  /**
-   * 调用 OpenAI API
-   */
-  private async callOpenAI(systemPrompt: string, userPrompt: string): Promise<LLMDecision> {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.config.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: this.config.model || 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.7,
-        max_tokens: 500,
-      }),
-    });
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || '{}';
-    
-    return this.parseDecision(content);
-  }
-
-  /**
-   * 调用 Anthropic API
-   */
-  private async callAnthropic(systemPrompt: string, userPrompt: string): Promise<LLMDecision> {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': this.config.apiKey || '',
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: this.config.model || 'claude-3-haiku-20240307',
-        max_tokens: 500,
-        system: systemPrompt,
-        messages: [
-          { role: 'user', content: userPrompt },
-        ],
-      }),
-    });
-
-    const data = await response.json();
-    const content = data.content?.[0]?.text || '{}';
-    
-    return this.parseDecision(content);
   }
 
   /**

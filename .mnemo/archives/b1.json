@@ -1,0 +1,17 @@
+{
+  "blockId": 1,
+  "topic": "Anthropic支持和MiniMax思考链调试",
+  "summary": "修复了Anthropic支持（API key传递方式、provider缓存key）、调试MiniMax思考链问题。发现SDK的extractReasoningMiddleware只支持`<think>`标签，MiniMax使用`莱斯...CLE>`格式。最终确认MiniMax使用Anthropic端点时会自动分离thinking/text block。修复了发言截断问题：移除\"只取第一行\"逻辑，maxTokens从500改为2000，maxLength从50改为200。",
+  "messageCount": 157,
+  "toolCount": 0,
+  "tokensSaved": 109900,
+  "createdAt": "2026-03-15T12:03:29.751Z",
+  "tools": [],
+  "startId": "m2714",
+  "endId": "m2870",
+  "sessionId": "ses_30edfee4cffe8PDpjG5j82pvQN",
+  "active": true,
+  "effectiveMessageIds": [],
+  "compressMessageId": "msg_cf1611996001PUmf7QCFWyE4mH",
+  "overview": "修复了Anthropic提供商支持问题：更正API key在Vercel AI SDK中的传递方式，修复provider缓存key生成逻辑。调试MiniMax思考链问题：发现SDK的extractReasoningMiddleware仅支持标准`<think>`标签，MiniMax返回格式为`莱斯...CLE>`。最终方案：MiniMax使用Anthropic端点格式时，API会自动分离thinking/text block，无需额外处理。同时修复发言截断bug：在AIAdapter.ts中移除\"只取第一行\"截断逻辑，将maxTokens从500增加到2000，聊天显示maxLength从50增加到200，解决AI发言被截断问题。"
+}

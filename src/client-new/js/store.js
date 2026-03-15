@@ -241,6 +241,12 @@ export function getPlayerScore() {
  * @param {object} message - 发言消息
  */
 export function addSpeechMessage(message) {
+  // 过滤空内容
+  if (!message.content || message.content.trim().length === 0) {
+    console.log('[Store] 过滤空消息');
+    return;
+  }
+  
   // 去重：检查是否已存在相同消息
   const exists = state.speechMessages.some(m => 
     m.playerId === message.playerId && 

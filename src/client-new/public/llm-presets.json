@@ -1,12 +1,12 @@
 {
   "presets": [
     {
-      "id": "openai-gpt4",
-      "name": "OpenAI GPT-4",
+      "id": "openai",
+      "name": "OpenAI",
       "type": "openai",
       "apiBase": "https://api.openai.com/v1",
-      "model": "gpt-4-turbo",
-      "description": "OpenAI GPT-4 Turbo"
+      "model": "gpt-4o",
+      "description": "OpenAI GPT-4o"
     },
     {
       "id": "openai-gpt35",
@@ -17,12 +17,12 @@
       "description": "OpenAI GPT-3.5 Turbo"
     },
     {
-      "id": "anthropic-claude",
+      "id": "anthropic",
       "name": "Anthropic Claude",
       "type": "anthropic",
       "apiBase": "https://api.anthropic.com/v1",
-      "model": "claude-3-sonnet",
-      "description": "Anthropic Claude 3 Sonnet"
+      "model": "claude-sonnet-4-20250514",
+      "description": "Anthropic Claude Sonnet 4"
     },
     {
       "id": "minimax",
@@ -30,7 +30,15 @@
       "type": "openai",
       "apiBase": "https://api.minimaxi.com/v1",
       "model": "MiniMax-M2.5",
-      "description": "MiniMax M2.5"
+      "description": "MiniMax M2.5 (Thinking)"
+    },
+    {
+      "id": "minimax-portal",
+      "name": "MiniMax Portal",
+      "type": "openai",
+      "apiBase": "https://api.minimax.io/anthropic",
+      "model": "MiniMax-M2.5",
+      "description": "MiniMax Portal (Anthropic API)"
     },
     {
       "id": "deepseek",
@@ -41,20 +49,132 @@
       "description": "DeepSeek Chat"
     },
     {
+      "id": "deepseek-reasoner",
+      "name": "DeepSeek Reasoner",
+      "type": "openai",
+      "apiBase": "https://api.deepseek.com/v1",
+      "model": "deepseek-reasoner",
+      "description": "DeepSeek R1 (Thinking)"
+    },
+    {
       "id": "qwen",
-      "name": "Qwen",
+      "name": "Qwen (通义千问)",
       "type": "openai",
       "apiBase": "https://dashscope.aliyuncs.com/compatible-mode/v1",
       "model": "qwen-turbo",
-      "description": "Alibaba Qwen Turbo"
+      "description": "阿里通义千问"
     },
     {
-      "id": "local-bge",
-      "name": "Local BGE (embedding only)",
+      "id": "qwen-portal",
+      "name": "Qwen Portal",
       "type": "openai",
-      "apiBase": "http://localhost:8080/v1",
-      "model": "BAAI/bge-large-zh-v1.5",
-      "description": "Local BGE embedding model"
+      "apiBase": "https://portal.qwen.ai/v1",
+      "model": "coder-model",
+      "description": "Qwen Portal Coder"
+    },
+    {
+      "id": "moonshot",
+      "name": "Moonshot (Kimi)",
+      "type": "openai",
+      "apiBase": "https://api.moonshot.ai/v1",
+      "model": "kimi-k2.5",
+      "description": "Moonshot Kimi K2.5"
+    },
+    {
+      "id": "kimi-coding",
+      "name": "Kimi Coding",
+      "type": "openai",
+      "apiBase": "https://api.kimi.com/coding/",
+      "model": "k2p5",
+      "description": "Kimi for Coding"
+    },
+    {
+      "id": "qianfan",
+      "name": "百度千帆",
+      "type": "openai",
+      "apiBase": "https://qianfan.baidubce.com/v2",
+      "model": "deepseek-v3.2",
+      "description": "百度千帆 DeepSeek V3.2"
+    },
+    {
+      "id": "doubao",
+      "name": "豆包 (火山引擎)",
+      "type": "openai",
+      "apiBase": "https://ark.cn-beijing.volces.com/api/v3",
+      "model": "doubao-pro-32k",
+      "description": "字节豆包"
+    },
+    {
+      "id": "xiaomi",
+      "name": "小米 MiMo",
+      "type": "openai",
+      "apiBase": "https://api.xiaomimimo.com/anthropic",
+      "model": "mimo-v2-flash",
+      "description": "小米 MiMo V2 Flash"
+    },
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "type": "openai",
+      "apiBase": "https://openrouter.ai/api/v1",
+      "model": "auto",
+      "description": "OpenRouter (多模型聚合)"
+    },
+    {
+      "id": "together",
+      "name": "Together AI",
+      "type": "openai",
+      "apiBase": "https://api.together.xyz/v1",
+      "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      "description": "Together AI"
+    },
+    {
+      "id": "huggingface",
+      "name": "HuggingFace",
+      "type": "openai",
+      "apiBase": "https://api-inference.huggingface.co/v1",
+      "model": "meta-llama/Llama-3.2-3B-Instruct",
+      "description": "HuggingFace Inference API"
+    },
+    {
+      "id": "nvidia",
+      "name": "NVIDIA NIM",
+      "type": "openai",
+      "apiBase": "https://integrate.api.nvidia.com/v1",
+      "model": "nvidia/llama-3.1-nemotron-70b-instruct",
+      "description": "NVIDIA NIM API"
+    },
+    {
+      "id": "venice",
+      "name": "Venice AI",
+      "type": "openai",
+      "apiBase": "https://api.venice.ai/api/v1",
+      "model": "llama-3.3-70b",
+      "description": "Venice AI"
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama (本地)",
+      "type": "openai",
+      "apiBase": "http://localhost:11434/v1",
+      "model": "llama3.2",
+      "description": "Ollama 本地模型"
+    },
+    {
+      "id": "vllm",
+      "name": "vLLM (本地)",
+      "type": "openai",
+      "apiBase": "http://localhost:8000/v1",
+      "model": "auto",
+      "description": "vLLM 本地推理服务"
+    },
+    {
+      "id": "glm",
+      "name": "智谱 GLM",
+      "type": "openai",
+      "apiBase": "https://open.bigmodel.cn/api/paas/v4",
+      "model": "glm-4-flash",
+      "description": "智谱 GLM-4"
     }
   ]
 }

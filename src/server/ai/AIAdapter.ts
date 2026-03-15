@@ -5,13 +5,10 @@
 
 import type { Player, AIConfig } from '@shared/types';
 import type { Tile, GameStatePublic, PendingAction } from '@shared/types';
-import { promptGenerator, PromptType } from '../prompt';
 import { findBestDiscard } from './RuleEngine';
 import { PERSONALITIES } from '../speech/SpeechManager';
 import type { GameEvent as QueueEvent } from './EventQueue';
-import { generateText } from 'ai';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
-import { createAnthropic } from '@ai-sdk/anthropic';
+import { chatWithSystem } from '../llm/LLMService';
 
 // AI 决策（扩展：包含发言和情绪）
 export interface AIDecision {
@@ -125,50 +122,32 @@ export class AIAdapter {
 性格：${personality.traits.join('、')}
 说话风格：${personality.speakStyle}
 
-有人说了话，你可以选择回应。回应要简短自然，符合你的性格。`;
+直接回应，简短自然。不想回应就说"无"。`;
 
     const userPrompt = `${fromPlayer} 说："${message}"
-
-你要回应吗？如果回应，直接说出你的话，不要加引号或格式。`;
+你回应：`;
 
     try {
+      const modelId = this.config.llmModel || 'gpt-4o';
       const providerType = this.config.llmProviderType || 'openai';
-      const modelId = this.config.llmModel || 'default';
+      const endpoint = this.config.llmEndpoint?.replace('/chat/completions', '').replace('/v1/messages', '');
       
-      let model: any;
+      const result = await chatWithSystem(
+        {
+          provider: providerType,
+          apiKey: this.config.llmApiKey!,
+          baseURL: endpoint || 'https://api.openai.com/v1',
+          model: modelId,
+        },
+        systemPrompt,
+        userPrompt,
+        { temperature: 1.0, maxTokens: 100 }
+      );
       
-      if (providerType === 'anthropic') {
-        const anthropic = createAnthropic({
-          apiKey: this.config.llmApiKey,
-          baseURL: this.config.llmEndpoint?.replace('/v1/messages', ''),
-        });
-        model = anthropic(modelId);
-      } else {
-        const openai = createOpenAICompatible({
-          apiKey: this.config.llmApiKey,
-          baseURL: this.config.llmEndpoint?.replace('/chat/completions', ''),
-          name: 'mahjong-ai',
-        });
-        model = openai(modelId);
-      }
-
-      const result = await generateText({
-        model,
-        system: systemPrompt,
-        prompt: userPrompt,
-        temperature: 1.0,  // 更随机
-        maxOutputTokens: 100,
-      });
-
-      let content = result.text?.trim();
+      let content = result.text?.trim() || '';
       
-      // 清理思考链
-      content = content?.replace(/莱斯[\s\S]*?<\/think>/gi, '');
-      content = content?.replace(/<tool_call>.*?<\/final>/gis, '');
-      content = content?.trim();
-      
-      // 如果回应太长，截断
-      if (content && content.length > 50) {
+      // 简单清理
+      if (content.length > 50) {
         content = content.substring(0, 50) + '...';
       }
       
@@ -224,53 +203,33 @@ export class AIAdapter {
 性格：${personality.traits.join('、')}
 说话风格：${personality.speakStyle}
 
-你正在看别人打麻将，可以选择说点什么。简短自然，符合你的性格。`;
+直接说你的反应，简短自然。不想说就说"无"。`;
 
-    const userPrompt = `刚才发生的事：
+    const userPrompt = `刚才发生：
 ${eventDescriptions}
 
-你要说什么吗？直接说出你的话，不要加引号或格式。不想说就回复"无"。`;
+你回应：`;
 
     try {
-      const { generateText } = await import('ai');
-      const { createOpenAICompatible } = await import('@ai-sdk/openai-compatible');
-      
+      const modelId = this.config.llmModel || 'gpt-4o';
       const providerType = this.config.llmProviderType || 'openai';
-      const modelId = this.config.llmModel || 'default';
+      const endpoint = this.config.llmEndpoint?.replace('/chat/completions', '').replace('/v1/messages', '');
       
-      let model: any;
+      const result = await chatWithSystem(
+        {
+          provider: providerType,
+          apiKey: this.config.llmApiKey!,
+          baseURL: endpoint || 'https://api.openai.com/v1',
+          model: modelId,
+        },
+        systemPrompt,
+        userPrompt,
+        { temperature: 1.0, maxTokens: 50 }
+      );
       
-      if (providerType === 'anthropic') {
-        // Anthropic 格式也用 OpenAI 兼容模式
-        const openai = createOpenAICompatible({
-          apiKey: this.config.llmApiKey,
-          baseURL: this.config.llmEndpoint?.replace('/chat/completions', '').replace('/v1/messages', ''),
-          name: 'mahjong-ai',
-        });
-        model = openai(modelId);
-      } else {
-        const openai = createOpenAICompatible({
-          apiKey: this.config.llmApiKey,
-          baseURL: this.config.llmEndpoint?.replace('/chat/completions', ''),
-          name: 'mahjong-ai',
-        });
-        model = openai(modelId);
-      }
-
-      const result = await generateText({
-        model,
-        system: systemPrompt,
-        prompt: userPrompt,
-        temperature: 1.0,
-        maxOutputTokens: 50,
-      });
-
-      let content = result.text?.trim();
-      content = content?.replace(/莱斯[\s\S]*?<\/think>/gi, '');
-      content = content?.replace(/<tool_call>.*?<\/final>/gis, '');
-      content = content?.trim();
+      let content = result.text?.trim() || '';
       
-      if (!content || content === '无' || content === '无。') {
+      if (!content || content === '无' || content === '无。' || content.length < 2) {
         return { reaction: null };
       }
       
@@ -307,7 +266,7 @@ ${eventDescriptions}
   }
 
   /**
-   * 调用 LLM（使用 Vercel AI SDK）
+   * 调用 LLM（使用原生 fetch，支持 reasoning_split）
    */
   private async callLLM(gameState: GameStatePublic, chatHistory?: { playerName: string; content: string }[]): Promise<AIDecision | null> {
     if (!this.config.llmEndpoint || !this.config.llmApiKey) return null;
@@ -318,13 +277,6 @@ ${eventDescriptions}
       traits: ['普通'],
       speakStyle: '正常说话',
     };
-
-    // 系统提示词（使用 OpenClaw 的 reasoningTagHint 模式）
-    // 要求 LLM 用 ऐ思...ॆ 和  包裹思考，<final>...</final> 包裹最终 JSON
-    const thinkTag = '莱斯';
-    const thinkEndTag = 'ॆ';
-    const finalTag = '<final>';
-    const finalEndTag = '</final>';
     
     const personalityHint = this.getPersonalityHint();
     
@@ -333,80 +285,63 @@ ${eventDescriptions}
 【你的性格特点】
 ${personalityHint}
 
-【说话规则 - 重要！】
-- 你必须在 message 字段里说话！每轮都要说点什么
-- 说话要符合你的性格：可以吐槽其他玩家、调侃牌运、发表感想
-- 说话要有趣、有个性，不要太机械
-- 可以回应其他玩家的发言，制造互动
+【说话规则】
+- 你必须在 message 字段里说话
+- 说话要符合你的性格，有趣有个性
+- 可以回应其他玩家的发言
 
-【格式规则】
-1. 先用 ${thinkTag}...${thinkEndTag} 包裹你的分析
-2. 然后用 ${finalTag}...${finalEndTag} 包裹最终决策 JSON
-3. JSON 格式: {"cmd":"discard","tile":"牌ID","message":"你想说的话"}
-
-示例:
-${thinkTag}手牌很散，北风孤张，先打掉...${thinkEndTag}
-${finalTag}{"cmd":"discard","tile":"feng-4-123","message":"这破牌，风牌全是单张，烦死了"}${finalEndTag}`;
+【输出格式】
+直接输出 JSON，不要任何思考过程或标签：
+{"cmd":"discard","tile":"牌ID","message":"你想说的话"}`;
 
     // 用户消息（当前游戏状态）
     let chatSection = '';
     if (chatHistory && chatHistory.length > 0) {
-      const recentChat = chatHistory.slice(-5);  // 最近5条
+      const recentChat = chatHistory.slice(-5);
       chatSection = `\n\n【最近聊天】\n${recentChat.map(m => `${m.playerName}: ${m.content}`).join('\n')}\n`;
     }
     
-    const gamePrompt = `【麻将游戏 - 你的回合】
+    const userPrompt = `【麻将游戏 - 你的回合】
 
 手牌: ${this.player.hand.map(t => `${t.display}[${t.id}]`).join(' ')}
 牌墙: ${gameState.wallRemaining}张${chatSection}
 
-选择一张牌打出。记得在 message 里说点什么！回应其他玩家的发言！`;
+选择一张牌打出，输出 JSON。`;
 
     try {
+      const modelId = this.config.llmModel || 'gpt-4o';
       const providerType = this.config.llmProviderType || 'openai';
-      const modelId = this.config.llmModel || 'default';
       
-      console.log(`[AIAdapter] 使用 Vercel AI SDK: providerType=${providerType}, model=${modelId}`);
-
-      // 根据 provider 类型创建客户端
-      let model: any;
+      console.log(`[AIAdapter] 调用 LLM: provider=${providerType}, model=${modelId}`);
       
-      if (providerType === 'anthropic') {
-        // Anthropic 格式
-        const anthropic = createAnthropic({
-          apiKey: this.config.llmApiKey,
-          baseURL: this.config.llmEndpoint?.replace('/v1/messages', ''),
-        });
-        model = anthropic(modelId);
-      } else {
-        // OpenAI 兼容格式（MiniMax, DeepSeek, Qwen, OpenAI 等）
-        const openai = createOpenAICompatible({
-          apiKey: this.config.llmApiKey,
-          baseURL: this.config.llmEndpoint?.replace('/chat/completions', ''),
-          name: 'mahjong-ai',
-        });
-        model = openai(modelId);
+      // 使用 SDK 调用，自动处理思考链
+      const endpoint = this.config.llmEndpoint?.replace('/chat/completions', '').replace('/v1/messages', '');
+      
+      const result = await chatWithSystem(
+        {
+          provider: providerType,
+          apiKey: this.config.llmApiKey!,
+          baseURL: endpoint || 'https://api.openai.com/v1',
+          model: modelId,
+        },
+        systemPrompt,
+        userPrompt,
+        { 
+          temperature: this.getTemperature(),
+          maxTokens: 800,  // 决策层需要更多 token 输出 JSON
+        }
+      );
+      
+      const content = result.text;
+      
+      console.log(`[AIAdapter] SDK 响应: ${content?.substring(0, 200)}`);
+      
+      if (!content || content.length < 5) {
+        console.log(`[AIAdapter] content 为空，跳过`);
+        return null;
       }
-
-      // 使用 Vercel AI SDK 的 generateText
-      const result = await generateText({
-        model,
-        system: systemPrompt,
-        prompt: gamePrompt,
-        temperature: this.getTemperature(),
-        maxOutputTokens: 1500,  // 增加，避免截断
-      });
-
-      // text 是实际响应，reasoningText 是思考链（如果有）
-      const text = result.text;
-      const reasoning = (result as any).reasoningText || '';
       
-      console.log(`[AIAdapter] ===完整响应开始===`);
-      console.log(text);
-      console.log(`[AIAdapter] ===完整响应结束===`);
-      console.log(`[AIAdapter] 思考链: ${reasoning || '无'}`);
-      
-      return this.parseLLMResponse(text);
+      return this.parseLLMResponse(content);
     } catch (e: any) {
       console.error(`[AIAdapter] LLM 调用失败: ${e.message}`);
       throw e;
@@ -414,43 +349,20 @@ ${finalTag}{"cmd":"discard","tile":"feng-4-123","message":"这破牌，风牌全
   }
 
   /**
-   * 解析 LLM 响应（OpenClaw 模式）
+   * 解析 LLM 响应
    */
   private parseLLMResponse(content: string): AIDecision | null {
     try {
-      console.log(`[AIAdapter] 解析内容长度: ${content.length}`);
+      console.log(`[AIAdapter] 解析内容: ${content.substring(0, 100)}`);
       
-      // 1. 提取 <final>...</final> 内的内容（OpenClaw 模式）
-      const finalMatch = content.match(/<final>([\s\S]*?)<\/final>/i);
-      if (finalMatch) {
-        const jsonStr = finalMatch[1].trim();
-        console.log(`[AIAdapter] 提取到 <final> 内容: ${jsonStr}`);
+      // 查找 JSON 对象
+      const jsonMatch = content.match(/\{[\s\S]*?"(?:cmd|action)"[\s\S]*?\}/i);
+      if (jsonMatch) {
         try {
-          const data = JSON.parse(jsonStr);
+          const data = JSON.parse(jsonMatch[0]);
           return this.buildDecision(data);
         } catch (e) {
-          console.log(`[AIAdapter] final 内 JSON 解析失败，尝试其他方式`);
-        }
-      }
-      
-      // 2. 直接查找 JSON 对象（兼容无 final 标签的情况）
-      const jsonPatterns = [
-        /\{"cmd"\s*:\s*"discard"\s*,\s*"tile"\s*:\s*"[^"]+"\s*(,\s*"message"\s*:\s*"[^"]*")?\s*\}/i,
-        /\{"action"\s*:\s*"discard"\s*,\s*"tileId"\s*:\s*"[^"]+"\s*(,\s*"message"\s*:\s*"[^"]*")?\s*\}/i,
-        /\{[\s\S]*?"(?:cmd|action)"[\s\S]*?\}/i,
-      ];
-      
-      for (const pattern of jsonPatterns) {
-        const match = content.match(pattern);
-        if (match) {
-          let jsonStr = match[0];
-          console.log(`[AIAdapter] 找到 JSON: ${jsonStr.substring(0, 100)}`);
-          try {
-            const data = JSON.parse(jsonStr);
-            return this.buildDecision(data);
-          } catch (e) {
-            console.log(`[AIAdapter] JSON 解析失败，继续尝试`);
-          }
+          console.log(`[AIAdapter] JSON 解析失败`);
         }
       }
       
@@ -534,6 +446,13 @@ ${finalTag}{"cmd":"discard","tile":"feng-4-123","message":"这破牌，风牌全
   }
 
   /**
+   * 延迟函数
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
    * 根据性格获取提示
    */
   private getPersonalityHint(): string {
@@ -564,12 +483,5 @@ ${finalTag}{"cmd":"discard","tile":"feng-4-123","message":"这破牌，风牌全
     };
     
     return temperatureMap[personality] || 0.9;
-  }
-
-  /**
-   * 延迟函数
-   */
-  private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }

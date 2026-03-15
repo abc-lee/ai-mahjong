@@ -37,10 +37,13 @@ function updateGameInfo() {
     nameEl.textContent = state.playerName;
   }
   
-  // 玩家分数
+  // 玩家分数 - 从房间信息中获取
   const scoreEl = document.getElementById('player-score');
-  if (scoreEl) {
-    scoreEl.textContent = store.getPlayerScore();
+  if (scoreEl && state.currentRoom) {
+    const currentPlayer = state.currentRoom.players?.find(p => p.id === state.playerId);
+    if (currentPlayer) {
+      scoreEl.textContent = currentPlayer.score || 1000;
+    }
   }
 }
 
@@ -601,6 +604,12 @@ export async function handleDraw() {
  * 设置聊天输入监听
  */
 function setupChatInput() {
+  // 避免重复绑定
+  if (window.chatInputBound) {
+    console.log('[Game] 聊天输入已绑定，跳过');
+    return;
+  }
+  
   const chatInput = document.getElementById('chat-input');
   const chatSendBtn = document.getElementById('chat-send-btn');
   
@@ -632,6 +641,9 @@ function setupChatInput() {
       sendChat();
     }
   });
+  
+  window.chatInputBound = true;
+  console.log('[Game] 聊天输入已绑定');
 }
 
 // ==================== 事件监听设置 ====================
@@ -794,14 +806,14 @@ function showGameEndDialog(winner, winningHand, players) {
   // 添加到页面
   document.body.insertAdjacentHTML('beforeend', modalHtml);
   
-  // 更新顶栏分数显示
+  // 更新顶栏分数显示 - 使用服务端同步的分数
   const myId = state.playerId;
   const myResult = scoreChanges.find(p => p.id === myId);
-  if (myResult && myResult.scoreChange) {
-    const newScore = (store.getPlayerScore() || 0) + myResult.scoreChange;
+  if (myResult) {
     const scoreEl = document.getElementById('player-score');
     if (scoreEl) {
-      scoreEl.textContent = newScore;
+      // 直接使用服务端返回的最新分数
+      scoreEl.textContent = myResult.score || 1000;
     }
   }
   
@@ -1210,10 +1222,11 @@ function updateWaitingPlayers(room) {
         nameSpan.textContent = currentPlayer.name;
       }
     }
-    // 更新分数
+    // 更新分数 - 直接使用服务端同步的分数
     const scoreEl = document.getElementById('player-score');
     if (scoreEl) {
-      scoreEl.textContent = store.getPlayerScore();
+      // 使用服务端的分数，而不是 store 中累计的
+      scoreEl.textContent = currentPlayer.score || 1000;
     }
   }
   

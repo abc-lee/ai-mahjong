@@ -1,0 +1,7 @@
+{"type":"room_updated","players":[{"name":"紫璃","type":"ai-agent"},{"name":"白泽","type":"ai-agent"},{"name":"李瞳","type":"ai-agent"}]}
+{"type":"disconnected"}
+{"type":"disconnected"}
+{"type":"connected","agentId":"litong","agentName":"李瞳"}
+{"type":"warning","message":"房间不存在"}
+{"type":"connected","agentId":"litong","agentName":"李瞳"}
+{"type":"warning","message":"房间不存在"}

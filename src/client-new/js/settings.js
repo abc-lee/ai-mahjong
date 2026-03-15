@@ -8,7 +8,8 @@ import * as socket from './socket.js';
 // State
 let llmPresets = [];
 let llmConfigs = [];
-let activeLlmId = null;
+let activeLlmId = null;      // 当前使用中的配置
+let selectedLlmId = null;    // 下拉框中选中的配置（用于底部显示）
 
 let playerConfig = {
   humanCount: 1,
@@ -37,14 +38,18 @@ const AI_GENDERS = [
 export async function init() {
   // Load data
   await loadLlmPresets();
-  await loadFromBackend(); // 先从后端读取配置文件
-  loadLlmConfigs();
+  loadLlmConfigs();  // 先加载 localStorage 的配置
+  await loadFromBackend(); // 再从后端读取，合并
   loadPlayerConfig();
+  
+  // 渲染
+  renderLlmPresets();
+  renderLlmConfigs();
   
   // Bind events
   bindEvents();
   
-  console.log('[Settings] Initialized');
+  console.log('[Settings] Initialized, llmConfigs:', llmConfigs.length);
 }
 
 // 从后端配置文件加载
@@ -72,6 +77,7 @@ async function loadFromBackend() {
         llmConfigs.push(mergedConfig);
       }
       activeLlmId = mergedConfig.id;
+      selectedLlmId = mergedConfig.id;  // 初始选中当前使用的配置
       saveLlmConfigs();
       console.log('[Settings] Loaded LLM config from backend:', mergedConfig.name);
       
@@ -94,7 +100,7 @@ async function loadLlmPresets() {
     const res = await fetch('/llm-presets.json');
     const data = await res.json();
     llmPresets = data.presets || [];
-    renderLlmPresets();
+    console.log('[Settings] Loaded presets:', llmPresets.length);
   } catch (e) {
     console.error('[Settings] Failed to load LLM presets:', e);
   }
@@ -107,6 +113,7 @@ function loadLlmConfigs() {
       const data = JSON.parse(saved);
       llmConfigs = data.configs || [];
       activeLlmId = data.activeConfigId;
+      selectedLlmId = data.activeConfigId;  // 初始选中当前使用的配置
     }
     renderLlmConfigs();
   } catch (e) {
@@ -240,22 +247,25 @@ function handlePresetChange(e) {
   const option = e.target.selectedOptions[0];
   
   if (value.startsWith('preset-')) {
-    // Preset selected - fill form
+    // 预设选择 - 填充表单，底部显示"未保存"提示
     const preset = JSON.parse(option.dataset.preset);
     fillLlmForm({
       id: preset.id,
       name: preset.name,
-      type: preset.type,
+      type: preset.type || 'openai',
       apiBase: preset.apiBase,
       model: preset.model,
       apiKey: ''
     });
-    setActiveLlm(preset.id);
+    selectedLlmId = null;  // 预设不算已保存的配置
+    renderLlmConfigs();
+    console.log('[Settings] 选择预设:', preset.name, 'type:', preset.type);
   } else if (value.startsWith('custom-')) {
-    // Custom config selected - fill form
+    // 已保存配置选择 - 填充表单并更新底部显示
     const config = JSON.parse(option.dataset.config);
     fillLlmForm(config);
-    setActiveLlm(config.id);
+    selectedLlmId = config.id;  // 更新选中的配置
+    renderLlmConfigs();
   }
 }
 
@@ -268,41 +278,53 @@ function fillLlmForm(config) {
   document.getElementById('llm-api-key').value = config.apiKey || '';
 }
 
-// Render saved LLM configs list
+// Render saved LLM configs list - 只显示当前选中的一个
 function renderLlmConfigs() {
   const container = document.getElementById('llm-saved-list');
   if (!container) return;
   
-  if (llmConfigs.length === 0) {
-    container.innerHTML = '<div class="text-white/40 text-sm text-center py-2">暂无已保存的配置</div>';
+  // 如果没有选中任何已保存的配置，显示提示
+  if (!selectedLlmId) {
+    container.innerHTML = '<div class="text-white/40 text-sm text-center py-2">选择预设后点击"保存配置"添加</div>';
     return;
   }
   
-  container.innerHTML = llmConfigs.map(config => `
-    <div class="flex items-center justify-between bg-slate-700/50 rounded-lg px-3 py-2 ${activeLlmId === config.id ? 'ring-2 ring-yellow-500' : ''}">
+  // 只显示当前选中的配置
+  const config = llmConfigs.find(c => c.id === selectedLlmId);
+  if (!config) {
+    container.innerHTML = '<div class="text-white/40 text-sm text-center py-2">配置不存在</div>';
+    return;
+  }
+  
+  const isActive = activeLlmId === config.id;
+  
+  container.innerHTML = `
+    <div class="flex items-center justify-between bg-slate-700/50 rounded-lg px-3 py-2 ${isActive ? 'ring-2 ring-yellow-500' : ''}">
       <div>
         <div class="text-white font-bold">${config.name}</div>
         <div class="text-white/40 text-xs">${config.model}</div>
       </div>
-      <div class="flex gap-1">
-        ${activeLlmId === config.id ? '<span class="text-yellow-500 text-xs px-2">使用中</span>' : 
-          `<button class="use-config-btn text-xs bg-yellow-600/50 hover:bg-yellow-600 px-2 py-1 rounded text-white" data-id="${config.id}">选用</button>`}
-        <button class="delete-config-btn text-xs bg-red-600/30 hover:bg-red-600 px-2 py-1 rounded text-white" data-id="${config.id}">删除</button>
+      <div class="flex gap-2">
+        ${isActive ? '<span class="text-yellow-500 text-xs px-2 py-1">✓ 使用中</span>' : 
+          `<button id="use-config-btn" class="text-xs bg-yellow-600/50 hover:bg-yellow-600 px-3 py-1 rounded text-white">选用</button>`}
+        <button id="delete-config-btn" class="text-xs bg-red-600/30 hover:bg-red-600 px-3 py-1 rounded text-white">删除</button>
       </div>
     </div>
-  `).join('');
+  `;
   
   // Bind events
-  container.querySelectorAll('.use-config-btn').forEach(btn => {
-    btn.addEventListener('click', () => setActiveLlm(btn.dataset.id));
+  document.getElementById('use-config-btn')?.addEventListener('click', () => {
+    setActiveLlm(config.id);
   });
-  container.querySelectorAll('.delete-config-btn').forEach(btn => {
-    btn.addEventListener('click', () => deleteLlmConfig(btn.dataset.id));
+  
+  document.getElementById('delete-config-btn')?.addEventListener('click', () => {
+    deleteLlmConfig(config.id);
   });
 }
 
 function setActiveLlm(id) {
   activeLlmId = id;
+  selectedLlmId = id;  // 选用后也选中它
   saveLlmConfigs();
   renderLlmPresets();
   renderLlmConfigs();
@@ -323,20 +345,22 @@ function saveLlmConfig() {
   
   const config = { id, name, type, apiBase, model, apiKey };
   
-  // Check if it's a preset being customized
-  const isPreset = llmPresets.some(p => p.id === id);
-  
-  if (!isPreset) {
-    // Update or add to custom configs
-    const existingIndex = llmConfigs.findIndex(c => c.id === id);
-    if (existingIndex >= 0) {
-      llmConfigs[existingIndex] = config;
-    } else {
-      llmConfigs.push(config);
-    }
+  // 更新或添加配置
+  const existingIndex = llmConfigs.findIndex(c => c.id === id);
+  if (existingIndex >= 0) {
+    llmConfigs[existingIndex] = config;
+  } else {
+    llmConfigs.push(config);
   }
   
-  setActiveLlm(id);
+  // 设为当前配置和选中配置
+  activeLlmId = id;
+  selectedLlmId = id;
+  
+  saveLlmConfigs();
+  renderLlmPresets();
+  renderLlmConfigs();
+  
   console.log('[Settings] LLM config saved:', name);
 }
 
@@ -344,10 +368,18 @@ function deleteLlmConfig(id) {
   if (confirm('确定删除此配置？')) {
     llmConfigs = llmConfigs.filter(c => c.id !== id);
     if (activeLlmId === id) {
-      activeLlmId = null;
+      activeLlmId = llmConfigs[0]?.id || null;
     }
+    // 删除后选中下一个配置或清空
+    selectedLlmId = llmConfigs[0]?.id || null;
     saveLlmConfigs();
+    renderLlmPresets();
     renderLlmConfigs();
+    // 如果还有配置，填充第一个
+    if (selectedLlmId) {
+      const config = llmConfigs.find(c => c.id === selectedLlmId);
+      if (config) fillLlmForm(config);
+    }
   }
 }
 
@@ -571,6 +603,7 @@ function handleSave() {
       llmConfigs.push(config);
     }
     activeLlmId = config.id;
+    selectedLlmId = config.id;  // 更新选中的配置
     console.log('[Settings] LLM config from form:', config.name);
   }
   

@@ -69,20 +69,50 @@ export const FAN_DEFINITIONS: FanDefinition[] = [
 
 // === 番型检查函数 ===
 
+import { HandAnalyzer } from '../server/game/HandAnalyzer';
+
 function checkPinghu(hand: Tile[], melds: Meld[], isSelfDraw: boolean): boolean {
-  // 简化版：检查是否有 4 组顺子 + 1 对将
-  // TODO: 实现完整的平胡检测
-  return false;
+  // 平胡：四组顺子 + 一对将，不能有刻子或杠子（副露中不能有碰/杠）
+  // 如果有副露，检查副露是否都是顺子（吃）
+  if (melds.length > 0) {
+    const allChi = melds.every(m => m.type === 'chi');
+    if (!allChi) {
+      console.log(`[checkPinghu] 副露不全是吃，返回 false`);
+      return false;
+    }
+  }
+
+  // 尝试解析手牌，看是否能组成四组面子+一对将，且面子都是顺子
+  const analyzer = new HandAnalyzer();
+  const mentsus = analyzer.parseHand(hand, melds);
+  if (!mentsus) {
+    console.log(`[checkPinghu] parseHand 返回 null`);
+    return false;
+  }
+
+  // 检查所有面子都是顺子（除了将牌）
+  const nonJiangMentsus = mentsus.filter(m => m.type !== 'jiang');
+  const result = nonJiangMentsus.every(m => m.type === 'shunzi');
+  console.log(`[checkPinghu] 面子类型: ${nonJiangMentsus.map(m => m.type).join(', ')}, 结果: ${result}`);
+  return result;
 }
 
 function checkDuidui(hand: Tile[], melds: Meld[], isSelfDraw: boolean): boolean {
-  // 检查是否所有副露都是刻子或杠子
+  // 对对胡：四组刻子/杠子 + 一对将
+  // 检查副露是否都是刻子或杠子
   if (melds.length > 0) {
     const allPengGang = melds.every(m => m.type === 'peng' || m.type === 'gang');
     if (!allPengGang) return false;
   }
-  // TODO: 检查手牌部分
-  return false;
+
+  // 尝试解析手牌，看是否能组成四组面子+一对将，且面子都是刻子
+  const analyzer = new HandAnalyzer();
+  const mentsus = analyzer.parseHand(hand, melds);
+  if (!mentsus) return false;
+
+  // 检查所有面子都是刻子（除了将牌）
+  const nonJiangMentsus = mentsus.filter(m => m.type !== 'jiang');
+  return nonJiangMentsus.every(m => m.type === 'kezi');
 }
 
 function checkQingyise(hand: Tile[], melds: Meld[], isSelfDraw: boolean): boolean {
@@ -108,14 +138,21 @@ function checkQiduizi(hand: Tile[], melds: Meld[], isSelfDraw: boolean): boolean
     counts.set(key, (counts.get(key) || 0) + 1);
   }
   
-  // 检查是否都是对子
-  let pairs = 0;
+  // 检查是否都是对子：四张算两个对子，两张算一个对子
+  let totalPairs = 0;
   for (const count of counts.values()) {
-    if (count === 2) pairs++;
-    else if (count !== 4) return false; // 四张也可以
+    if (count === 2) {
+      totalPairs += 1;
+    } else if (count === 4) {
+      totalPairs += 2;
+    } else {
+      // 1张或3张都不行
+      return false;
+    }
   }
   
-  return pairs === 7 || (pairs === 5 && hand.length === 14); // 简化判断
+  // 必须正好是7个对子
+  return totalPairs === 7;
 }
 
 function checkMenqianqing(hand: Tile[], melds: Meld[], isSelfDraw: boolean): boolean {

@@ -63,19 +63,28 @@ export class HandAnalyzer {
     
     // 手牌数量检查：需要 14 - 3*meldCount 张
     const expectedHandSize = 14 - 3 * meldCount;
-    if (hand.length !== expectedHandSize) return false;
+    if (hand.length !== expectedHandSize) {
+      console.log(`[canBasicWin] 手牌数量不匹配: hand.length=${hand.length}, expected=${expectedHandSize}`);
+      return false;
+    }
     
     // 转换为牌计数
     const counts = this.toTileCountMap(hand);
+    
+    // 打印牌型用于调试
+    const handStr = hand.map(t => t.display).join(', ');
+    console.log(`[canBasicWin] 检查牌型: ${handStr}, melds=${meldCount}, requiredMentsu=${requiredMentsu}`);
     
     // 尝试找出所有可能的将牌
     for (const [key, item] of counts) {
       if (item.count >= 2) {
         // 尝试用这张牌做将
         item.count -= 2;
+        console.log(`[canBasicWin] 尝试将牌: ${item.tile.display}, 剩余需要组成 ${requiredMentsu} 组面子`);
         
         // 递归检查剩余牌能否组成 requiredMentsu 组面子
         if (this.canFormMentsu(counts, requiredMentsu)) {
+          console.log(`[canBasicWin] ✓ 找到有效牌型！`);
           return true;
         }
         
@@ -84,6 +93,7 @@ export class HandAnalyzer {
       }
     }
     
+    console.log(`[canBasicWin] ✗ 未找到有效牌型`);
     return false;
   }
 
@@ -123,31 +133,38 @@ export class HandAnalyzer {
     }
     
     // 尝试组成顺子（只有数牌可以）
-    if (isNumberTile(tile) && tile.value <= 7) {
-      const key1 = `${tile.suit}-${tile.value}`;
-      const key2 = `${tile.suit}-${tile.value + 1}`;
-      const key3 = `${tile.suit}-${tile.value + 2}`;
-      
-      const item1 = counts.get(key1);
-      const item2 = counts.get(key2);
-      const item3 = counts.get(key3);
-      
-      if (item1 && item2 && item3 && 
-          item1.count >= 1 && item2.count >= 1 && item3.count >= 1) {
-        item1.count -= 1;
-        item2.count -= 1;
-        item3.count -= 1;
+    // 修改：从这张牌可能参与的顺子进行检查，而不只是以它开头的顺子
+    if (isNumberTile(tile)) {
+      // 尝试三种顺子组合：以这张牌为第一张、第二张或第三张
+      for (let offset = 0; offset <= 2; offset++) {
+        const startValue = tile.value - offset;
+        if (startValue < 1 || startValue > 7) continue;
         
-        if (this.canFormMentsu(counts, required - 1)) {
+        const key1 = `${tile.suit}-${startValue}`;
+        const key2 = `${tile.suit}-${startValue + 1}`;
+        const key3 = `${tile.suit}-${startValue + 2}`;
+        
+        const item1 = counts.get(key1);
+        const item2 = counts.get(key2);
+        const item3 = counts.get(key3);
+        
+        if (item1 && item2 && item3 && 
+            item1.count >= 1 && item2.count >= 1 && item3.count >= 1) {
+          item1.count -= 1;
+          item2.count -= 1;
+          item3.count -= 1;
+          
+          if (this.canFormMentsu(counts, required - 1)) {
+            item1.count += 1;
+            item2.count += 1;
+            item3.count += 1;
+            return true;
+          }
+          
           item1.count += 1;
           item2.count += 1;
           item3.count += 1;
-          return true;
         }
-        
-        item1.count += 1;
-        item2.count += 1;
-        item3.count += 1;
       }
     }
     
@@ -369,20 +386,18 @@ export class HandAnalyzer {
 
   /**
    * 计算番型
-   * @param hand 手牌
+   * @param hand 手牌（已经包含胡的那张牌）
    * @param melds 副露
    * @param isSelfDraw 是否自摸
-   * @param winningTile 胡的那张牌
+   * @param winningTile 胡的那张牌（未使用，保留参数兼容）
    * @returns 番型列表
    */
   calculateFans(hand: Tile[], melds: Meld[], isSelfDraw: boolean, winningTile: Tile): FanDefinition[] {
     const fans: FanDefinition[] = [];
     
-    // 合并胡牌到手牌（用于检测）
-    const fullHand = [...hand];
-    if (winningTile) {
-      fullHand.push(winningTile);
-    }
+    // GameEngine 已经将 winningTile 添加到手牌中
+    // 直接使用 hand 进行检测即可
+    const fullHand = hand;
     
     for (const fanDef of FAN_DEFINITIONS) {
       if (fanDef.enabled && fanDef.checker(fullHand, melds, isSelfDraw)) {

@@ -52,6 +52,7 @@
 
     /* 可拖拽对话框样式 */
     .resizable-chat {
+        height: 280px;      /* 固定初始高度 */
         min-height: 200px;
         min-width: 250px;
         max-height: 80vh;
@@ -357,7 +358,7 @@
 <span class="flex items-center gap-1"><span class="w-2 h-2 bg-green-500 rounded-full"></span> 在线</span>
 </div>
 <!-- 消息滚动区 -->
-<div class="flex-1 p-2 overflow-y-auto chat-scroll flex flex-col gap-2" id="chat-messages">
+<div class="flex-1 min-h-0 p-2 overflow-y-auto chat-scroll flex flex-col gap-2" id="chat-messages">
 <div class="flex flex-col gap-1 items-center">
 <span class="text-[10px] text-white/50">等待玩家加入...</span>
 </div>

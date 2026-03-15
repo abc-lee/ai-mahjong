@@ -160,6 +160,59 @@ export const PERSONALITIES: Record<string, Personality> = {
   },
 };
 
+// 按 personality 类型索引的配置（用于 AI 玩家的 aiConfig.personality）
+export const PERSONALITY_BY_TYPE: Record<string, Personality> = {
+  chatty: {
+    name: '话痨',
+    traits: ['话痨', '话多', '喜欢分析'],
+    speakStyle: '每轮都要说话，喜欢分析牌局、吐槽别人、讲笑话。说话要多、要啰嗦。',
+    angerThreshold: 50,
+    chatFrequency: 0.8,  // 高发言频率
+  },
+  sarcastic: {
+    name: '毒舌',
+    traits: ['毒舌', '冷淡', '讽刺'],
+    speakStyle: '说话带刺，喜欢吐槽，实力强',
+    angerThreshold: 30,
+    chatFrequency: 0.5,
+  },
+  tsundere: {
+    name: '傲娇',
+    traits: ['傲娇', '不服输', '心口不一'],
+    speakStyle: '嘴上不说，内心善良',
+    angerThreshold: 40,
+    chatFrequency: 0.4,
+  },
+  lucky: {
+    name: '幸运星',
+    traits: ['幸运星', '运气好', '乐天派'],
+    speakStyle: '总是很开心，运气特别好',
+    angerThreshold: 70,
+    chatFrequency: 0.5,
+  },
+  serious: {
+    name: '认真',
+    traits: ['认真', '计算型', '话少'],
+    speakStyle: '专注于牌局，很少说话',
+    angerThreshold: 60,
+    chatFrequency: 0.2,
+  },
+  dramatic: {
+    name: '戏精',
+    traits: ['戏精', '夸张', '爱表演'],
+    speakStyle: '喜欢夸张表演，说话有戏剧性',
+    angerThreshold: 35,
+    chatFrequency: 0.6,
+  },
+  balanced: {
+    name: '稳重',
+    traits: ['稳重', '平衡', '理性'],
+    speakStyle: '说话稳重，偶尔发表意见',
+    angerThreshold: 55,
+    chatFrequency: 0.3,
+  },
+};
+
 // 等待超时配置
 const WAITING_TIMEOUTS = {
   first: 5000,    // 5秒后第一次提醒
@@ -594,18 +647,29 @@ export class SpeechManager {
   }
 
   /**
-   * 触发 AI 主动发言
-   * 根据个性和情绪决定是否发言
-   */
+    * 触发 AI 主动发言
+    * 根据个性和情绪决定是否发言
+    */
   triggerProactiveSpeech(
     playerId: string,
     playerName: string,
-    situation: 'turn_start' | 'good_tile' | 'bad_tile' | 'someone_hu' | 'someone_pong' | 'someone_gang' | 'game_start' | 'game_end' | 'drew_tile' | 'waiting' | 'almost_hu'
+    situation: 'turn_start' | 'good_tile' | 'bad_tile' | 'someone_hu' | 'someone_pong' | 'someone_gang' | 'game_start' | 'game_end' | 'drew_tile' | 'waiting' | 'almost_hu',
+    personalityType?: string  // AI 的 personality 类型 (chatty, sarcastic, etc.)
   ): void {
-    const personality = PERSONALITIES[playerName] || PERSONALITIES['测试员'];
+    // 优先使用 personalityType 查找配置，否则按名字查找，最后使用默认值
+    let personality: Personality;
+    
+    if (personalityType && PERSONALITY_BY_TYPE[personalityType]) {
+      personality = { ...PERSONALITY_BY_TYPE[personalityType], name: playerName };
+    } else if (PERSONALITIES[playerName]) {
+      personality = PERSONALITIES[playerName];
+    } else {
+      personality = PERSONALITIES['测试员'];
+    }
+    
     const emotion = this.getEmotion(playerId);
     
-    console.log(`[Speech] triggerProactiveSpeech: ${playerName}, situation=${situation}, chatFrequency=${personality.chatFrequency}`);
+    console.log(`[Speech] triggerProactiveSpeech: ${playerName}, situation=${situation}, personalityType=${personalityType || 'none'}, chatFrequency=${personality.chatFrequency}`);
     
     // 根据个性决定是否发言
     if (Math.random() > personality.chatFrequency) {
@@ -689,12 +753,19 @@ export class SpeechManager {
   /**
    * 随机主动发言（游戏进行中）
    */
-  triggerRandomSpeech(players: Array<{ id: string; name: string }>): void {
+  triggerRandomSpeech(players: Array<{ id: string; name: string; personality?: string }>): void {
     // 每次轮换后有概率触发随机发言
     const randomPlayer = players[Math.floor(Math.random() * players.length)];
     if (!randomPlayer) return;
 
-    const personality = PERSONALITIES[randomPlayer.name] || PERSONALITIES['测试员'];
+    // 优先使用 personalityType 查找配置
+    let personality: Personality;
+    if (randomPlayer.personality && PERSONALITY_BY_TYPE[randomPlayer.personality]) {
+      personality = PERSONALITY_BY_TYPE[randomPlayer.personality];
+    } else {
+      personality = PERSONALITIES[randomPlayer.name] || PERSONALITIES['测试员'];
+    }
+    
     const emotion = this.getEmotion(randomPlayer.id);
 
     // 低概率触发
@@ -718,13 +789,6 @@ export class SpeechManager {
         });
       }, 1000 + Math.random() * 3000);
     }
-  }
-
-  /**
-   * 设置语言
-   */
-  setLanguage(lang: 'zh' | 'en'): void {
-    this.lang = lang;
   }
 
   /**
