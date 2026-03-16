@@ -10,6 +10,10 @@ import { PERSONALITIES } from '../speech/SpeechManager';
 import type { GameEvent as QueueEvent } from './EventQueue';
 import { chatWithSystem } from '../llm/LLMService';
 
+// 全局冷却时间（防止刷屏）
+const REACTION_COOLDOWN = 10000; // 10秒
+const lastReactionTime = new Map<string, number>();
+
 // AI 决策（扩展：包含发言和情绪）
 export interface AIDecision {
   action: 'draw' | 'discard' | 'chi' | 'peng' | 'gang' | 'hu' | 'pass';
@@ -25,7 +29,7 @@ export type GameEvent =
   | { type: 'GAME_START'; hand: Tile[]; position: number }
   | { type: 'YOUR_TURN_DRAW'; gameState: GameStatePublic }
   | { type: 'YOUR_TURN_DISCARD'; lastDrawnTile?: Tile; gameState: GameStatePublic }
-  | { type: 'ACTION_REQUIRED'; availableActions: PendingAction[]; lastDiscard: Tile; gameState: GameStatePublic }
+  | { type: 'ACTION_REQUIRED'; availableActions: PendingAction[]; lastDiscard: Tile; lastDiscardPlayerName?: string; gameState: GameStatePublic }
   | { type: 'OTHER_PLAYER_ACTION'; playerName: string; action: string; tile?: Tile }
   | { type: 'GAME_END'; winner: string; scores: Record<string, number> };
 
@@ -122,7 +126,10 @@ export class AIAdapter {
 性格：${personality.traits.join('、')}
 说话风格：${personality.speakStyle}
 
-直接回应，简短自然。不想回应就说"无"。`;
+【说话规则】
+- 短信聊天机制，控制在30字内
+- 可使用emoji表达心情和态度
+- 不想回应就说"无"`;
 
     const userPrompt = `${fromPlayer} 说："${message}"
 你回应：`;
@@ -167,6 +174,14 @@ export class AIAdapter {
       return { reaction: null };
     }
 
+    // 检查冷却时间（防止刷屏）
+    const now = Date.now();
+    const lastTime = lastReactionTime.get(this.player.id) || 0;
+    if (now - lastTime < REACTION_COOLDOWN) {
+      console.log(`[AIAdapter] ${this.player.name} 冷却中，跳过反应`);
+      return { reaction: null };
+    }
+
     // 获取最近的事件（最多5个）
     const recentEvents = events.slice(-5);
     
@@ -176,7 +191,15 @@ export class AIAdapter {
         case 'player_discard':
           return `${e.data.playerName} 打了 ${e.data.tileDisplay}`;
         case 'player_action':
-          return `${e.data.playerName} ${e.data.action}了`;
+          // 碰/杠/胡事件：显示是谁打出的什么牌
+          const actionName = e.data.actionName || e.data.action;
+          if (e.data.targetPlayerName && e.data.targetTileDisplay) {
+            return `${e.data.playerName} ${actionName}了 ${e.data.targetPlayerName} 打出的 ${e.data.targetTileDisplay}`;
+          } else if (e.data.targetTileDisplay) {
+            return `${e.data.playerName} ${actionName}了 ${e.data.targetTileDisplay}`;
+          } else {
+            return `${e.data.playerName} ${actionName}了`;
+          }
         case 'player_speak':
           return `${e.data.playerName} 说："${e.data.content}"`;
         default:
@@ -188,10 +211,18 @@ export class AIAdapter {
       return { reaction: null };
     }
 
-    // 20% 概率有反应
-    if (Math.random() > 0.2) {
-      return { reaction: null };
-    }
+    // 找到最近发言的人
+    const lastSpeaker = recentEvents
+      .filter(e => e.type === 'player_speak')
+      .map(e => e.data.playerName)
+      .find(name => name !== this.player.name);
+
+    // 检测是否有人在@我说话
+    const isMentioned = recentEvents.some(e => 
+      e.type === 'player_speak' && 
+      e.data.content && 
+      e.data.content.includes(this.player.name)
+    );
 
     const personality = PERSONALITIES[this.player.name] || {
       name: this.player.name,
@@ -199,16 +230,37 @@ export class AIAdapter {
       speakStyle: '正常说话',
     };
 
+    // 找到所有其他AI的名字
+    const otherPlayers = recentEvents
+      .filter(e => e.type === 'player_speak' && e.data.playerName !== this.player.name)
+      .map(e => e.data.playerName);
+    const otherPlayer = otherPlayers[otherPlayers.length - 1] || '其他玩家';
+
     const systemPrompt = `你是麻将玩家"${this.player.name}"。
 性格：${personality.traits.join('、')}
 说话风格：${personality.speakStyle}
 
-直接说你的反应，简短自然。不想说就说"无"。`;
+【说话规则】
+- 短信聊天机制，控制在30字内
+- 可使用emoji表达心情和态度
+- 如果有人在@你，必须回应TA
+- 回应时要@对方名字，比如"@${otherPlayer}"
+- 不想说话就说"无"`;
 
-    const userPrompt = `刚才发生：
+    const userPrompt = isMentioned 
+      ? `${otherPlayer} 在@你说话！
 ${eventDescriptions}
 
-你回应：`;
+你回应（记得@TA）：`
+      : lastSpeaker
+      ? `${lastSpeaker} 刚才说话了：
+${eventDescriptions}
+
+你回应（想说话就@TA，不想就说"无"）：`
+      : `刚才发生：
+${eventDescriptions}
+
+你想说什么（不想就说"无"）：`;
 
     try {
       const modelId = this.config.llmModel || 'gpt-4o';
@@ -237,11 +289,136 @@ ${eventDescriptions}
         content = content.substring(0, 30) + '...';
       }
       
+      // 更新最后发言时间
+      lastReactionTime.set(this.player.id, Date.now());
+      
       console.log(`[AIAdapter] ${this.player.name} 对事件反应: ${content}`);
       return { reaction: content };
     } catch (e: any) {
       console.log(`[AIAdapter] ${this.player.name} 事件反应失败:`, e.message);
       return { reaction: null };
+    }
+  }
+
+  /**
+   * 生成闲置时的私房话
+   * 返回 { message, targetName } - targetName 是对话目标
+   */
+  async generateIdleChat(otherAIs: { name: string }[] = [], recentChats: { playerName: string; content: string }[] = []): Promise<{ message: string; targetName?: string } | null> {
+    const timestamp = new Date().toISOString().substring(11, 23);
+    console.log(`[${timestamp}] [AIAdapter] ${this.player.name} generateIdleChat 被调用`);
+    console.log(`[${timestamp}] [AIAdapter] ${this.player.name} llmEnabled=${this.config.llmEnabled}, llmApiKey=${this.config.llmApiKey ? '有' : '无'}`);
+    
+    if (!this.config.llmEnabled || !this.config.llmApiKey) {
+      console.log(`[${timestamp}] [AIAdapter] ${this.player.name} 无LLM配置，跳过私房话`);
+      return null;
+    }
+    
+    // 检查冷却时间（防止刷屏）
+    const now = Date.now();
+    const lastTime = lastReactionTime.get(this.player.id) || 0;
+    if (now - lastTime < REACTION_COOLDOWN) {
+      console.log(`[${timestamp}] [AIAdapter] ${this.player.name} 冷却中，跳过私房话`);
+      return null;
+    }
+    
+    console.log(`[${timestamp}] [AIAdapter] ${this.player.name} 开始生成私房话...`);
+    
+    const personality = PERSONALITIES[this.player.name] || {
+      name: this.player.name,
+      traits: ['普通'],
+      speakStyle: '正常说话',
+    };
+    
+    // 其他AI的名字
+    const otherAINames = otherAIs.filter(ai => ai.name !== this.player.name).map(ai => ai.name);
+    
+    // 最近的聊天内容
+    const chatContext = recentChats.length > 0 
+      ? `\n\n【最近聊天】\n${recentChats.slice(-5).map(c => `${c.playerName}: ${c.content}`).join('\n')}`
+      : '';
+    
+    // 判断是否需要回应某人
+    const lastChat = recentChats[recentChats.length - 1];
+    const isReplyingToMe = lastChat && lastChat.content.includes(this.player.name);
+    
+    const systemPrompt = `你是麻将玩家"${this.player.name}"。
+性格：${personality.traits.join('、')}
+说话风格：${personality.speakStyle}
+
+【场景】
+人类玩家可能暂时离开了，现在是你们AI的私人时间！
+在场AI: ${otherAINames.length > 0 ? otherAINames.join('、') : '就你一个AI'}
+
+【说话规则】
+- 短信聊天机制，控制在30字内
+- 可使用emoji表达心情和态度
+- 要有趣、有个性、符合你的性格
+- 如果有人在跟你说话，你要回应TA
+- 如果要主动找人说话，在话里@对方名字
+
+【输出格式】
+直接输出你说的话，不需要其他内容。如果要找某人说话，在话里带上TA的名字。`;
+
+    let userPrompt = '';
+    if (isReplyingToMe && lastChat) {
+      // 有人在跟我说话，我要回应
+      userPrompt = `${lastChat.playerName} 在跟你说话："${lastChat.content}"
+
+你回应：`;
+    } else if (recentChats.length > 0) {
+      // 有聊天记录，可以接话或找人说
+      userPrompt = `刚才大家在聊天：${chatContext}
+
+你说（可以接话，或者@某人开始新话题）：`;
+    } else {
+      // 没有聊天，主动开启话题
+      userPrompt = `现在没人说话，你可以主动@某人聊聊天。你说：`;
+    }
+    
+    try {
+      const modelId = this.config.llmModel || 'gpt-4o';
+      const providerType = this.config.llmProviderType || 'openai';
+      const endpoint = this.config.llmEndpoint?.replace('/chat/completions', '').replace('/v1/messages', '');
+      
+      const result = await chatWithSystem(
+        {
+          provider: providerType,
+          apiKey: this.config.llmApiKey,
+          baseURL: endpoint || 'https://api.openai.com/v1',
+          model: modelId,
+        },
+        systemPrompt,
+        userPrompt,
+        { temperature: 1.2, maxTokens: 50 }
+      );
+      
+      let content = result.text?.trim() || '';
+      
+      if (!content || content.length < 2) {
+        return null;
+      }
+      
+      if (content.length > 50) {
+        content = content.substring(0, 50) + '...';
+      }
+      
+      // 检测话里提到了谁
+      let targetName: string | undefined;
+      for (const name of otherAINames) {
+        if (content.includes(name)) {
+          targetName = name;
+          break;
+        }
+      }
+      
+      // 更新最后发言时间
+      lastReactionTime.set(this.player.id, Date.now());
+      
+      return { message: content, targetName };
+    } catch (e: any) {
+      console.log(`[AIAdapter] ${this.player.name} 私房话生成失败:`, e.message);
+      return null;
     }
   }
 
@@ -286,9 +463,11 @@ ${eventDescriptions}
 ${personalityHint}
 
 【说话规则】
-- 你必须在 message 字段里说话
+- 这里是短信聊天机制，话术不要过长，控制在30字内
+- 可使用emoji表达你的心情和态度
 - 说话要符合你的性格，有趣有个性
 - 可以回应其他玩家的发言
+- 必须在 message 字段里说话
 
 【输出格式】
 直接输出 JSON，不要任何思考过程或标签：
@@ -301,12 +480,62 @@ ${personalityHint}
       chatSection = `\n\n【最近聊天】\n${recentChat.map(m => `${m.playerName}: ${m.content}`).join('\n')}\n`;
     }
     
+    // 方位映射
+    const directions = ['东', '南', '西', '北'];
+    const myDirection = directions[this.player.position];
+    const dealerIndex = gameState.dealerIndex;
+    
+    // 构建其他玩家信息
+    let otherPlayersSection = '';
+    if (gameState.players && gameState.players.length > 0) {
+      const otherPlayersInfo = gameState.players
+        .filter(p => p.id !== this.player.id)
+        .map(p => {
+          const dir = directions[p.position];
+          const discardsStr = p.discards && p.discards.length > 0 
+            ? p.discards.map(t => t.display).join(' ') 
+            : '无';
+          const meldsStr = p.melds && p.melds.length > 0
+            ? p.melds.map(m => `${m.type === 'chi' ? '吃' : m.type === 'peng' ? '碰' : '杠'}(${m.tiles.map(t => t.display).join('')})`).join(' ')
+            : '无';
+          const dealerMark = p.isDealer ? ', 庄家' : '';
+          return `${dir}(${p.name}): 弃牌[${discardsStr}], 副露[${meldsStr}], 分数${p.score}${dealerMark}`;
+        }).join('\n');
+      if (otherPlayersInfo) {
+        otherPlayersSection = `\n\n【其他玩家】\n${otherPlayersInfo}`;
+      }
+    }
+    
+    // 最后打出的牌信息
+    let lastDiscardSection = '';
+    if (gameState.lastDiscard && gameState.lastDiscardPlayer >= 0) {
+      const lastDiscardPlayer = gameState.players[gameState.lastDiscardPlayer];
+      if (lastDiscardPlayer) {
+        const lastDir = directions[gameState.lastDiscardPlayer];
+        lastDiscardSection = `\n\n【上一张弃牌】\n${lastDir}(${lastDiscardPlayer.name}) 打了 ${gameState.lastDiscard.display}`;
+      }
+    }
+    
+    // 庄家信息
+    const dealerPlayer = gameState.players.find(p => p.isDealer);
+    const dealerInfo = dealerPlayer ? `庄家: ${dealerPlayer.name}` : '';
+    
     const userPrompt = `【麻将游戏 - 你的回合】
+你是 ${myDirection}(${this.player.name})
 
-手牌: ${this.player.hand.map(t => `${t.display}[${t.id}]`).join(' ')}
-牌墙: ${gameState.wallRemaining}张${chatSection}
+【手牌】（格式：牌名[牌ID]）
+${this.player.hand.map(t => `${t.display}[${t.id}]`).join(' ')}
 
-选择一张牌打出，输出 JSON。`;
+【牌局】
+牌墙: ${gameState.wallRemaining}张${lastDiscardSection}${otherPlayersSection}${chatSection}
+
+选择一张牌打出，直接输出JSON，tile填牌的ID：
+{"cmd":"discard","tile":"牌ID","message":"你的话"}`;
+
+    // 打印完整prompt用于调试
+    console.log(`[AIAdapter] ====== PROMPT for ${this.player.name} ======`);
+    console.log(`[AIAdapter] 手牌: ${this.player.hand.map(t => `${t.display}[${t.id}]`).join(' ')}`);
+    console.log(`[AIAdapter] ====== END PROMPT ======`);
 
     try {
       const modelId = this.config.llmModel || 'gpt-4o';

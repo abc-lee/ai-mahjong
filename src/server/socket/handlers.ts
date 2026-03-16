@@ -9,6 +9,7 @@ import { aiManager } from '../ai/AIManager';
 import { getSpeechManager, removeSpeechManager, SpeechManager } from '../speech/SpeechManager';
 import { eventQueueManager, GameEvent } from '../ai/EventQueue';
 import { getConversationManager } from '../speech/ConversationManager';
+import { IdleDetector } from '../idle/IdleDetector';
 
 // Socket 数据类型
 interface SocketData {
@@ -195,27 +196,10 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
       const currentPlayer = room.players[currentPlayerIndex];
       const lastDiscard = room.gameEngine.getState().lastDiscard;
       
-      // 实时事件通知：不管是不是自己的回合
-      // 1. 有人打牌
-      if (lastDiscard && !yourTurn) {
-        // 通知 AI 有人打了什么牌
-        const adapter = aiManager.getAdapter(player.id);
-        if (adapter && speechManager) {
-          // 10% 概率对别人的打牌发表评论
-          if (Math.random() < 0.1) {
-            const personalityType = player.aiConfig?.personality;
-            speechManager.triggerProactiveSpeech(player.id, player.name, 'someone_pong', personalityType);
-          }
-        }
-      }
+      // 不再在游戏事件中触发发言，避免刷屏
+      // AI发言只在：1) 用户说话时会话层处理，2) 闲置时私房话
       
-      // 2. 等待时可能抱怨
-      if (!yourTurn && !hasActions && speechManager && Math.random() < 0.08) {
-        const personalityType = player.aiConfig?.personality;
-        speechManager.triggerProactiveSpeech(player.id, player.name, 'waiting', personalityType);
-      }
-      
-      // 3. 轮到自己或有操作时，做决策
+      // 轮到自己或有操作时，做决策
       if (yourTurn || hasActions) {
         // 检查 agentSocket 是否存在
         if (agentSocket) {
@@ -238,12 +222,6 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
           if (speechManager) {
             const emotionPrompt = speechManager.generateEmotionPrompt(player.id, player.name);
             prompt = emotionPrompt + '\n' + prompt;
-            
-            // 触发 AI 发言（30% 概率）
-            if (Math.random() < 0.3) {
-              const personalityType = player.aiConfig?.personality;
-              speechManager.triggerProactiveSpeech(player.id, player.name, 'turn_start', personalityType);
-            }
           }
           
           agentSocket.emit('agent:your_turn', {
@@ -298,25 +276,8 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
           const adapter = aiManager.getAdapter(player.id);
           console.log(`[broadcastGameState] ${player.name}(ai-agent, 无socket) 使用 adapter: ${!!adapter}, yourTurn=${yourTurn}`);
           
-          // 处理事件队列，可能产生反应/发言
-          const queueEvents = eventQueueManager.getRecentEvents(player.id, 5);
-          if (adapter && queueEvents.length > 0) {
-            // 清空队列，避免重复处理
-            eventQueueManager.clearQueue(player.id);
-            
-            adapter.processQueueEvents(queueEvents).then(result => {
-              if (result.reaction) {
-                // 广播 AI 的反应
-                io.in(roomId).emit('player:speech', {
-                  playerId: player.id,
-                  playerName: player.name,
-                  content: result.reaction,
-                  timestamp: Date.now(),
-                });
-                console.log(`[AI] ${player.name} 反应: ${result.reaction}`);
-              }
-            }).catch(e => console.log(`[AI] ${player.name} 反应失败:`, e.message));
-          }
+          // 不处理事件队列，避免刷屏
+          // AI只在用户说话时会话层处理，或闲置时私房话
           
           if (adapter && yourTurn) {
             adapter.handleEvent({
@@ -343,25 +304,8 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
         const adapter = aiManager.getAdapter(player.id);
         console.log(`[broadcastGameState] ${player.name}(ai-agent, 无socket或auto) 使用 adapter: ${!!adapter}, yourTurn=${yourTurn}`);
         
-        // 处理事件队列，可能产生反应/发言
-        const queueEvents = eventQueueManager.getRecentEvents(player.id, 5);
-        if (adapter && queueEvents.length > 0) {
-          // 清空队列，避免重复处理
-          eventQueueManager.clearQueue(player.id);
-          
-          adapter.processQueueEvents(queueEvents).then(result => {
-            if (result.reaction) {
-              // 广播 AI 的反应
-              io.in(roomId).emit('player:speech', {
-                playerId: player.id,
-                playerName: player.name,
-                content: result.reaction,
-                timestamp: Date.now(),
-              });
-              console.log(`[AI] ${player.name} 反应: ${result.reaction}`);
-            }
-          }).catch(e => console.log(`[AI] ${player.name} 反应失败:`, e.message));
-        }
+        // 不处理事件队列，避免刷屏
+        // AI只在用户说话时会话层处理，或闲置时私房话
         
         if (adapter && yourTurn) {
           adapter.handleEvent({
@@ -388,24 +332,8 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
       const adapter = aiManager.getAdapter(player.id);
       console.log(`[broadcastGameState] npc ${player.name}: adapter=${!!adapter}, yourTurn=${yourTurn}, phase=${turnPhase}`);
       
-      // 处理事件队列，可能产生反应/发言
-      const queueEvents = eventQueueManager.getRecentEvents(player.id, 5);
-      if (adapter && queueEvents.length > 0) {
-        // 清空队列，避免重复处理
-        eventQueueManager.clearQueue(player.id);
-        
-        adapter.processQueueEvents(queueEvents).then(result => {
-          if (result.reaction) {
-            io.in(roomId).emit('player:speech', {
-              playerId: player.id,
-              playerName: player.name,
-              content: result.reaction,
-              timestamp: Date.now(),
-            });
-            console.log(`[NPC] ${player.name} 反应: ${result.reaction}`);
-          }
-        }).catch(e => console.log(`[NPC] ${player.name} 反应失败:`, e.message));
-      }
+      // 不处理事件队列，避免刷屏
+      // AI只在用户说话时会话层处理，或闲置时私房话
       
       if (adapter && yourTurn) {
         adapter.handleEvent({
@@ -845,7 +773,8 @@ export async function handleReady(
           // 延迟 1 秒开始，让玩家看到准备状态
           setTimeout(() => {
             const startRoom = roomManager.getRoom(roomId);
-            if (startRoom && startRoom.state === 'waiting') {
+            // 允许从 waiting 或 finished 状态开始新游戏（支持再来一局）
+            if (startRoom && (startRoom.state === 'waiting' || startRoom.state === 'finished')) {
               roomManager.startGame(roomId);
               const gameRoom = roomManager.getRoom(roomId);
               if (gameRoom) {
@@ -905,10 +834,19 @@ export async function handleGameStart(
     // 初始化发言系统
     const speechManager = getSpeechManager(io, roomId);
     
-    // 清理所有旧记忆（新游戏开始）
+    // 开始新一局（保留统计数据和玩家关系，只清理事件）
     const { memoryManager } = require('../speech/MemoryManager');
-    memoryManager.clearAll();
-    console.log(`[Server] 已清理所有旧记忆`);
+    gameRoom?.players.forEach(p => {
+      if (p.type === 'ai-agent' || p.type === 'npc') {
+        // 如果没有记忆，初始化；否则开始新一局
+        if (!memoryManager.getMemory(p.id)) {
+          memoryManager.initMemory(p.id, p.name);
+        } else {
+          memoryManager.startNewGame(p.id);
+        }
+      }
+    });
+    console.log(`[Server] AI记忆已保留，开始新一局`);
     
     gameRoom?.players.forEach(p => {
       // 每个玩家都初始化新记忆
@@ -918,6 +856,9 @@ export async function handleGameStart(
     // 广播给房间所有人（包括房主）
     io.in(roomId).emit('game:started');
     broadcastGameState(io, roomId, roomManager);
+    
+    // 启动闲置检测
+    IdleDetector.resetTimer(roomId, io, roomManager);
     
     if (callback) callback({ success: true });
   } catch (error) {
@@ -987,6 +928,9 @@ export async function handleDiscard(
     const success = room.gameEngine.discardTile(playerId, payload.tileId);
     if (!success) throw new Error('无法出牌');
     
+    // 重置闲置定时器
+    IdleDetector.resetTimer(roomId, io, roomManager);
+    
     // 获取打牌信息，广播给所有 AI
     const player = room.players.find(p => p.id === playerId);
     const discardedTile = player?.hand.find(t => t.id === payload.tileId) || 
@@ -1006,13 +950,15 @@ export async function handleDiscard(
       };
       
       // 推送给所有 AI（排除打牌者自己）
+      const pushedTo: string[] = [];
       for (const p of room.players) {
         if ((p.type === 'ai-agent' || p.type === 'npc') && p.id !== playerId) {
           eventQueueManager.pushTo(p.id, discardEvent);
+          pushedTo.push(p.name);
         }
       }
       
-      console.log(`[EventQueue] ${player.name} 打牌: ${discardedTile.display}，已通知所有 AI`);
+      console.log(`[EventQueue] ${player.name} 打牌: ${discardedTile.display}，已通知: ${pushedTo.join(', ') || '无'}`);
     }
     
     broadcastGameState(io, roomId, roomManager);
@@ -1110,9 +1056,26 @@ export async function handleAction(
     const success = room.gameEngine.performAction(playerId, pendingAction);
     if (!success) throw new Error('无法执行操作');
     
+    // 重置闲置定时器
+    IdleDetector.resetTimer(roomId, io, roomManager);
+    
     // 广播碰/杠/胡事件给所有 AI
     const player = room.players.find(p => p.id === playerId);
+    const stateForAction = room.gameEngine.getState();
     if (player && payload.action) {
+      // 获取被碰/杠/胡的牌的信息
+      const lastDiscard = stateForAction.lastDiscard;
+      const lastDiscardPlayerIndex = stateForAction.lastDiscardPlayer;
+      const lastDiscardPlayer = lastDiscardPlayerIndex >= 0 ? room.players[lastDiscardPlayerIndex] : null;
+      
+      // 动作名称映射
+      const actionNames: Record<string, string> = {
+        chi: '吃',
+        peng: '碰',
+        gang: '杠',
+        hu: '胡',
+      };
+      
       const actionEvent: GameEvent = {
         type: 'player_action',
         timestamp: Date.now(),
@@ -1120,18 +1083,26 @@ export async function handleAction(
           playerId,
           playerName: player.name,
           action: payload.action,
+          actionName: actionNames[payload.action] || payload.action,
           tiles: payload.tiles,
+          // 被操作的牌（碰/杠/胡的是谁打出的什么牌）
+          targetPlayerId: lastDiscardPlayer?.id,
+          targetPlayerName: lastDiscardPlayer?.name,
+          targetTile: lastDiscard,
+          targetTileDisplay: lastDiscard?.display,
         }
       };
       
       // 推送给所有 AI（排除自己）
+      const pushedTo: string[] = [];
       for (const p of room.players) {
         if ((p.type === 'ai-agent' || p.type === 'npc') && p.id !== playerId) {
           eventQueueManager.pushTo(p.id, actionEvent);
+          pushedTo.push(p.name);
         }
       }
       
-      console.log(`[EventQueue] ${player.name} ${payload.action}，已通知所有 AI`);
+      console.log(`[EventQueue] ${player.name} ${payload.action}(${lastDiscard?.display || '未知牌'})，已通知: ${pushedTo.join(', ') || '无'}`);
     }
     
     // 检查游戏是否结束
@@ -1139,41 +1110,50 @@ export async function handleAction(
     console.log(`[Server] handleAction: phase=${gameState.phase}, winner=${gameState.winner}, currentPlayer=${gameState.currentPlayerIndex}`);
     
     if (gameState.phase === 'finished' && gameState.winner !== null) {
-      // 游戏结束时广播最终状态，清除所有玩家的 pendingActions
-      broadcastGameState(io, roomId, roomManager);
+      // 清除闲置定时器
+      IdleDetector.clearTimer(roomId);
+      
+      // 先更新 RoomManager 的房间状态
+      roomManager.endGame(roomId);
+      
+      // 计算分数变化（在更新 lastScore 之前）
+      const scoreChangesBefore = room.players.map(p => ({
+        id: p.id,
+        name: p.name,
+        score: p.score || 0,
+        lastScore: p.lastScore || 1000,
+        scoreChange: (p.score || 0) - (p.lastScore || 1000),
+      }));
+      
+      console.log(`[Server] 分数变化: ${scoreChangesBefore.map(s => `${s.name}=${s.scoreChange}`).join(', ')}`);
       
       // 处理分数变化和情绪更新
       try {
         const speechManager = getSpeechManager(io, roomId);
-        const scoreChanges = room.players.map((p, idx) => ({
-          playerId: p.id,
-          playerName: p.name,
-          scoreChange: (p.score || 0) - (p.lastScore || 0),
-        }));
-        speechManager.handleScoreChanges(scoreChanges);
-        
-        // 更新 lastScore
-        room.players.forEach(p => {
-          p.lastScore = p.score || 0;
-        });
-        
-        // 情绪衰减（为下一局做准备）
+        speechManager.handleScoreChanges(scoreChangesBefore.map(s => ({
+          playerId: s.id,
+          playerName: s.name,
+          scoreChange: s.scoreChange,
+        })));
         speechManager.decayEmotions();
-        
       } catch (e) {
         console.log(`[Score] 分数情绪处理失败:`, e);
       }
       
+      // 更新 lastScore（在发送 game:ended 之前）
+      room.players.forEach(p => {
+        p.lastScore = p.score || 1000;
+      });
+      
+      // 打印发送前的分数
+      console.log(`[Server] game:ended 分数: ${room.players.map(p => `${p.name}=${p.score}(last=${p.lastScore})`).join(', ')}`);
+      
+      // 只发送一次 game:ended
       console.log(`[Server] 发送 game:ended, winner=${gameState.winner}`);
       io.to(roomId).emit('game:ended', {
         winner: gameState.winner,
         winningHand: gameState.winningHand,
-        players: room.players.map(p => ({
-          id: p.id,
-          name: p.name,
-          score: p.score || 0,
-          scoreChange: (p.score || 0) - (p.lastScore || 1000),
-        })),
+        players: scoreChangesBefore,
       });
     } else {
       console.log(`[Server] handleAction: 广播游戏状态给房间 ${roomId}`);
@@ -1718,6 +1698,9 @@ export async function handlePlayerSpeak(
 
     console.log(`[Speech] 玩家 ${playerName} 发言: ${payload.content}`);
 
+    // 重置闲置定时器
+    IdleDetector.resetTimer(roomId, io, roomManager);
+
     // 保存到发言历史
     const message = {
       playerId,
@@ -2144,20 +2127,21 @@ export async function handlePlayerSpeech(
 
     console.log(`[Chat] ${playerName} 在房间 ${roomId} 发言: ${content}`);
 
-    // 获取所有启用了 LLM 的 AI 玩家，触发即时回应
-    const aiPlayers = room.players.filter(p =>
+    // 获取所有 AI 玩家（不要求 llmEnabled，让会话层自己判断）
+    const allAIPlayers = room.players.filter(p =>
       (p.type === 'ai-agent' || p.type === 'npc') &&
-      p.id !== playerId &&
-      p.aiConfig?.llmEnabled
+      p.id !== playerId
     );
+    
+    console.log(`[Chat] 所有AI玩家: [${allAIPlayers.map(p => `"${p.name}"(llmEnabled=${p.aiConfig?.llmEnabled})`).join(', ')}]`);
 
-    if (aiPlayers.length > 0) {
+    if (allAIPlayers.length > 0) {
       // 使用 ConversationManager 处理并生成回应
       const { getConversationManager } = require('../speech/ConversationManager');
       const conversationManager = getConversationManager(io, roomId);
 
-      // 获取第一个可用 AI 的 LLM 配置（所有 AI 使用同一个配置）
-      const firstAI = aiPlayers[0];
+      // 获取第一个可用 AI 的 LLM 配置
+      const firstAI = allAIPlayers.find(p => p.aiConfig?.llmEnabled) || allAIPlayers[0];
       const llmConfig = {
         apiKey: firstAI.aiConfig?.llmApiKey,
         endpoint: firstAI.aiConfig?.llmEndpoint,
@@ -2166,7 +2150,7 @@ export async function handlePlayerSpeech(
       };
 
       // 异步处理，不阻塞响应
-      conversationManager.handleSpeech(roomId, message, aiPlayers, llmConfig).catch(e => {
+      conversationManager.handleSpeech(roomId, message, allAIPlayers, llmConfig).catch(e => {
         console.error(`[Conversation] 处理发言回应失败:`, e.message);
       });
     }

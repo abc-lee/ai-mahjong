@@ -17,7 +17,7 @@
 import type { Player } from '@shared/types';
 import type { Server } from 'socket.io';
 import { PERSONALITIES, Personality } from './SpeechManager';
-import { chatWithSystem, clearProviderCache } from '../llm/LLMService';
+import { chatWithSystem } from '../llm/LLMService';
 
 // 根据 personality 类型获取性格配置
 function getPersonalityByType(type: string, playerName: string): Personality {
@@ -33,7 +33,7 @@ function getPersonalityByType(type: string, playerName: string): Personality {
       traits: ['话痨', '话多', '喜欢分析'],
       speakStyle: '每轮都要说话，喜欢分析牌局、吐槽别人、讲笑话。说话要多、要啰嗦。',
       angerThreshold: 50,
-      chatFrequency: 0.8,  // 高发言频率
+      chatFrequency: 0.8,
     },
     sarcastic: {
       name: playerName,
@@ -96,19 +96,25 @@ interface ResponseConfig {
   minDelay: number;              // 最小延迟（毫秒）
   maxDelay: number;              // 最大延迟（毫秒）
   maxLength: number;             // 最大回应长度
+  batchWindow: number;           // 批量累积窗口（毫秒）
 }
 
 // 默认配置
 const DEFAULT_CONFIG: ResponseConfig = {
-  responseProbability: 0.5,     // 50% 概率回应（被点名时必回应）
-  minDelay: 500,                // 0.5秒
-  maxDelay: 2000,               // 2秒
-  maxLength: 200,               // 200字符（允许多行发言）
+  responseProbability: 0.5,
+  minDelay: 300,    // 最小延迟0.3秒
+  maxDelay: 1000,   // 最大延迟1秒
+  maxLength: 200,
+  batchWindow: 800, // 批量累积窗口0.8秒
 };
 
 /**
  * 会话管理器类
  * 处理 AI 即时发言，不阻塞游戏
+ * 
+ * 关键机制：批量累积
+ * - 短时间内多条消息累积起来
+ * - 一起给AI处理，避免刷屏
  */
 export class ConversationManager {
   private io: Server;
@@ -117,8 +123,14 @@ export class ConversationManager {
   // 每个 AI 的最近发言时间（防刷屏）
   private lastResponseTime: Map<string, number> = new Map();
   
-  // 每个 AI 的发言冷却时间（毫秒）- LLM响应慢，不需要冷却
-  private readonly COOLDOWN = 0;
+  // 每个 AI 的发言冷却时间（毫秒）
+  private readonly COOLDOWN = 3000; // 3秒冷却，让对话更流畅
+  
+  // 批量累积：房间 -> 消息缓冲区
+  private messageBuffer: Map<string, ConversationMessage[]> = new Map();
+  
+  // 批量累积：房间 -> 处理定时器
+  private batchTimers: Map<string, NodeJS.Timeout> = new Map();
 
   constructor(io: Server, config: Partial<ResponseConfig> = {}) {
     this.io = io;
@@ -126,8 +138,8 @@ export class ConversationManager {
   }
 
   /**
- * 处理发言事件
-   * 当有人说话时，通知所有 AI，可能触发即时回应
+   * 处理发言事件
+   * 当有人说话时，AI即时回应
    */
   async handleSpeech(
     roomId: string,
@@ -135,54 +147,126 @@ export class ConversationManager {
     aiPlayers: Player[],
     llmConfig?: { apiKey?: string; endpoint?: string; model?: string; providerType?: string }
   ): Promise<void> {
-    console.log(`[Conversation] ========== 开始处理发言 ==========`);
-    console.log(`[Conversation] 房间: ${roomId}`);
-    console.log(`[Conversation] 发言者: ${message.playerName}(${message.playerId})`);
-    console.log(`[Conversation] 内容: "${message.content}"`);
-    console.log(`[Conversation] AI玩家数量: ${aiPlayers.length}`);
-    console.log(`[Conversation] AI玩家: ${aiPlayers.map(p => p.name).join(', ')}`);
-    console.log(`[Conversation] LLM配置: apiKey=${llmConfig?.apiKey ? '有' : '无'}, endpoint=${llmConfig?.endpoint}, model=${llmConfig?.model}`);
+    const timestamp = new Date().toISOString().substring(11, 23);
+    console.log(`[${timestamp}] [Conversation] ========== 收到消息 ==========`);
+    console.log(`[${timestamp}] [Conversation] 发言者: ${message.playerName}`);
+    console.log(`[${timestamp}] [Conversation] 内容: "${message.content}"`);
+    console.log(`[${timestamp}] [Conversation] AI玩家列表: [${aiPlayers.map(p => `"${p.name}"`).join(', ')}]`);
+    console.log(`[${timestamp}] [Conversation] LLM配置: apiKey=${llmConfig?.apiKey ? '有' : '无'}, endpoint=${llmConfig?.endpoint}, model=${llmConfig?.model}`);
     
-    // 并行通知所有 AI（不阻塞）
-    for (const aiPlayer of aiPlayers) {
-      // 不回应自己
-      if (aiPlayer.id === message.playerId) {
-        console.log(`[Conversation] ${aiPlayer.name}: 跳过（自己）`);
-        continue;
-      }
+    // 检查是否有AI被点名
+    const mentionedAI = aiPlayers.find(p => message.content.includes(p.name));
+    console.log(`[${timestamp}] [Conversation] 被@的AI: ${mentionedAI?.name || '无'}`);
+    
+    // 被@的AI强制回应，忽略冷却时间
+    if (mentionedAI) {
+      console.log(`[${timestamp}] [Conversation] ${mentionedAI.name} 被@，强制回应（忽略冷却）`);
       
-      // 检查玩家是否启用了 LLM
-      if (!aiPlayer.aiConfig?.llmEnabled) {
-        console.log(`[Conversation] ${aiPlayer.name}: 跳过（llmEnabled=false）`);
-        continue;
-      }
+      // 检查AI自己的LLM配置
+      const aiConfig = (mentionedAI as any).aiConfig;
+      console.log(`[${timestamp}] [Conversation] ${mentionedAI.name} 的aiConfig:`, JSON.stringify({
+        llmEnabled: aiConfig?.llmEnabled,
+        llmApiKey: aiConfig?.llmApiKey ? '有' : '无',
+        llmEndpoint: aiConfig?.llmEndpoint,
+        llmModel: aiConfig?.llmModel,
+      }));
       
-      // 检查冷却时间
-      const now = Date.now();
-      const lastTime = this.lastResponseTime.get(aiPlayer.id) || 0;
-      const timeSinceLast = now - lastTime;
-      if (timeSinceLast < this.COOLDOWN) {
-        console.log(`[Conversation] ${aiPlayer.name}: 冷却中 (${timeSinceLast}ms < ${this.COOLDOWN}ms)`);
-        continue;
-      }
-      
-      // 被点名时必回应，否则也尝试回应（LLM响应慢，不会刷屏）
-      const isMentioned = message.content.includes(aiPlayer.name);
-      if (isMentioned) {
-        console.log(`[Conversation] ${aiPlayer.name}: 被点名，准备回应`);
-      } else {
-        console.log(`[Conversation] ${aiPlayer.name}: 准备回应`);
-      }
-      
-      console.log(`[Conversation] ${aiPlayer.name}: 准备生成回应...`);
-      
-      // 异步生成回应（不阻塞）
-      this.generateAndBroadcastResponse(roomId, aiPlayer, message, aiPlayers, llmConfig).catch(e => {
-        console.error(`[Conversation] ${aiPlayer.name} 回应失败:`, e.message);
+      this.generateAndBroadcastResponse(roomId, mentionedAI, [message], aiPlayers, llmConfig).catch(e => {
+        console.error(`[${timestamp}] [Conversation] ${mentionedAI.name} 回应失败:`, e.message);
       });
+      return;
     }
     
+    // 没被@，筛选可回应的AI（冷却时间检查）
+    const eligibleAIs = aiPlayers.filter(p => {
+      const lastTime = this.lastResponseTime.get(p.id) || 0;
+      const elapsed = Date.now() - lastTime;
+      if (elapsed < this.COOLDOWN) {
+        console.log(`[Conversation] ${p.name} 冷却中(${elapsed}ms/${this.COOLDOWN}ms)`);
+        return false;
+      }
+      return true;
+    });
+    
+    console.log(`[Conversation] 可回应AI: ${eligibleAIs.map(p => p.name).join(', ') || '无'}`);
+    
+    if (eligibleAIs.length === 0) {
+      console.log(`[Conversation] 所有AI都在冷却中，跳过`);
+      return;
+    }
+    
+    // 随机选择一个AI
+    const selectedAI = eligibleAIs[Math.floor(Math.random() * eligibleAIs.length)];
+    console.log(`[Conversation] ${selectedAI.name} 随机选中，准备回应`);
+    
+    // 异步生成回应
+    this.generateAndBroadcastResponse(roomId, selectedAI, [message], aiPlayers, llmConfig).catch(e => {
+      console.error(`[Conversation] ${selectedAI.name} 回应失败:`, e.message);
+    });
+    
     console.log(`[Conversation] ========== 处理完成 ==========`);
+  }
+  
+  /**
+   * 批量处理累积的消息
+   * 一次性给AI所有消息，让它看到完整上下文
+   */
+  private async processBatch(
+    roomId: string,
+    aiPlayers: Player[],
+    llmConfig?: { apiKey?: string; endpoint?: string; model?: string; providerType?: string }
+  ): Promise<void> {
+    const messages = this.messageBuffer.get(roomId) || [];
+    this.messageBuffer.delete(roomId);
+    
+    if (messages.length === 0) {
+      return;
+    }
+    
+    console.log(`[Conversation] ========== 批量处理 ${messages.length} 条消息 ==========`);
+    messages.forEach((m, i) => {
+      console.log(`[Conversation]   ${i + 1}. ${m.playerName}: "${m.content}"`);
+    });
+    
+    // 检查冷却时间，筛选可回应的AI
+    const eligibleAIs = aiPlayers.filter(p => {
+      const lastTime = this.lastResponseTime.get(p.id) || 0;
+      const elapsed = Date.now() - lastTime;
+      if (elapsed < this.COOLDOWN) {
+        console.log(`[Conversation] ${p.name} 冷却中，跳过`);
+        return false;
+      }
+      return true;
+    });
+    
+    if (eligibleAIs.length === 0) {
+      console.log(`[Conversation] 所有AI都在冷却中，跳过`);
+      return;
+    }
+    
+    // 检查是否有AI被点名（优先让被点名的AI回应）
+    const mentionedAI = eligibleAIs.find(p => 
+      messages.some(m => m.content.includes(p.name))
+    );
+    
+    let selectedAI: Player | undefined;
+    
+    if (mentionedAI) {
+      // 被点名的AI必须回应
+      selectedAI = mentionedAI;
+      console.log(`[Conversation] ${selectedAI.name} 被点名，准备回应`);
+    } else {
+      // 没被点名，随机选择一个AI回应
+      selectedAI = eligibleAIs[Math.floor(Math.random() * eligibleAIs.length)];
+      console.log(`[Conversation] ${selectedAI.name} 随机选中，准备回应`);
+    }
+    
+    // 生成回应
+    this.generateAndBroadcastResponse(roomId, selectedAI, messages, aiPlayers, llmConfig).catch(e => {
+      console.error(`[Conversation] ${selectedAI!.name} 回应失败:`, e.message);
+    });
+    
+    console.log(`[Conversation] ========== 批量处理完成 ==========`);
   }
 
   /**
@@ -191,14 +275,14 @@ export class ConversationManager {
   private async generateAndBroadcastResponse(
     roomId: string,
     aiPlayer: Player,
-    message: ConversationMessage,
+    messages: ConversationMessage[],
     allPlayers: Player[],
     llmConfig?: { apiKey?: string; endpoint?: string; model?: string; providerType?: string }
   ): Promise<void> {
     console.log(`[Conversation] >>> ${aiPlayer.name} 开始生成回应`);
     
     try {
-      const response = await this.generateResponse(aiPlayer, message, allPlayers, llmConfig);
+      const response = await this.generateResponse(aiPlayer, messages, allPlayers, llmConfig);
       
       console.log(`[Conversation] >>> ${aiPlayer.name} 生成结果: "${response || '无回应'}"`);
       
@@ -220,8 +304,6 @@ export class ConversationManager {
         });
         
         console.log(`[Conversation] >>> ${aiPlayer.name} 已广播回应: "${response}"`);
-      } else {
-        console.log(`[Conversation] >>> ${aiPlayer.name} 无回应内容，不广播`);
       }
     } catch (e: any) {
       console.error(`[Conversation] >>> ${aiPlayer.name} 回应失败:`, e.message);
@@ -229,21 +311,31 @@ export class ConversationManager {
   }
 
   /**
-   * 生成回应 - 使用 SDK 统一处理
+   * 生成回应 - 传入批量消息
    */
   private async generateResponse(
     aiPlayer: Player,
-    message: ConversationMessage,
+    messages: ConversationMessage[],
     allPlayers: Player[],
     llmConfig?: { apiKey?: string; endpoint?: string; model?: string; providerType?: string }
   ): Promise<string | null> {
+    // 优先使用AI自己的配置，其次使用全局配置
+    const aiConfig = (aiPlayer as any).aiConfig;
+    const actualConfig = {
+      apiKey: aiConfig?.llmApiKey || llmConfig?.apiKey,
+      endpoint: aiConfig?.llmEndpoint || llmConfig?.endpoint,
+      model: aiConfig?.llmModel || llmConfig?.model,
+      providerType: aiConfig?.llmProviderType || llmConfig?.providerType,
+    };
+    
     // 没有 LLM 配置，使用 fallback
-    if (!llmConfig?.apiKey || !llmConfig?.endpoint) {
-      return this.fallbackResponse(aiPlayer, message);
+    if (!actualConfig.apiKey || !actualConfig.endpoint) {
+      console.log(`[Conversation] ${aiPlayer.name} 无LLM配置，使用fallback`);
+      return this.fallbackResponse(aiPlayer, messages[messages.length - 1]);
     }
     
     // 根据 AI 配置的 personality 类型获取性格
-    const personalityType = (aiPlayer as any).aiConfig?.personality || 'balanced';
+    const personalityType = aiConfig?.personality || 'balanced';
     const personality = getPersonalityByType(personalityType, aiPlayer.name);
 
     // 构建牌桌信息
@@ -254,6 +346,10 @@ export class ConversationManager {
       return `- ${p.name}(${pos}位, ${role})`;
     }).join('\n');
 
+    // 构建消息上下文（批量消息）
+    const messageContext = messages.map(m => `${m.playerName}: "${m.content}"`).join('\n');
+    const lastMessage = messages[messages.length - 1];
+    
     const systemPrompt = `你是麻将玩家"${aiPlayer.name}"。
 性格：${personality.traits.join('、')}
 说话风格：${personality.speakStyle}
@@ -261,48 +357,40 @@ export class ConversationManager {
 牌桌玩家：
 ${playerList}
 
-规则：简短回应，直接说话。不想说就回"无"。`;
+规则：简短回应（30字内），直接说话。不想说就回"无"。`;
 
-    const userPrompt = `${message.playerName}说："${message.content}"
+    const userPrompt = `刚才大家说：
+${messageContext}
+
 你回应：`;
 
-    console.log(`[Conversation] >>> ${aiPlayer.name} 提示词:`);
-    console.log(`[Conversation] >>> System: ${systemPrompt.substring(0, 100)}...`);
-    console.log(`[Conversation] >>> User: ${userPrompt}`);
+    console.log(`[Conversation] >>> ${aiPlayer.name} 批量消息上下文: ${messages.length} 条`);
 
     try {
-      // 使用 SDK 调用，自动处理思考链
-      const endpoint = llmConfig.endpoint?.replace('/chat/completions', '').replace('/v1/messages', '');
+      const endpoint = actualConfig.endpoint?.replace('/chat/completions', '').replace('/v1/messages', '');
       const result = await chatWithSystem(
         {
-          provider: llmConfig.providerType || 'openai',
-          apiKey: llmConfig.apiKey!,
+          provider: actualConfig.providerType || 'openai',
+          apiKey: actualConfig.apiKey!,
           baseURL: endpoint || 'https://api.openai.com/v1',
-          model: llmConfig.model || 'gpt-4o',
+          model: actualConfig.model || 'gpt-4o',
         },
         systemPrompt,
         userPrompt,
-        { temperature: 1.0, maxTokens: 2000 }
+        { temperature: 1.0, maxTokens: 100 }
       );
       
       let content = result.text;
       
-      console.log(`[Conversation] >>> ${aiPlayer.name} SDK 响应: "${content?.substring(0, 100)}"`);
-      
       if (!content || content.trim().length < 2) {
-        console.log(`[Conversation] >>> ${aiPlayer.name} content 为空，跳过`);
         return null;
       }
       
-      // 移除引号，保留换行（允许多行发言）
       content = content.replace(/[「」""'']/g, '').trim();
       
-      // 过滤无意义回应
       if (content === '无' || content === '无。' || content.length < 2) {
         return null;
       }
-      
-      console.log(`[Conversation] >>> ${aiPlayer.name} 最终: "${content.substring(0, 100)}"`);
       
       // 截断过长回应
       if (content.length > this.config.maxLength) {
@@ -312,7 +400,7 @@ ${playerList}
       return content;
     } catch (e: any) {
       console.log(`[Conversation] LLM 回应失败，使用 fallback:`, e.message);
-      return this.fallbackResponse(aiPlayer, message);
+      return this.fallbackResponse(aiPlayer, lastMessage);
     }
   }
 
@@ -322,7 +410,6 @@ ${playerList}
   private fallbackResponse(aiPlayer: Player, message: ConversationMessage): string | null {
     const personality = PERSONALITIES[aiPlayer.name];
     
-    // 根据性格选择回应模板
     if (personality?.traits.includes('话痨')) {
       const templates = [
         `哈哈，${message.playerName}说得对`,
@@ -341,20 +428,13 @@ ${playerList}
       return templates[Math.floor(Math.random() * templates.length)];
     }
     
-    // 默认不回应
     return null;
   }
 
-  /**
-   * 随机延迟
-   */
   private randomDelay(): number {
     return Math.random() * (this.config.maxDelay - this.config.minDelay) + this.config.minDelay;
   }
 
-  /**
-   * 睡眠
-   */
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -363,9 +443,6 @@ ${playerList}
 // 全局实例缓存
 const conversationManagers = new Map<string, ConversationManager>();
 
-/**
- * 获取或创建会话管理器
- */
 export function getConversationManager(io: Server, roomId: string): ConversationManager {
   if (!conversationManagers.has(roomId)) {
     conversationManagers.set(roomId, new ConversationManager(io));

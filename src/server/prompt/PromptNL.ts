@@ -460,10 +460,11 @@ export function generateErrorPrompt(error: string, context?: {
 export function generateActionPrompt(data: {
   actions: any[];
   lastDiscard?: any;
+  lastDiscardPlayerName?: string;
   hand?: any[];
   lang?: Language;
 }): string {
-  const { actions, lastDiscard, hand } = data;
+  const { actions, lastDiscard, lastDiscardPlayerName, hand } = data;
   const lang = data.lang || 'zh';
   
   const lines: string[] = [];
@@ -474,7 +475,9 @@ export function generateActionPrompt(data: {
   lines.push('');
   
   if (lastDiscard) {
-    lines.push(`${t('lastPlayed', lang)} ${lastDiscard.display}`);
+    // 显示谁打出了什么牌
+    const playerInfo = lastDiscardPlayerName ? `${lastDiscardPlayerName} ` : '';
+    lines.push(`${t('lastPlayed', lang)} ${playerInfo}${lastDiscard.display}`);
     lines.push('');
   }
   

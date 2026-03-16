@@ -238,14 +238,106 @@ curl -s http://localhost:3000/api/rooms
 
 | 问题 | 优先级 | 说明 |
 |------|--------|------|
-| AI 非轮次发言 | 高 | AI 应该能在任何时候说话，不只是打牌时 |
+| Prompt JSON提取 | 高 | 将所有prompt提取为JSON文件，支持多语言 |
 | 番型计算 | 中 | 平胡等番型检测需要进一步调试 |
-| 再来一局 | 中 | 需要进一步测试 |
 | 分数计算 | 中 | 番型检测有时不正确，导致分数为0 |
+
+**已解决**：
+- ~~闲置检测不触发~~ - 修复：只选择llmEnabled=true的AI
+- ~~AI发言无回应~~ - 修复：被@强制回应，发言后触发会话层
+- ~~NPC被选中发言~~ - 修复：排除NPC，只选择ai-agent
 
 ---
 
 ## 11. 本次会话改进记录
+
+### 2026-03-16 - Prompt信息传递与事件系统优化
+
+**核心改进**：
+
+1. **Prompt信息传递补齐**
+   - `AIAdapter.ts` callLLM() 添加完整牌局信息（其他玩家弃牌/副露/分数/庄家/上一张弃牌）
+   - `handlers.ts` player_action 事件添加 targetPlayerName、targetTileDisplay 字段
+   - `handlers.ts` ACTION_REQUIRED 事件添加 lastDiscardPlayerName
+   - `PromptNL.ts` generateActionPrompt() 显示打牌者名字
+
+2. **事件反应机制**
+   - 游戏结束时（phase=finished）处理事件队列，让AI对胡牌有反应
+   - 非轮次时也能处理事件队列（不只是轮到自己时）
+   - 反应概率从 20% 提高到 50%
+   - 添加详细日志追踪事件推送和处理流程
+
+3. **"再来一局"修复**
+   - `handlers.ts` handleReady 允许从 `finished` 状态开始新游戏
+   - `handlers.ts` handleGameStart 不再清空AI记忆
+   - 改用 `memoryManager.startNewGame()` 保留统计数据和玩家关系
+
+4. **发言限制优化**
+   - 添加"短信聊天机制，话术控制在30字内"
+   - 允许使用emoji表达心情和态度
+
+**关键文件修改**：
+- `src/server/ai/AIAdapter.ts` - 牌局信息、事件描述、发言限制
+- `src/server/socket/handlers.ts` - 事件字段、再来一局、AI记忆保留
+- `src/server/prompt/PromptNL.ts` - 打牌者名字显示
+- `src/server/speech/MemoryManager.ts` - startNewGame() 保留记忆
+
+**待完成**：
+- Prompt JSON提取（支持多语言）
+
+### 2026-03-16 - 闲置检测与AI聊天系统修复
+
+**核心问题**：
+- 闲置15秒触发私房话功能不工作
+- AI发言后没有其他AI回应
+- NPC被选中发言但无LLM配置
+
+**根本原因**：
+1. `IdleDetector.ts` 选择AI时包含了NPC（llmEnabled=false）
+2. AI发言后没有重置15秒定时器
+3. AI发言后没有触发会话层让其他AI回应
+
+**修复内容**：
+
+1. **闲置检测修复**
+   - 只选择 `llmEnabled=true` 的AI玩家，排除NPC
+   - AI发言后重新设置15秒定时器
+   - 添加详细日志追踪触发流程
+
+2. **会话层优化**
+   - 被@的AI强制回应，忽略冷却时间
+   - AI发言后触发会话层让其他AI回应
+   - 使用AI自己的LLM配置，而非全局配置
+
+3. **移除冗余代码**
+   - 移除 `broadcastGameState` 中的概率发言代码
+   - 清理重复的事件处理逻辑
+
+**关键文件修改**：
+- `src/server/idle/IdleDetector.ts` - AI选择逻辑、定时器重置
+- `src/server/speech/ConversationManager.ts` - 被@强制回应
+- `src/server/socket/handlers.ts` - 会话层触发
+
+**架构说明**：
+```
+用户说话 @AI
+    ↓
+handlers.ts: handlePlayerSpeech
+    ↓
+ConversationManager.handleSpeech
+    ↓
+被@的AI？ → 是 → 强制回应（忽略冷却）
+    ↓ 否
+随机选择AI（3秒冷却）
+    ↓
+生成回应 → 广播
+
+---
+
+IdleDetector（独立）
+15秒无活动 → 随机选AI（llmEnabled=true）→ 私房话
+发言后重置定时器 → 触发会话层
+```
 
 ### 2026-03-15 - LLM 适配重构与游戏逻辑修复
 
