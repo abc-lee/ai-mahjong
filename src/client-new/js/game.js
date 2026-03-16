@@ -23,8 +23,9 @@ function updateGameInfo() {
   if (state.gamePublicState) {
     const gs = state.gamePublicState;
     const windNames = ['东', '南', '西', '北'];
-    const currentWind = windNames[Math.floor(gs.roundNumber / 4) % 4];
-    const roundInWind = (gs.roundNumber % 4) + 1;
+    // roundNumber 从1开始，1-4是东风圈，5-8是南风圈，以此类推
+    const currentWind = windNames[Math.floor((gs.roundNumber - 1) / 4) % 4];
+    const roundInWind = ((gs.roundNumber - 1) % 4) + 1;
     
     gameInfoEl.innerHTML = `
       ${currentWind}风圈 - ${roundInWind}局 <span class="text-yellow-400 ml-2">剩 ${gs.wallRemaining} 张</span>
@@ -677,8 +678,15 @@ export function setupGameListeners() {
     // 更新开始按钮显示
     const state = store.getState();
     const startBtnContainer = document.getElementById('start-button-container');
-    if (startBtnContainer && room.host === state.playerId && room.state === 'waiting') {
-      startBtnContainer.classList.remove('hidden');
+    console.log('[Game] 检查开始按钮: host=', room.host, 'playerId=', state.playerId, 'state=', room.state);
+    if (startBtnContainer) {
+      // 房主在 waiting 或 finished 状态可以开始游戏
+      if (room.host === state.playerId && (room.state === 'waiting' || room.state === 'finished')) {
+        startBtnContainer.classList.remove('hidden');
+        console.log('[Game] 显示开始按钮');
+      } else {
+        startBtnContainer.classList.add('hidden');
+      }
     }
   });
   
@@ -726,6 +734,24 @@ export function setupGameListeners() {
     const winningHand = data.winningHand;
     const players = data.players;
     console.log('[Game] 游戏结束，获胜者:', winner);
+    console.log('[Game] 分数变化:', players?.map(p => `${p.name}=${p.scoreChange}`).join(', '));
+    
+    // 更新 currentRoom 中玩家的分数
+    const state = store.getState();
+    if (state.currentRoom && players) {
+      const updatedPlayers = state.currentRoom.players.map(p => {
+        const updated = players.find(up => up.id === p.id);
+        if (updated) {
+          return { ...p, score: updated.score };
+        }
+        return p;
+      });
+      store.setCurrentRoom({ ...state.currentRoom, players: updatedPlayers });
+      
+      // 立即更新其他玩家的分数显示
+      updatePlayerScores(updatedPlayers);
+    }
+    
     store.setGameEndState({ winner, winningHand, players });
     showGameEndDialog(winner, winningHand, players);
   });
@@ -940,18 +966,30 @@ function setupPositionModal() {
         const roomList = await socket.getRoomList();
         let roomId = null;
         
+        // 先设置 playerId（用 socket.id），避免事件触发时 playerId 为 null
+        const socketId = socket.socket?.id;
+        if (socketId) {
+          store.setPlayerInfo(socketId, playerName, position);
+        }
+        
         if (roomList.rooms && roomList.rooms.length > 0) {
           // 有等待中的房间，加入
           roomId = roomList.rooms[0].id;
           console.log('[Game] 加入现有房间:', roomId);
           const result = await socket.joinRoom(roomId, playerName);
-          store.setPlayerInfo(result.playerId || socket.socket.id, playerName, position);
+          // 更新 playerId（服务器可能返回不同的 id）
+          if (result.playerId) {
+            store.setPlayerInfo(result.playerId, playerName, position);
+          }
           store.setCurrentRoom(result.room);
         } else {
           // 没有等待中的房间，创建新房间
           console.log('[Game] 创建新房间');
           const result = await socket.createRoom(playerName);
-          store.setPlayerInfo(result.playerId || socket.socket.id, playerName, position);
+          // 更新 playerId
+          if (result.playerId) {
+            store.setPlayerInfo(result.playerId, playerName, position);
+          }
           store.setCurrentRoom(result.room);
           
           // 第一个进入的人显示开始按钮
@@ -1122,6 +1160,10 @@ function updateWaitingPlayers(room) {
       if (nameEl) {
         nameEl.textContent = '等待中';
       }
+      const scoreEl = areaEl.querySelector('.player-score');
+      if (scoreEl) {
+        scoreEl.textContent = '0';
+      }
       const avatarEl = areaEl.querySelector('.player-avatar');
       if (avatarEl) {
         // 重置为默认状态
@@ -1165,6 +1207,12 @@ function updateWaitingPlayers(room) {
       const nameEl = areaEl.querySelector('.player-name');
       if (nameEl) {
         nameEl.textContent = player.name;
+      }
+      
+      // 更新分数
+      const scoreEl = areaEl.querySelector('.player-score');
+      if (scoreEl) {
+        scoreEl.textContent = player.score || 1000;
       }
       
       // 更新头像 - 使用图片
@@ -1231,6 +1279,33 @@ function updateWaitingPlayers(room) {
   }
   
   console.log('[Game] 更新等待玩家:', room.players.map(p => `${p.name}(${p.position})`));
+}
+
+/**
+ * 更新其他玩家的分数显示
+ */
+function updatePlayerScores(players) {
+  const state = store.getState();
+  const myPosition = store.getMyPosition();
+  
+  if (myPosition === null || myPosition === undefined) return;
+  
+  const relativeToDirection = ['south', 'west', 'north', 'east'];
+  
+  players.forEach(player => {
+    // 相对方位
+    const relativePosition = (player.position - myPosition + 4) % 4;
+    const direction = relativeToDirection[relativePosition];
+    
+    const areaEl = document.querySelector(`[data-position="${direction}"]`) || 
+                   document.getElementById(`player-${direction}`);
+    if (areaEl) {
+      const scoreEl = areaEl.querySelector('.player-score');
+      if (scoreEl) {
+        scoreEl.textContent = player.score || 1000;
+      }
+    }
+  });
 }
 
 // 导出到全局（供 HTML onclick 使用）

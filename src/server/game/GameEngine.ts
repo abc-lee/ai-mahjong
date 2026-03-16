@@ -54,7 +54,7 @@ export class GameEngine {
     };
   }
 
-  startGame(players: Player[]): void {
+  startGame(players: Player[], lastDealerIndex?: number, roundNumber?: number): void {
     if (players.length !== 4) {
       throw new Error('麻将需要4名玩家');
     }
@@ -65,10 +65,10 @@ export class GameEngine {
     // 庄家轮换：上一局的庄家下家成为新庄家
     // 如果是第一局或没有上一局庄家，随机选择
     let dealerIndex: number;
-    if (this.state.dealerIndex !== undefined && this.state.dealerIndex >= 0) {
+    if (lastDealerIndex !== undefined && lastDealerIndex >= 0) {
       // 上一局庄家的下家成为新庄家
-      dealerIndex = (this.state.dealerIndex + 1) % 4;
-      console.log(`[GameEngine] 庄家轮换: 上一局庄家 ${this.state.dealerIndex} -> 新庄家 ${dealerIndex}`);
+      dealerIndex = (lastDealerIndex + 1) % 4;
+      console.log(`[GameEngine] 庄家轮换: 上一局庄家 ${lastDealerIndex} -> 新庄家 ${dealerIndex}`);
     } else {
       // 第一局随机选择
       dealerIndex = Math.floor(Math.random() * 4);
@@ -94,7 +94,7 @@ export class GameEngine {
       lastDiscard: null,
       lastDiscardPlayer: -1,
       dealerIndex,
-      roundNumber: 1,
+      roundNumber: roundNumber || 1,  // 使用传入的局数，默认为1
       pendingActions: [],
       winner: null,
       winningHand: null,
@@ -398,6 +398,7 @@ export class GameEngine {
     const winningTile = isSelfDraw ? this.lastDrawnTile.get(player.id)! : this.state.lastDiscard!;
     
     console.log(`[performHu] 玩家 ${player.name} 胡牌, isSelfDraw=${isSelfDraw}, hand=${player.hand.length}, melds=${player.melds.length}`);
+    console.log(`[performHu] 胡牌前分数: ${this.state.players.map(p => `${p.name}=${p.score}`).join(', ')}`);
     
     if (!isSelfDraw) {
       player.hand.push(winningTile);
@@ -411,9 +412,11 @@ export class GameEngine {
     const loser = loserIndex !== null ? this.state.players[loserIndex] : null;
     const scoreResult = this.calculator.calculateDetailedScore(player, loser, fans, isSelfDraw);
     
-    console.log(`[performHu] 分数结果: winnerScore=${scoreResult.winnerScore}, han=${scoreResult.han}`);
+    console.log(`[performHu] 分数结果: winnerScore=${scoreResult.winnerScore}, loserScore=${scoreResult.loserScore}, han=${scoreResult.han}`);
     
     this.calculator.applyScoreChange(this.state.players, playerIndex, loserIndex, scoreResult);
+    
+    console.log(`[performHu] 胡牌后分数: ${this.state.players.map(p => `${p.name}=${p.score}`).join(', ')}`);
     
     this.state.winner = playerIndex;
     this.state.winningHand = {

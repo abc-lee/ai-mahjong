@@ -36,6 +36,8 @@ export interface Room {
   createdAt: Date;
   settings: RoomSettings;
   chatHistory: ChatMessage[];  // 发言历史
+  lastDealerIndex?: number;    // 上一局庄家位置，用于庄家轮换
+  roundNumber: number;         // 当前局数，从1开始，每局结束+1
 }
 
 // 默认房间设置
@@ -107,6 +109,7 @@ export class RoomManager {
       createdAt: new Date(),
       settings: { ...DEFAULT_ROOM_SETTINGS, ...settings },
       chatHistory: [],  // 初始化发言历史
+      roundNumber: 1,   // 初始局数
     };
 
     this.rooms.set(roomId, room);
@@ -245,7 +248,7 @@ export class RoomManager {
     });
 
     // 开始游戏
-    room.gameEngine.startGame(room.players);
+    room.gameEngine.startGame(room.players, room.lastDealerIndex, room.roundNumber);
     room.state = 'playing';
 
     return true;
@@ -262,6 +265,10 @@ export class RoomManager {
     
     if (room.gameEngine) {
       const gameState = room.gameEngine.getState();
+      // 保存上一局庄家位置（用于下一局庄家轮换）
+      room.lastDealerIndex = gameState.dealerIndex;
+      // 递增局数（下一局）
+      room.roundNumber = (room.roundNumber || 1) + 1;
       // 更新玩家分数
       room.players.forEach(player => {
         const gameStatePlayer = gameState.players.find(p => p.id === player.id);
