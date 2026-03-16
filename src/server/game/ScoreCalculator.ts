@@ -29,7 +29,7 @@ export interface ScoreConfig {
 }
 
 const DEFAULT_CONFIG: ScoreConfig = {
-  baseScore: 1000,
+  baseScore: 100,  // 底分改为100，1番=200分
   maxHan: 13,
 };
 

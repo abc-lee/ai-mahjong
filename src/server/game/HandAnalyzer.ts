@@ -405,6 +405,19 @@ export class HandAnalyzer {
       }
     }
     
+    // 如果没有检测到任何番型，给一个基础胡牌番
+    if (fans.length === 0) {
+      console.log(`[calculateFans] 未检测到番型，使用基础胡牌`);
+      fans.push({
+        id: 'base',
+        name: '胡牌',
+        fan: 1,
+        description: '基础胡牌',
+        checker: () => true,
+        enabled: true,
+      });
+    }
+    
     return fans;
   }
 

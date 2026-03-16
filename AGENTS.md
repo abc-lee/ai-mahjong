@@ -283,7 +283,87 @@ curl -s http://localhost:3000/api/rooms
 - `src/server/speech/MemoryManager.ts` - startNewGame() 保留记忆
 
 **待完成**：
-- Prompt JSON提取（支持多语言）
+- ~~Prompt JSON提取（支持多语言）~~ ✅ 已完成
+
+### 2026-03-16 - 提示词提取与多语言支持
+
+**核心改进**：
+
+1. **提示词JSON化**
+   - 创建 `locales/zh-CN/prompts.json` 存储所有中文提示词
+   - 创建 `src/server/prompt/PromptLoader.ts` 提示词加载器
+   - 支持 `{{变量名}}` 格式的变量替换
+
+2. **迁移的文件**
+   - `AIAdapter.ts` - 决策、聊天、闲置私房话提示词
+   - `PromptGenerator.ts` - 游戏状态提示词
+   - `ConversationManager.ts` - 会话提示词
+   - `LLMClient.ts` - LLM系统提示词
+   - `SpeechManager.ts` - 角色和性格配置
+
+3. **借鉴OpenClaw提示词工程**
+   - 添加 `identityTemplate`：身份定义，强调"你不是AI助手，你就是这个角色本人"
+   - 添加 `personalityGuide`：6种性格类型的具体行为指南
+   - 添加 `chatRules`：聊天规则（要做的/不要做的/触发时机）
+   - 使用XML标签结构：`<identity>/<personality_guide>/<chat_rules>/<memory>`
+
+4. **新增字段**
+   - `chatProbability`：说话概率（话痨50%，沉稳15%）
+   - `behaviors`：具体行为描述
+   - `gender`：角色性别
+
+5. **15秒私房话修复**
+   - 问题：AI在闲置时聊麻将（摸到几条等），但游戏没在进行
+   - 修复：添加话题限制，禁止聊麻将，改为聊八卦、生活话题
+
+**文件结构**：
+```
+locales/
+└── zh-CN/
+    └── prompts.json    # 中文提示词配置
+
+src/server/prompt/
+└── PromptLoader.ts     # 提示词加载器
+```
+
+**待完成**：
+- 英文版 `locales/en-US/prompts.json`
+
+### 2026-03-16 - 庄家轮换与风圈显示修复
+
+**核心问题**：
+- 每次游戏显示"东风圈-2局"从未变化
+- 庄家总是随机，没有轮换
+
+**根本原因**：
+1. `roundNumber` 没有递增，每局都重置为1
+2. 客户端风圈计算逻辑错误：`(1 % 4) + 1 = 2`
+
+**修复内容**：
+
+1. **Room层保存状态**
+   - 添加 `lastDealerIndex`：保存上一局庄家
+   - 添加 `roundNumber`：保存局数
+
+2. **庄家轮换**
+   - 第一局随机选庄家
+   - 之后庄家轮换到下家（按国标规则，不连庄）
+
+3. **风圈计算修正**
+   - 第1-4局：东风圈
+   - 第5-8局：南风圈
+   - 以此类推
+
+**关键文件修改**：
+- `src/server/room/RoomManager.ts` - 保存状态、传递参数
+- `src/server/game/GameEngine.ts` - 接收参数、庄家轮换
+- `src/client-new/js/game.js` - 风圈计算修正
+
+**提交记录**：
+- `32deb06` - 庄家轮换与风圈显示修复
+- `546914d` - 提示词提取到JSON文件
+- `d910368` - 借鉴OpenClaw提示词工程优化
+- `ee7a9ec` - 15秒私房话不再聊麻将
 
 ### 2026-03-16 - 闲置检测与AI聊天系统修复
 
@@ -453,5 +533,5 @@ IdleDetector（独立）
 
 ---
 
-*文档版本: v3.2*
-*更新时间: 2026-03-15*
+*文档版本: v3.3*
+*更新时间: 2026-03-16*

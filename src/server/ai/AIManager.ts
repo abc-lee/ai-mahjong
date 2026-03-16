@@ -5,6 +5,7 @@
 
 import type { Player, AIConfig } from '@shared/types';
 import { AIAdapter } from './AIAdapter';
+import { eventQueueManager } from './EventQueue';
 
 /**
  * AI 管理器类
@@ -45,8 +46,11 @@ export class AIManager {
     for (const player of players) {
       console.log(`[AIManager] 玩家 ${player.name}: type=${player.type}, aiConfig=${JSON.stringify(player.aiConfig)}`);
       if ((player.type === 'ai-agent' || player.type === 'npc') && player.aiConfig) {
+        // 创建 AI 适配器
         this.createAdapter(player);
-        console.log(`[AIManager] 创建 adapter: ${player.name}, llmEnabled=${player.aiConfig.llmEnabled}`);
+        // 创建事件队列
+        eventQueueManager.createQueue(player.id);
+        console.log(`[AIManager] 创建 adapter 和事件队列: ${player.name}, llmEnabled=${player.aiConfig.llmEnabled}`);
       }
     }
   }
