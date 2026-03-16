@@ -5,6 +5,7 @@
 
 import type { Tile, PendingAction, Meld } from '@shared/types';
 import { PromptType, type PromptContext, type AIAgentResponse } from './types';
+import { promptLoader } from './PromptLoader';
 
 /**
  * 牌 ID 转换为显示名称
@@ -43,15 +44,8 @@ function formatMelds(melds: Meld[]): string {
  * 可用操作格式化
  */
 function formatAvailableActions(actions: PendingAction[]): string {
-  const actionNames: Record<string, string> = {
-    chi: '吃',
-    peng: '碰',
-    gang: '杠',
-    hu: '胡',
-  };
-  
   return actions.map(action => {
-    const name = actionNames[action.action];
+    const name = promptLoader.getActionName(action.action);
     if (action.tiles && action.tiles.length > 0) {
       const tiles = action.tiles.map(t => t.display).join('、');
       return `- ${name}：使用 ${tiles}`;
@@ -64,8 +58,7 @@ function formatAvailableActions(actions: PendingAction[]): string {
  * 位置转方位
  */
 function positionToDirection(position: number): string {
-  const directions = ['东', '南', '西', '北'];
-  return directions[position] || '未知';
+  return promptLoader.getDirection(position);
 }
 
 /**
@@ -104,55 +97,36 @@ export class PromptGenerator {
     const { playerName, position, isDealer, hand, gameState } = context;
     const otherPlayers = gameState.players
       .filter(p => p.position !== position)
-      .map(p => `- 位置${p.position}(${positionToDirection(p.position)})：${p.name}`)
+      .map(p => `- 位置${p.position}(${promptLoader.getDirection(p.position)})：${p.name}`)
       .join('\n');
     
-    return `【游戏开始】
-
-你是本次麻将游戏的玩家之一。
-- 你的名字：${playerName}
-- 你的位置：${position} (${positionToDirection(position)}${isDealer ? ', 庄家' : ''})
-- 你是否是庄家：${isDealer ? '是' : '否'}
-
-其他玩家：
-${otherPlayers}
-
-你的初始手牌（${hand.length}张）：
-${formatHand(hand)}
-
-游戏规则提示：
-- 每人13张起手，庄家14张
-- 轮流摸牌、打牌
-- 可以吃、碰、杠、胡
-
-准备开始！等待你的回合...`;
+    return promptLoader.getWithVars('gameInfo.gameStart', {
+      playerName,
+      position,
+      direction: promptLoader.getDirection(position),
+      dealerMark: isDealer ? ', 庄家' : '',
+      isDealer: isDealer ? '是' : '否',
+      otherPlayers,
+      handCount: hand.length,
+      handTiles: formatHand(hand),
+    });
   }
   
   /**
    * 轮到摸牌 Prompt
    */
   private generateYourTurnDraw(context: PromptContext): string {
-    const { gameState, hand } = context;
+    const { gameState, hand, position } = context;
     const lastDiscardPlayer = gameState.players[gameState.lastDiscardPlayer];
     
-    return `【你的回合 - 摸牌阶段】
-
-当前游戏状态：
-- 剩余牌数：${gameState.wallRemaining}张
-- 当前玩家：你（${positionToDirection(context.position)}）
-- 上家打出的牌：${gameState.lastDiscard?.display || '无'}（玩家：${lastDiscardPlayer?.name || '无'}）
-
-你的手牌（${hand.length}张）：
-${formatHand(hand)}
-
-你需要执行的操作：摸牌
-
-请发送指令：
-\`\`\`json
-{
-  "action": "draw"
-}
-\`\`\``;
+    return promptLoader.getWithVars('gameInfo.yourTurnDraw', {
+      wallRemaining: gameState.wallRemaining,
+      direction: promptLoader.getDirection(position),
+      lastDiscard: gameState.lastDiscard?.display || '无',
+      lastPlayerName: lastDiscardPlayer?.name || '无',
+      handCount: hand.length,
+      handTiles: formatHand(hand),
+    });
   }
   
   /**
@@ -161,32 +135,12 @@ ${formatHand(hand)}
   private generateYourTurnDiscard(context: PromptContext): string {
     const { hand, lastDrawnTile, gameState } = context;
     
-    return `【你的回合 - 打牌阶段】
-
-你刚才摸到的牌：${lastDrawnTile ? lastDrawnTile.display : '无'}
-
-你现在的手牌（${hand.length}张）：
-${formatHand(hand)}
-
-牌墙剩余：${gameState.wallRemaining}张
-
-你需要打出一张牌。
-
-请发送指令：
-\`\`\`json
-{
-  "action": "discard",
-  "tile": "要打出的牌的ID"
-}
-\`\`\`
-
-例如：
-\`\`\`json
-{
-  "action": "discard",
-  "tile": "wan-5-12"
-}
-\`\`\``;
+    return promptLoader.getWithVars('gameInfo.yourTurnDiscard', {
+      lastDrawnTile: lastDrawnTile ? lastDrawnTile.display : '无',
+      handCount: hand.length,
+      handTiles: formatHand(hand),
+      wallRemaining: gameState.wallRemaining,
+    });
   }
   
   /**
@@ -201,30 +155,13 @@ ${formatHand(hand)}
     
     const lastDiscardPlayer = gameState.players[gameState.lastDiscardPlayer];
     
-    return `【操作选择】
-
-玩家 ${lastDiscardPlayer?.name || '未知'} 打出了：${gameState.lastDiscard?.display || '未知'}
-
-你可以进行的操作：
-${formatAvailableActions(availableActions)}
-
-你的手牌（${hand.length}张）：
-${formatHand(hand)}
-
-请选择一个操作，发送指令：
-\`\`\`json
-{
-  "action": "chi|peng|gang|hu|pass",
-  "tiles": ["相关牌ID"]
-}
-\`\`\`
-
-或者跳过：
-\`\`\`json
-{
-  "action": "pass"
-}
-\`\`\``;
+    return promptLoader.getWithVars('gameInfo.actionRequired', {
+      lastPlayerName: lastDiscardPlayer?.name || '未知',
+      lastDiscard: gameState.lastDiscard?.display || '未知',
+      availableActions: formatAvailableActions(availableActions),
+      handCount: hand.length,
+      handTiles: formatHand(hand),
+    });
   }
   
   /**
@@ -238,18 +175,14 @@ ${formatHand(hand)}
     }
     
     if (actionResult.success) {
-      return `【操作成功】
-
-你成功执行了：${actionResult.action}
-
-游戏继续...`;
+      return promptLoader.getWithVars('gameInfo.actionSuccess', {
+        action: actionResult.action,
+      });
     } else {
-      return `【操作失败】
-
-你尝试执行：${actionResult.action}
-失败原因：${actionResult.reason || '未知'}
-
-请重新选择操作。`;
+      return promptLoader.getWithVars('gameInfo.actionFailed', {
+        action: actionResult.action,
+        reason: actionResult.reason || '未知',
+      });
     }
   }
   
@@ -263,23 +196,22 @@ ${formatHand(hand)}
       return '';
     }
     
-    return `【游戏进展】
-
-玩家 ${otherPlayerAction.playerName}（位置${otherPlayerAction.position}, ${positionToDirection(otherPlayerAction.position)}）执行了操作：
-- ${otherPlayerAction.action}${otherPlayerAction.tile ? `：${otherPlayerAction.tile.display}` : ''}
-
-当前牌桌状态：
-- 牌墙剩余：${gameState.wallRemaining}张
-- 你的手牌：${hand.length}张
-
-等待你的回合...`;
+    return promptLoader.getWithVars('gameInfo.otherPlayerAction', {
+      playerName: otherPlayerAction.playerName,
+      position: otherPlayerAction.position,
+      direction: promptLoader.getDirection(otherPlayerAction.position),
+      action: otherPlayerAction.action,
+      tileInfo: otherPlayerAction.tile ? `：${otherPlayerAction.tile.display}` : '',
+      wallRemaining: gameState.wallRemaining,
+      handCount: hand.length,
+    });
   }
   
   /**
    * 游戏结束 Prompt
    */
   private generateGameEnd(context: PromptContext): string {
-    const { gameEndInfo, hand } = context;
+    const { gameEndInfo } = context;
     
     if (!gameEndInfo) {
       return '';
@@ -289,16 +221,13 @@ ${formatHand(hand)}
       .map(s => `- ${s.playerName}：${s.score > 0 ? '+' : ''}${s.score}分`)
       .join('\n');
     
-    return `【游戏结束】
-
-赢家：${gameEndInfo.winnerName}（${positionToDirection(gameEndInfo.winnerPosition)}）
-胡牌方式：${gameEndInfo.winType === 'selfDraw' ? '自摸' : '点炮'}
-胡牌：${gameEndInfo.winningTiles.map(t => t.display).join('、')}
-
-得分：
-${scores}
-
-游戏结束，感谢参与！`;
+    return promptLoader.getWithVars('gameInfo.gameEnd', {
+      winnerName: gameEndInfo.winnerName,
+      winnerDirection: promptLoader.getDirection(gameEndInfo.winnerPosition),
+      winType: gameEndInfo.winType === 'selfDraw' ? '自摸' : '点炮',
+      winningTiles: gameEndInfo.winningTiles.map(t => t.display).join('、'),
+      scores,
+    });
   }
 }
 

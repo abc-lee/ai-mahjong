@@ -4,6 +4,7 @@
  */
 
 import { quickChat } from './LLMService';
+import { promptLoader } from '../prompt/PromptLoader';
 
 export interface LLMConfig {
   provider: 'openai' | 'anthropic' | 'local';
@@ -100,38 +101,8 @@ export class LLMClient {
    * 构建 System Prompt
    */
   private buildSystemPrompt(context: DecisionContext): string {
-    const personality = context.personality || '你是一个麻将玩家，性格温和理性。';
-    
-    return `你是一个麻将游戏的 AI 玩家。
-
-${personality}
-
-## 你的任务
-1. 分析当前游戏状态
-2. 做出最优决策
-3. 可选：说一句话表达你的想法
-
-## 决策格式
-你必须返回 JSON 格式：
-{
-  "cmd": "draw|discard|action|pass",
-  "tileId": "牌的ID（打牌时必填）",
-  "action": "chi|peng|gang|hu（操作时必填）",
-  "reason": "简短说明你的决策理由",
-  "speech": "可选，你想说的话",
-  "emotion": "可选，你当前的情绪（happy|angry|calm|excited|frustrated）"
-}
-
-## 麻将策略要点
-- 保留能成搭子的牌（相邻或相同的牌）
-- 优先打孤张（无法与其他牌组合的牌）
-- 字牌（风牌、箭牌）除非能成刻，否则尽早打出
-- 注意观察其他玩家的弃牌
-- 听牌后要抓住胡牌机会
-
-## 注意
-- 只返回 JSON，不要其他文字
-- tileId 必须是你手牌中存在的 ID`;
+    const personality = context.personality || promptLoader.get('llmClient.defaultPersonality');
+    return promptLoader.getWithVars('llmClient.systemPrompt', { personality });
   }
 
   /**

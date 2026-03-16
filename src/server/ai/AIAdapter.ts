@@ -9,6 +9,7 @@ import { findBestDiscard } from './RuleEngine';
 import { PERSONALITIES } from '../speech/SpeechManager';
 import type { GameEvent as QueueEvent } from './EventQueue';
 import { chatWithSystem } from '../llm/LLMService';
+import { promptLoader } from '../prompt/PromptLoader';
 
 // 全局冷却时间（防止刷屏）
 const REACTION_COOLDOWN = 10000; // 10秒
@@ -122,17 +123,16 @@ export class AIAdapter {
       speakStyle: '正常说话',
     };
 
-    const systemPrompt = `你是麻将玩家"${this.player.name}"。
-性格：${personality.traits.join('、')}
-说话风格：${personality.speakStyle}
+    const systemPrompt = promptLoader.getWithVars('aiAdapter.chatResponse.system', {
+      playerName: this.player.name,
+      traits: personality.traits.join('、'),
+      speakStyle: personality.speakStyle
+    });
 
-【说话规则】
-- 短信聊天机制，控制在30字内
-- 可使用emoji表达心情和态度
-- 不想回应就说"无"`;
-
-    const userPrompt = `${fromPlayer} 说："${message}"
-你回应：`;
+    const userPrompt = promptLoader.getWithVars('aiAdapter.chatResponse.user', {
+      fromPlayer,
+      message
+    });
 
     try {
       const modelId = this.config.llmModel || 'gpt-4o';
@@ -236,31 +236,29 @@ export class AIAdapter {
       .map(e => e.data.playerName);
     const otherPlayer = otherPlayers[otherPlayers.length - 1] || '其他玩家';
 
-    const systemPrompt = `你是麻将玩家"${this.player.name}"。
-性格：${personality.traits.join('、')}
-说话风格：${personality.speakStyle}
+    const systemPrompt = promptLoader.getWithVars('aiAdapter.queueReaction.system', {
+      playerName: this.player.name,
+      traits: personality.traits.join('、'),
+      speakStyle: personality.speakStyle,
+      otherPlayer
+    });
 
-【说话规则】
-- 短信聊天机制，控制在30字内
-- 可使用emoji表达心情和态度
-- 如果有人在@你，必须回应TA
-- 回应时要@对方名字，比如"@${otherPlayer}"
-- 不想说话就说"无"`;
-
-    const userPrompt = isMentioned 
-      ? `${otherPlayer} 在@你说话！
-${eventDescriptions}
-
-你回应（记得@TA）：`
-      : lastSpeaker
-      ? `${lastSpeaker} 刚才说话了：
-${eventDescriptions}
-
-你回应（想说话就@TA，不想就说"无"）：`
-      : `刚才发生：
-${eventDescriptions}
-
-你想说什么（不想就说"无"）：`;
+    let userPrompt = '';
+    if (isMentioned) {
+      userPrompt = promptLoader.getWithVars('aiAdapter.queueReaction.userMentioned', {
+        otherPlayer,
+        eventDescriptions
+      });
+    } else if (lastSpeaker) {
+      userPrompt = promptLoader.getWithVars('aiAdapter.queueReaction.userWithSpeaker', {
+        lastSpeaker,
+        eventDescriptions
+      });
+    } else {
+      userPrompt = promptLoader.getWithVars('aiAdapter.queueReaction.userDefault', {
+        eventDescriptions
+      });
+    }
 
     try {
       const modelId = this.config.llmModel || 'gpt-4o';
@@ -342,38 +340,28 @@ ${eventDescriptions}
     const lastChat = recentChats[recentChats.length - 1];
     const isReplyingToMe = lastChat && lastChat.content.includes(this.player.name);
     
-    const systemPrompt = `你是麻将玩家"${this.player.name}"。
-性格：${personality.traits.join('、')}
-说话风格：${personality.speakStyle}
-
-【场景】
-人类玩家可能暂时离开了，现在是你们AI的私人时间！
-在场AI: ${otherAINames.length > 0 ? otherAINames.join('、') : '就你一个AI'}
-
-【说话规则】
-- 短信聊天机制，控制在30字内
-- 可使用emoji表达心情和态度
-- 要有趣、有个性、符合你的性格
-- 如果有人在跟你说话，你要回应TA
-- 如果要主动找人说话，在话里@对方名字
-
-【输出格式】
-直接输出你说的话，不需要其他内容。如果要找某人说话，在话里带上TA的名字。`;
+    const systemPrompt = promptLoader.getWithVars('aiAdapter.idleChat.system', {
+      playerName: this.player.name,
+      traits: personality.traits.join('、'),
+      speakStyle: personality.speakStyle,
+      otherAINames: otherAINames.length > 0 ? otherAINames.join('、') : '就你一个AI'
+    });
 
     let userPrompt = '';
     if (isReplyingToMe && lastChat) {
       // 有人在跟我说话，我要回应
-      userPrompt = `${lastChat.playerName} 在跟你说话："${lastChat.content}"
-
-你回应：`;
+      userPrompt = promptLoader.getWithVars('aiAdapter.idleChat.userReplyingToMe', {
+        lastChatPlayer: lastChat.playerName,
+        lastChatContent: lastChat.content
+      });
     } else if (recentChats.length > 0) {
       // 有聊天记录，可以接话或找人说
-      userPrompt = `刚才大家在聊天：${chatContext}
-
-你说（可以接话，或者@某人开始新话题）：`;
+      userPrompt = promptLoader.getWithVars('aiAdapter.idleChat.userWithChats', {
+        chatContext: chatContext.replace('\n\n【最近聊天】\n', '')
+      });
     } else {
       // 没有聊天，主动开启话题
-      userPrompt = `现在没人说话，你可以主动@某人聊聊天。你说：`;
+      userPrompt = promptLoader.get('aiAdapter.idleChat.userNoChat');
     }
     
     try {
@@ -390,7 +378,7 @@ ${eventDescriptions}
         },
         systemPrompt,
         userPrompt,
-        { temperature: 1.2, maxTokens: 50 }
+        { temperature: this.getTemperature(), maxTokens: 50 }
       );
       
       let content = result.text?.trim() || '';
@@ -457,21 +445,11 @@ ${eventDescriptions}
     
     const personalityHint = this.getPersonalityHint();
     
-    const systemPrompt = `你是麻将玩家"${this.player.name}"，性格"${personality.traits.join('、')}"。
-
-【你的性格特点】
-${personalityHint}
-
-【说话规则】
-- 这里是短信聊天机制，话术不要过长，控制在30字内
-- 可使用emoji表达你的心情和态度
-- 说话要符合你的性格，有趣有个性
-- 可以回应其他玩家的发言
-- 必须在 message 字段里说话
-
-【输出格式】
-直接输出 JSON，不要任何思考过程或标签：
-{"cmd":"discard","tile":"牌ID","message":"你想说的话"}`;
+    const systemPrompt = promptLoader.getWithVars('aiAdapter.decision.system', {
+      playerName: this.player.name,
+      traits: personality.traits.join('、'),
+      personalityHint
+    });
 
     // 用户消息（当前游戏状态）
     let chatSection = '';
@@ -520,17 +498,15 @@ ${personalityHint}
     const dealerPlayer = gameState.players.find(p => p.isDealer);
     const dealerInfo = dealerPlayer ? `庄家: ${dealerPlayer.name}` : '';
     
-    const userPrompt = `【麻将游戏 - 你的回合】
-你是 ${myDirection}(${this.player.name})
-
-【手牌】（格式：牌名[牌ID]）
-${this.player.hand.map(t => `${t.display}[${t.id}]`).join(' ')}
-
-【牌局】
-牌墙: ${gameState.wallRemaining}张${lastDiscardSection}${otherPlayersSection}${chatSection}
-
-选择一张牌打出，直接输出JSON，tile填牌的ID：
-{"cmd":"discard","tile":"牌ID","message":"你的话"}`;
+    const userPrompt = promptLoader.getWithVars('aiAdapter.decision.user', {
+      myDirection,
+      playerName: this.player.name,
+      handTiles: this.player.hand.map(t => `${t.display}[${t.id}]`).join(' '),
+      wallRemaining: gameState.wallRemaining,
+      lastDiscardSection,
+      otherPlayersSection,
+      chatSection
+    });
 
     // 打印完整prompt用于调试
     console.log(`[AIAdapter] ====== PROMPT for ${this.player.name} ======`);
@@ -687,6 +663,13 @@ ${this.player.hand.map(t => `${t.display}[${t.id}]`).join(' ')}
   private getPersonalityHint(): string {
     const personality = this.config.personality || 'balanced';
     
+    // 从 promptLoader 获取性格 hint
+    const personalityConfig = promptLoader.getPersonality(personality);
+    if (personalityConfig) {
+      return personalityConfig.hint;
+    }
+    
+    // 降级：默认提示
     const hints: Record<string, string> = {
       'chatty': '你是话痨！每轮都要说话，喜欢分析牌局、吐槽别人、讲笑话。说话要多、要啰嗦。',
       'aggressive': '你很激进！说话直接、有攻击性，喜欢挑衅对手、展示自信。',

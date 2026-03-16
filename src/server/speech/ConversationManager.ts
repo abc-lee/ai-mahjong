@@ -18,6 +18,7 @@ import type { Player } from '@shared/types';
 import type { Server } from 'socket.io';
 import { PERSONALITIES, Personality } from './SpeechManager';
 import { chatWithSystem } from '../llm/LLMService';
+import { promptLoader } from '../prompt/PromptLoader';
 
 // 根据 personality 类型获取性格配置
 function getPersonalityByType(type: string, playerName: string): Personality {
@@ -350,19 +351,16 @@ export class ConversationManager {
     const messageContext = messages.map(m => `${m.playerName}: "${m.content}"`).join('\n');
     const lastMessage = messages[messages.length - 1];
     
-    const systemPrompt = `你是麻将玩家"${aiPlayer.name}"。
-性格：${personality.traits.join('、')}
-说话风格：${personality.speakStyle}
+    const systemPrompt = promptLoader.getWithVars('conversation.response.system', {
+      playerName: aiPlayer.name,
+      traits: personality.traits.join('、'),
+      speakStyle: personality.speakStyle,
+      playerList
+    });
 
-牌桌玩家：
-${playerList}
-
-规则：简短回应（30字内），直接说话。不想说就回"无"。`;
-
-    const userPrompt = `刚才大家说：
-${messageContext}
-
-你回应：`;
+    const userPrompt = promptLoader.getWithVars('conversation.response.user', {
+      messageContext
+    });
 
     console.log(`[Conversation] >>> ${aiPlayer.name} 批量消息上下文: ${messages.length} 条`);
 
@@ -408,27 +406,12 @@ ${messageContext}
    * Fallback 回应（无 LLM 时）
    */
   private fallbackResponse(aiPlayer: Player, message: ConversationMessage): string | null {
-    const personality = PERSONALITIES[aiPlayer.name];
+    // 优先使用 AI 自己配置的 personality 类型
+    const aiConfig = (aiPlayer as any).aiConfig;
+    const personalityType = aiConfig?.personality || 'balanced';
     
-    if (personality?.traits.includes('话痨')) {
-      const templates = [
-        `哈哈，${message.playerName}说得对`,
-        `${message.playerName}，我也这么觉得`,
-        `是呀是呀`,
-      ];
-      return templates[Math.floor(Math.random() * templates.length)];
-    }
-    
-    if (personality?.traits.includes('暴躁')) {
-      const templates = [
-        `少废话，打牌`,
-        `${message.playerName}你话真多`,
-        `快点打牌行不行`,
-      ];
-      return templates[Math.floor(Math.random() * templates.length)];
-    }
-    
-    return null;
+    // 根据 personality 类型选择 fallback 模板
+    return promptLoader.getRandomFallback(personalityType, message.playerName);
   }
 
   private randomDelay(): number {
