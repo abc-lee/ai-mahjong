@@ -15,8 +15,11 @@ export interface PersonalityConfig {
   traits: string[];
   speakStyle: string;
   hint?: string;
+  gender?: string;
   chatFrequency: number;
+  chatProbability?: number;
   angerThreshold?: number;
+  behaviors?: string[];
   templates?: {
     happy?: string[];
     angry?: string[];
@@ -34,6 +37,19 @@ export interface PromptConfig {
     suitNames: Record<string, string>;
     actionNames: Record<string, string>;
     playerTypes: Record<string, string>;
+  };
+  identityTemplate: {
+    core: string;
+    genderOptions: string[];
+  };
+  personalityGuide: Record<string, {
+    traits: string[];
+    chatProbability: number;
+  }>;
+  chatRules: {
+    do: string[];
+    dont: string[];
+    triggers: string[];
   };
   aiAdapter: {
     chatResponse: { system: string; user: string };
@@ -54,6 +70,8 @@ export interface PromptConfig {
       lastDiscard: string;
       otherPlayers: string;
       chatHistory: string;
+      recentEvents: string;
+      crossGameMemory: string;
     };
     fallbackTemplates: Record<string, string[]>;
   };
@@ -265,6 +283,63 @@ class PromptLoader {
     
     const template = templates[Math.floor(Math.random() * templates.length)];
     return this.replaceVars(template, { playerName });
+  }
+
+  /**
+   * 获取身份模板
+   */
+  getIdentityTemplate(vars: { playerName: string; gender?: string; traits: string }): string {
+    const config = this.load();
+    return this.replaceVars(config.identityTemplate.core, {
+      playerName: vars.playerName,
+      gender: vars.gender || '玩家',
+      traits: vars.traits
+    });
+  }
+
+  /**
+   * 获取聊天规则
+   */
+  getChatRules(): { do: string[]; dont: string[]; triggers: string[] } {
+    const config = this.load();
+    return config.chatRules;
+  }
+
+  /**
+   * 获取聊天规则格式化字符串
+   */
+  getChatRulesFormatted(): { doText: string; dontText: string } {
+    const rules = this.getChatRules();
+    return {
+      doText: rules.do.map(r => `- ${r}`).join('\n'),
+      dontText: rules.dont.map(r => `- ${r}`).join('\n')
+    };
+  }
+
+  /**
+   * 获取性格表现指南
+   */
+  getPersonalityGuide(type: string): string {
+    const config = this.load();
+    const guide = config.personalityGuide[type];
+    if (!guide) return '';
+    return guide.traits.join('\n');
+  }
+
+  /**
+   * 获取说话概率（按性格类型）
+   */
+  getChatProbability(personalityType: string): number {
+    const personality = this.getPersonality(personalityType);
+    return personality?.chatProbability || 0.3;
+  }
+
+  /**
+   * 获取角色的性别
+   */
+  getCharacterGender(name: string): string {
+    const character = this.getCharacter(name);
+    return character?.gender || '玩家';
   }
 }
 
