@@ -90,7 +90,7 @@ export async function generateLLMText(
       model,
       messages,
       temperature: options?.temperature ?? 0.9,
-      maxTokens: options?.maxTokens ?? 800,
+      maxOutputTokens: options?.maxTokens ?? 800,  // AI SDK 5.0 用 maxOutputTokens
     } as any);
     
     console.log(`[LLMService] 调用成功: text="${result.text?.substring(0, 100)}"`);
