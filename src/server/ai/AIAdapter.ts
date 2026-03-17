@@ -7,6 +7,7 @@ import type { Player, AIConfig } from '@shared/types';
 import type { Tile, GameStatePublic, PendingAction } from '@shared/types';
 import { findBestDiscard } from './RuleEngine';
 import { PERSONALITIES } from '../speech/SpeechManager';
+import { memoryManager } from '../speech/MemoryManager';
 import type { GameEvent as QueueEvent } from './EventQueue';
 import { chatWithSystem } from '../llm/LLMService';
 import { promptLoader } from '../prompt/PromptLoader';
@@ -445,10 +446,17 @@ export class AIAdapter {
     
     const personalityHint = this.getPersonalityHint();
     
+    // 获取记忆摘要
+    const memorySummary = memoryManager.generateMemorySummary(this.player.id);
+    const recentEvents = memoryManager.getRecentEvents(this.player.id, 5)
+      .map(e => `- ${e.content || e.type}`)
+      .join('\n') || '无';
+    
     const systemPrompt = promptLoader.getWithVars('aiAdapter.decision.system', {
       playerName: this.player.name,
       traits: personality.traits.join('、'),
-      personalityHint
+      personalityHint,
+      chatProbability: this.getChatProbability()
     });
 
     // 用户消息（当前游戏状态）
@@ -494,6 +502,12 @@ export class AIAdapter {
       }
     }
     
+    // 记忆区（跨局印象）
+    let memorySection = '';
+    if (memorySummary) {
+      memorySection = `\n\n【你的记忆】\n${memorySummary}`;
+    }
+    
     // 庄家信息
     const dealerPlayer = gameState.players.find(p => p.isDealer);
     const dealerInfo = dealerPlayer ? `庄家: ${dealerPlayer.name}` : '';
@@ -505,7 +519,8 @@ export class AIAdapter {
       wallRemaining: gameState.wallRemaining,
       lastDiscardSection,
       otherPlayersSection,
-      chatSection
+      chatSection,
+      memorySection
     });
 
     // 打印完整prompt用于调试
@@ -678,6 +693,14 @@ export class AIAdapter {
     };
     
     return hints[personality] || hints['balanced'];
+  }
+
+  /**
+   * 获取说话概率
+   */
+  private getChatProbability(): number {
+    const personality = this.config.personality || 'balanced';
+    return promptLoader.getChatProbability(personality);
   }
 
   /**
