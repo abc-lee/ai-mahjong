@@ -323,7 +323,7 @@ export class ConversationManager {
         },
         systemPrompt,
         userPrompt,
-        { temperature: 1.0, maxTokens: 300 }  // 预留思考链空间
+        { temperature: 1.0, maxTokens: 800 }  // 思考链+回复共需要
       );
       
       let content = result.text;
