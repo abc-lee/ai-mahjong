@@ -97,7 +97,6 @@ export interface PromptConfig {
   };
   promptNL: Record<string, string>;
   personalities: Record<string, PersonalityConfig>;
-  characters: Record<string, PersonalityConfig>;
 }
 
 /**
@@ -252,22 +251,6 @@ class PromptLoader {
   }
 
   /**
-   * 获取预设角色配置（按名字，如 紫璃、白泽）
-   */
-  getCharacter(name: string): PersonalityConfig | undefined {
-    const config = this.load();
-    return config.characters[name];
-  }
-
-  /**
-   * 获取所有预设角色名字
-   */
-  getCharacterNames(): string[] {
-    const config = this.load();
-    return Object.keys(config.characters);
-  }
-
-  /**
    * 获取所有性格类型
    */
   getPersonalityTypes(): string[] {
@@ -334,14 +317,6 @@ class PromptLoader {
   getChatProbability(personalityType: string): number {
     const personality = this.getPersonality(personalityType);
     return personality?.chatProbability || 0.3;
-  }
-
-  /**
-   * 获取角色的性别
-   */
-  getCharacterGender(name: string): string {
-    const character = this.getCharacter(name);
-    return character?.gender || '玩家';
   }
 
   /**

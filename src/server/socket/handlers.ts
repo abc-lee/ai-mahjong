@@ -220,7 +220,7 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
           
           // 添加情绪上下文
           if (speechManager) {
-            const emotionPrompt = speechManager.generateEmotionPrompt(player.id, player.name);
+            const emotionPrompt = speechManager.generateEmotionPrompt(player.id, player.aiConfig?.personality);
             prompt = emotionPrompt + '\n' + prompt;
           }
           
@@ -1969,7 +1969,7 @@ export async function handleAgentRequestState(
     
     // 添加情绪上下文
     const speechManager = getSpeechManager(io, roomId);
-    const emotionPrompt = speechManager.generateEmotionPrompt(player.id, player.name);
+    const emotionPrompt = speechManager.generateEmotionPrompt(player.id, player.aiConfig?.personality);
     prompt = emotionPrompt + '\n' + prompt;
     
     console.log(`[Server] Agent ${player.name} 请求重新发送状态`);

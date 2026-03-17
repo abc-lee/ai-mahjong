@@ -45,21 +45,6 @@ export interface Personality {
   };
 }
 
-// 预设个性（从 JSON 加载）
-export const PERSONALITIES: Record<string, Personality> = Object.fromEntries(
-  promptLoader.getCharacterNames().map(name => {
-    const config = promptLoader.getCharacter(name)!;
-    return [name, {
-      name: config.name,
-      traits: config.traits,
-      speakStyle: config.speakStyle,
-      angerThreshold: config.angerThreshold || 50,
-      chatFrequency: config.chatFrequency,
-      templates: config.templates,
-    }];
-  })
-);
-
 // 按 personality 类型索引的配置（从 JSON 加载）
 export const PERSONALITY_BY_TYPE: Record<string, Personality> = Object.fromEntries(
   promptLoader.getPersonalityTypes().map(type => {
@@ -460,12 +445,15 @@ export class SpeechManager {
   }
 
   /**
-   * 根据情绪和记忆生成发言提示
-   */
-  generateEmotionPrompt(playerId: string, personalityName: string): string {
+    * 根据情绪和记忆生成发言提示
+    */
+  generateEmotionPrompt(playerId: string, personalityType?: string): string {
     const emotion = this.getEmotion(playerId);
-    const personality = PERSONALITIES[personalityName] || PERSONALITIES['测试员'];
-    
+
+    // 使用性格类型查找配置
+    const personalityTypeKey = personalityType || 'balanced';
+    const personality = PERSONALITY_BY_TYPE[personalityTypeKey] || PERSONALITY_BY_TYPE['balanced'];
+
     let prompt = `你的性格：${personality.traits.join('、')}\n`;
     prompt += `说话风格：${personality.speakStyle}\n\n`;
     
@@ -499,8 +487,8 @@ export class SpeechManager {
   /**
    * 获取个性发言模板
    */
-  getPersonalityTemplate(playerName: string, category: 'happy' | 'angry' | 'thinking' | 'winning' | 'losing' | 'greeting' | 'goodbye'): string | null {
-    const personality = PERSONALITIES[playerName] || PERSONALITIES['测试员'];
+  getPersonalityTemplate(personalityType: string, category: 'happy' | 'angry' | 'thinking' | 'winning' | 'losing' | 'greeting' | 'goodbye'): string | null {
+    const personality = PERSONALITY_BY_TYPE[personalityType] || PERSONALITY_BY_TYPE['balanced'];
     const templates = personality.templates?.[category];
     if (templates && templates.length > 0) {
       return templates[Math.floor(Math.random() * templates.length)];
@@ -518,17 +506,10 @@ export class SpeechManager {
     situation: 'turn_start' | 'good_tile' | 'bad_tile' | 'someone_hu' | 'someone_pong' | 'someone_gang' | 'game_start' | 'game_end' | 'drew_tile' | 'waiting' | 'almost_hu',
     personalityType?: string  // AI 的 personality 类型 (chatty, sarcastic, etc.)
   ): void {
-    // 优先使用 personalityType 查找配置，否则按名字查找，最后使用默认值
-    let personality: Personality;
-    
-    if (personalityType && PERSONALITY_BY_TYPE[personalityType]) {
-      personality = { ...PERSONALITY_BY_TYPE[personalityType], name: playerName };
-    } else if (PERSONALITIES[playerName]) {
-      personality = PERSONALITIES[playerName];
-    } else {
-      personality = PERSONALITIES['测试员'];
-    }
-    
+    // 使用性格类型查找配置
+    const personalityTypeKey = personalityType || 'balanced';
+    const personality = PERSONALITY_BY_TYPE[personalityTypeKey] || PERSONALITY_BY_TYPE['balanced'];
+
     const emotion = this.getEmotion(playerId);
     
     console.log(`[Speech] triggerProactiveSpeech: ${playerName}, situation=${situation}, personalityType=${personalityType || 'none'}, chatFrequency=${personality.chatFrequency}`);
@@ -555,37 +536,37 @@ export class SpeechManager {
 
     switch (situation) {
       case 'turn_start':
-        template = this.getPersonalityTemplate(playerName, 'thinking');
+        template = this.getPersonalityTemplate(personalityTypeKey, 'thinking');
         break;
       case 'good_tile':
       case 'drew_tile':
-        template = this.getPersonalityTemplate(playerName, 'happy');
+        template = this.getPersonalityTemplate(personalityTypeKey, 'happy');
         break;
       case 'bad_tile':
-        template = this.getPersonalityTemplate(playerName, 'angry');
+        template = this.getPersonalityTemplate(personalityTypeKey, 'angry');
         break;
       case 'someone_hu':
         template = emotion.happiness < 0 
-          ? this.getPersonalityTemplate(playerName, 'losing')
-          : this.getPersonalityTemplate(playerName, 'winning');
+          ? this.getPersonalityTemplate(personalityTypeKey, 'losing')
+          : this.getPersonalityTemplate(personalityTypeKey, 'winning');
         break;
       case 'someone_pong':
       case 'someone_gang':
-        template = this.getPersonalityTemplate(playerName, 'angry');
+        template = this.getPersonalityTemplate(personalityTypeKey, 'angry');
         break;
       case 'game_start':
-        template = this.getPersonalityTemplate(playerName, 'greeting');
+        template = this.getPersonalityTemplate(personalityTypeKey, 'greeting');
         break;
       case 'game_end':
         template = emotion.happiness > 0
-          ? this.getPersonalityTemplate(playerName, 'winning')
-          : this.getPersonalityTemplate(playerName, 'losing');
+          ? this.getPersonalityTemplate(personalityTypeKey, 'winning')
+          : this.getPersonalityTemplate(personalityTypeKey, 'losing');
         break;
       case 'waiting':
-        template = this.getPersonalityTemplate(playerName, 'thinking');
+        template = this.getPersonalityTemplate(personalityTypeKey, 'thinking');
         break;
       case 'almost_hu':
-        template = this.getPersonalityTemplate(playerName, 'happy');
+        template = this.getPersonalityTemplate(personalityTypeKey, 'happy');
         break;
     }
 
@@ -620,14 +601,10 @@ export class SpeechManager {
     const randomPlayer = players[Math.floor(Math.random() * players.length)];
     if (!randomPlayer) return;
 
-    // 优先使用 personalityType 查找配置
-    let personality: Personality;
-    if (randomPlayer.personality && PERSONALITY_BY_TYPE[randomPlayer.personality]) {
-      personality = PERSONALITY_BY_TYPE[randomPlayer.personality];
-    } else {
-      personality = PERSONALITIES[randomPlayer.name] || PERSONALITIES['测试员'];
-    }
-    
+    // 使用性格类型查找配置
+    const randomPersonalityType = (randomPlayer as any).aiConfig?.personality || 'balanced';
+    const personality = PERSONALITY_BY_TYPE[randomPersonalityType] || PERSONALITY_BY_TYPE['balanced'];
+
     const emotion = this.getEmotion(randomPlayer.id);
 
     // 低概率触发
@@ -638,7 +615,7 @@ export class SpeechManager {
     // 随机选择发言内容
     const categories: Array<'happy' | 'angry' | 'thinking'> = ['happy', 'angry', 'thinking'];
     const category = categories[Math.floor(Math.random() * categories.length)];
-    const template = this.getPersonalityTemplate(randomPlayer.name, category);
+    const template = this.getPersonalityTemplate(randomPersonalityType, category);
 
     if (template) {
       setTimeout(() => {

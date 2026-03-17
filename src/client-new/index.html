@@ -384,14 +384,14 @@
 </div>
 
 <!-- 底部：手牌操作区 (我) -->
-<!-- 自己的弃牌区和副露区（独立定位，不影响手牌布局） -->
-<div class="absolute bottom-32 sm:bottom-40 left-1/2 -translate-x-1/2 flex flex-col items-center" id="player-south" data-position="south">
-<div class="flex justify-center gap-0.5 mb-1 flex-wrap max-w-[600px]" id="south-discards"></div>
-<div class="flex justify-center gap-1 mb-1" id="south-melds"></div>
-</div>
 <div class="absolute bottom-4 left-1/2 -translate-x-1/2 w-[95%] max-w-[900px]" id="bottom-area">
 <!-- 操作按钮 - 动态渲染，默认隐藏 -->
 <div class="flex justify-center gap-3 mb-4 sm:mb-8" id="action-buttons">
+</div>
+<!-- 弃牌区和副露区（紧挨手牌） -->
+<div class="flex flex-col items-center" id="player-south" data-position="south">
+<div class="flex justify-center gap-0.5 flex-wrap max-w-[600px]" id="south-discards"></div>
+<div class="flex justify-center gap-1" id="south-melds"></div>
 </div>
 <!-- 手牌展示 -->
 <div id="hand-area" class="flex justify-center items-end gap-1 px-4 sm:gap-2">

@@ -16,71 +16,19 @@
 
 import type { Player } from '@shared/types';
 import type { Server } from 'socket.io';
-import { PERSONALITIES, Personality } from './SpeechManager';
+import { PERSONALITY_BY_TYPE, Personality } from './SpeechManager';
 import { chatWithSystem } from '../llm/LLMService';
 import { promptLoader } from '../prompt/PromptLoader';
 
 // 根据 personality 类型获取性格配置
 function getPersonalityByType(type: string, playerName: string): Personality {
-  // 先尝试从预设名字查找
-  if (PERSONALITIES[playerName]) {
-    return PERSONALITIES[playerName];
-  }
-  
-  // 根据 personality 类型返回配置
-  const typeConfigs: Record<string, Personality> = {
-    chatty: {
-      name: playerName,
-      traits: ['话痨', '话多', '喜欢分析'],
-      speakStyle: '每轮都要说话，喜欢分析牌局、吐槽别人、讲笑话。说话要多、要啰嗦。',
-      angerThreshold: 50,
-      chatFrequency: 0.8,
-    },
-    sarcastic: {
-      name: playerName,
-      traits: ['毒舌', '冷淡', '讽刺'],
-      speakStyle: '说话带刺，喜欢吐槽，实力强',
-      angerThreshold: 30,
-      chatFrequency: 0.4,
-    },
-    tsundere: {
-      name: playerName,
-      traits: ['傲娇', '不服输', '心口不一'],
-      speakStyle: '嘴上不说，内心善良',
-      angerThreshold: 40,
-      chatFrequency: 0.3,
-    },
-    lucky: {
-      name: playerName,
-      traits: ['幸运星', '运气好', '乐天派'],
-      speakStyle: '总是很开心，运气特别好',
-      angerThreshold: 70,
-      chatFrequency: 0.4,
-    },
-    serious: {
-      name: playerName,
-      traits: ['认真', '计算型', '话少'],
-      speakStyle: '专注于牌局，很少说话',
-      angerThreshold: 60,
-      chatFrequency: 0.1,
-    },
-    dramatic: {
-      name: playerName,
-      traits: ['戏精', '戏多', '夸张'],
-      speakStyle: '每件事都要夸张表达，喜欢演戏',
-      angerThreshold: 40,
-      chatFrequency: 0.6,
-    },
-    balanced: {
-      name: playerName,
-      traits: ['普通'],
-      speakStyle: '正常说话',
-      angerThreshold: 50,
-      chatFrequency: 0.3,
-    },
+  const personalityType = type || 'balanced';
+  const config = PERSONALITY_BY_TYPE[personalityType] || PERSONALITY_BY_TYPE['balanced'];
+
+  return {
+    ...config,
+    name: playerName,
   };
-  
-  return typeConfigs[type] || typeConfigs['balanced'];
 }
 
 // 会话消息

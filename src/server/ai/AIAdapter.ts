@@ -6,7 +6,7 @@
 import type { Player, AIConfig } from '@shared/types';
 import type { Tile, GameStatePublic, PendingAction } from '@shared/types';
 import { findBestDiscard } from './RuleEngine';
-import { PERSONALITIES } from '../speech/SpeechManager';
+import { PERSONALITY_BY_TYPE } from '../speech/SpeechManager';
 import { memoryManager } from '../speech/MemoryManager';
 import type { GameEvent as QueueEvent } from './EventQueue';
 import { chatWithSystem } from '../llm/LLMService';
@@ -118,16 +118,15 @@ export class AIAdapter {
       return null;
     }
 
-    const personality = PERSONALITIES[this.player.name] || {
-      name: this.player.name,
-      traits: ['普通'],
-      speakStyle: '正常说话',
-    };
+    const personalityType = this.config.personality || 'balanced';
+    const personalityConfig = promptLoader.getPersonality(personalityType);
+    const traits = personalityConfig?.traits || ['普通'];
+    const speakStyle = personalityConfig?.speakStyle || '正常说话';
 
     const systemPrompt = promptLoader.getWithVars('aiAdapter.chatResponse.system', {
       playerName: this.player.name,
-      traits: personality.traits.join('、'),
-      speakStyle: personality.speakStyle
+      traits: traits.join('、'),
+      speakStyle: speakStyle
     });
 
     const userPrompt = promptLoader.getWithVars('aiAdapter.chatResponse.user', {
@@ -225,11 +224,9 @@ export class AIAdapter {
       e.data.content.includes(this.player.name)
     );
 
-    const personality = PERSONALITIES[this.player.name] || {
-      name: this.player.name,
-      traits: ['普通'],
-      speakStyle: '正常说话',
-    };
+    const personalityType = this.config.personality || 'balanced';
+    const personalityConfig = promptLoader.getPersonality(personalityType);
+    const traits = personalityConfig?.traits || ['普通'];
 
     // 找到所有其他AI的名字
     const otherPlayers = recentEvents
@@ -239,8 +236,7 @@ export class AIAdapter {
 
     const systemPrompt = promptLoader.getWithVars('aiAdapter.queueReaction.system', {
       playerName: this.player.name,
-      traits: personality.traits.join('、'),
-      speakStyle: personality.speakStyle,
+      traits: traits.join('、'),
       otherPlayer
     });
 
@@ -322,13 +318,11 @@ export class AIAdapter {
     }
     
     console.log(`[${timestamp}] [AIAdapter] ${this.player.name} 开始生成私房话...`);
-    
-    const personality = PERSONALITIES[this.player.name] || {
-      name: this.player.name,
-      traits: ['普通'],
-      speakStyle: '正常说话',
-    };
-    
+
+    const personalityType = this.config.personality || 'balanced';
+    const personalityConfig = promptLoader.getPersonality(personalityType);
+    const traits = personalityConfig?.traits || ['普通'];
+
     // 其他AI的名字
     const otherAINames = otherAIs.filter(ai => ai.name !== this.player.name).map(ai => ai.name);
     
@@ -343,8 +337,7 @@ export class AIAdapter {
     
     const systemPrompt = promptLoader.getWithVars('aiAdapter.idleChat.system', {
       playerName: this.player.name,
-      traits: personality.traits.join('、'),
-      speakStyle: personality.speakStyle,
+      traits: traits.join('、'),
       otherAINames: otherAINames.length > 0 ? otherAINames.join('、') : '就你一个AI'
     });
 
@@ -438,12 +431,10 @@ export class AIAdapter {
     if (!this.config.llmEndpoint || !this.config.llmApiKey) return null;
 
     // 获取性格配置
-    const personality = PERSONALITIES[this.player.name] || {
-      name: this.player.name,
-      traits: ['普通'],
-      speakStyle: '正常说话',
-    };
-    
+    const personalityType = this.config.personality || 'balanced';
+    const personalityConfig = promptLoader.getPersonality(personalityType);
+    const traits = personalityConfig?.traits || ['普通'];
+
     const personalityHint = this.getPersonalityHint();
     
     // 获取记忆摘要
@@ -454,7 +445,7 @@ export class AIAdapter {
     
     const systemPrompt = promptLoader.getWithVars('aiAdapter.decision.system', {
       playerName: this.player.name,
-      traits: personality.traits.join('、'),
+      traits: traits.join('、'),
       personalityHint,
       chatProbability: this.getChatProbability()
     });
