@@ -150,14 +150,9 @@ export class AIAdapter {
         userPrompt,
         { temperature: 1.0, maxTokens: 100 }
       );
-      
+
       let content = result.text?.trim() || '';
-      
-      // 简单清理
-      if (content.length > 50) {
-        content = content.substring(0, 50) + '...';
-      }
-      
+
       return content || null;
     } catch (e: any) {
       console.log(`[AIAdapter] ${this.player.name} 聊天回应失败:`, e.message);
@@ -273,17 +268,13 @@ export class AIAdapter {
         userPrompt,
         { temperature: 1.0, maxTokens: 50 }
       );
-      
+
       let content = result.text?.trim() || '';
-      
+
       if (!content || content === '无' || content === '无。' || content.length < 2) {
         return { reaction: null };
       }
-      
-      if (content.length > 30) {
-        content = content.substring(0, 30) + '...';
-      }
-      
+
       // 更新最后发言时间
       lastReactionTime.set(this.player.id, Date.now());
       
@@ -380,11 +371,7 @@ export class AIAdapter {
       if (!content || content.length < 2) {
         return null;
       }
-      
-      if (content.length > 50) {
-        content = content.substring(0, 50) + '...';
-      }
-      
+
       // 检测话里提到了谁
       let targetName: string | undefined;
       for (const name of otherAINames) {
