@@ -1024,11 +1024,26 @@ function setupPositionModal() {
           
           console.log('[Game] 配置:', { aiCount, npcCount, aiPlayers });
           
-          // 当前房间里只有 1 个人类玩家
+          // 当前房间玩家数量
           const currentPlayers = state.currentRoom?.players?.length || 1;
+          const maxPlayers = 4;
+          const availableSlots = maxPlayers - currentPlayers;
+          
+          console.log(`[Game] 当前玩家: ${currentPlayers}, 可用位置: ${availableSlots}`);
+          
+          // 计算实际能添加的 AI 和 NPC 数量
+          let actualAiCount = Math.min(aiCount, availableSlots);
+          let actualNpcCount = Math.min(npcCount, availableSlots - actualAiCount);
+          
+          if (actualAiCount < aiCount) {
+            console.log(`[Game] 警告: 设置 ${aiCount} 个AI，但只有 ${availableSlots} 个位置，实际添加 ${actualAiCount} 个`);
+          }
+          if (actualNpcCount < npcCount) {
+            console.log(`[Game] 警告: 设置 ${npcCount} 个NPC，但只剩 ${availableSlots - actualAiCount} 个位置，实际添加 ${actualNpcCount} 个`);
+          }
           
           // 添加 AI 玩家（使用配置的名字）
-          for (let i = 0; i < aiCount; i++) {
+          for (let i = 0; i < actualAiCount; i++) {
             const aiConfig = aiPlayers?.[i] || { name: `AI${i + 1}`, personality: 'balanced' };
             
             const addRes = await fetch('/api/room/add-player', {
@@ -1043,11 +1058,15 @@ function setupPositionModal() {
             });
             
             const addResult = await addRes.json();
-            console.log('[Game] 添加 AI Agent:', addResult);
+            if (!addResult.success) {
+              console.error('[Game] 添加 AI Agent 失败:', addResult.error);
+            } else {
+              console.log('[Game] 添加 AI Agent:', addResult);
+            }
           }
           
           // 添加 NPC 玩家
-          for (let i = 0; i < npcCount; i++) {
+          for (let i = 0; i < actualNpcCount; i++) {
             const addRes = await fetch('/api/room/add-player', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -1059,7 +1078,11 @@ function setupPositionModal() {
             });
             
             const addResult = await addRes.json();
-            console.log('[Game] 添加 NPC:', addResult);
+            if (!addResult.success) {
+              console.error('[Game] 添加 NPC 失败:', addResult.error);
+            } else {
+              console.log('[Game] 添加 NPC:', addResult);
+            }
           }
         }
         
