@@ -323,7 +323,7 @@ export class ConversationManager {
         },
         systemPrompt,
         userPrompt,
-        { temperature: 1.0, maxTokens: 100 }
+        { temperature: 1.0, maxTokens: 300 }  // 预留思考链空间
       );
       
       let content = result.text;
@@ -337,12 +337,7 @@ export class ConversationManager {
       if (content === '无' || content === '无。' || content.length < 2) {
         return null;
       }
-      
-      // 截断过长回应
-      if (content.length > this.config.maxLength) {
-        content = content.substring(0, this.config.maxLength);
-      }
-      
+
       return content;
     } catch (e: any) {
       console.log(`[Conversation] LLM 回应失败，使用 fallback:`, e.message);

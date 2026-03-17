@@ -90,6 +90,7 @@ export async function generateLLMText(
       model,
       messages,
       temperature: options?.temperature ?? 0.9,
+      maxTokens: options?.maxTokens ?? 500,
     } as any);
     
     console.log(`[LLMService] 调用成功: text="${result.text?.substring(0, 100)}"`);

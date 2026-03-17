@@ -148,7 +148,7 @@ export class AIAdapter {
         },
         systemPrompt,
         userPrompt,
-        { temperature: 1.0, maxTokens: 100 }
+        { temperature: 1.0, maxTokens: 300 }  // 预留思考链空间
       );
 
       let content = result.text?.trim() || '';
@@ -266,7 +266,7 @@ export class AIAdapter {
         },
         systemPrompt,
         userPrompt,
-        { temperature: 1.0, maxTokens: 50 }
+        { temperature: 1.0, maxTokens: 200 }  // 预留思考链空间
       );
 
       let content = result.text?.trim() || '';
@@ -363,7 +363,7 @@ export class AIAdapter {
         },
         systemPrompt,
         userPrompt,
-        { temperature: this.getTemperature(), maxTokens: 50 }
+        { temperature: this.getTemperature(), maxTokens: 200 }  // 预留思考链空间
       );
       
       let content = result.text?.trim() || '';
