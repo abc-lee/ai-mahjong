@@ -40,7 +40,9 @@ export interface PromptConfig {
   };
   identityTemplate: {
     core: string;
-    genderOptions: string[];
+    genderMapping: Record<string, string>;
+    ageMapping: Record<string, string>;
+    genderAgeCombos: Record<string, string>;
   };
   personalityGuide: Record<string, {
     traits: string[];
@@ -340,6 +342,37 @@ class PromptLoader {
   getCharacterGender(name: string): string {
     const character = this.getCharacter(name);
     return character?.gender || '玩家';
+  }
+
+  /**
+   * 获取性别年龄组合描述
+   * @param gender 性别：male, female, unknown
+   * @param age 年龄：young, middle, senior, unknown
+   * @returns 组合描述，如"年轻女生"、"中年男性"
+   */
+  getGenderAgeDescription(gender: string, age: string): string {
+    const config = this.load();
+    const comboKey = `${gender}_${age}`;
+    return config.identityTemplate.genderAgeCombos[comboKey] || 
+           config.identityTemplate.genderAgeCombos['unknown_unknown'] || '玩家';
+  }
+
+  /**
+   * 获取身份模板（带性别年龄）
+   */
+  getIdentityTemplateWithGenderAge(vars: { 
+    playerName: string; 
+    gender?: string; 
+    age?: string; 
+    traits: string 
+  }): string {
+    const config = this.load();
+    const genderAge = this.getGenderAgeDescription(vars.gender || 'unknown', vars.age || 'unknown');
+    return this.replaceVars(config.identityTemplate.core, {
+      playerName: vars.playerName,
+      genderAge: genderAge,
+      traits: vars.traits
+    });
   }
 }
 

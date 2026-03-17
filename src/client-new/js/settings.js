@@ -21,17 +21,27 @@ let playerConfig = {
 // AI Character presets from server
 const AI_PERSONALITIES = [
   { id: 'chatty', name: '话痨', traits: '话多、喜欢分析、热心肠' },
+  { id: 'aggressive', name: '激进', traits: '果断、冒险、敢于做大牌' },
+  { id: 'cautious', name: '谨慎', traits: '稳重、细心、爱犹豫' },
+  { id: 'balanced', name: '平衡', traits: '随和、灵活、心态好' },
   { id: 'sarcastic', name: '毒舌', traits: '冷淡、讽刺、实力强' },
   { id: 'tsundere', name: '傲娇', traits: '不服输、心口不一' },
-  { id: 'lucky', name: '幸运星', traits: '运气好、乐天派' },
-  { id: 'serious', name: '认真', traits: '计算型、话少' },
-  { id: 'dramatic', name: '戏精', traits: '戏多、夸张' },
+  { id: 'lucky', name: '幸运星', traits: '运气好、乐天派、开心' },
+  { id: 'serious', name: '认真', traits: '计算型、话少、冷静' },
+  { id: 'dramatic', name: '戏精', traits: '戏多、夸张、爱表演' },
 ];
 
 const AI_GENDERS = [
   { id: 'male', name: '男', emoji: '♂️' },
   { id: 'female', name: '女', emoji: '♀️' },
   { id: 'unknown', name: '未知', emoji: '❓' },
+];
+
+const AI_AGES = [
+  { id: 'young', name: '青年', desc: '18-30岁' },
+  { id: 'middle', name: '中年', desc: '30-50岁' },
+  { id: 'senior', name: '老年', desc: '50岁以上' },
+  { id: 'unknown', name: '未知', desc: '年龄不详' },
 ];
 
 // Initialize
@@ -459,6 +469,7 @@ function handlePlayerCountChange(e) {
       id: 'ai-' + Date.now() + '-' + playerConfig.aiPlayers.length,
       name: '',
       gender: 'unknown',
+      age: 'young',
       personality: 'balanced'
     });
   }
@@ -484,7 +495,7 @@ function renderAiConfigList() {
       <div class="flex items-center justify-between mb-3">
         <span class="text-white font-bold">AI #${index + 1}</span>
       </div>
-      <div class="grid grid-cols-3 gap-3">
+      <div class="grid grid-cols-4 gap-3">
         <div>
           <label class="text-white/60 text-xs block mb-1">名字</label>
           <input type="text" class="ai-name-input w-full bg-slate-600 rounded px-2 py-1 text-white text-sm" 
@@ -494,6 +505,12 @@ function renderAiConfigList() {
           <label class="text-white/60 text-xs block mb-1">性别</label>
           <select class="ai-gender-select w-full bg-slate-600 rounded px-2 py-1 text-white text-sm" data-index="${index}">
             ${AI_GENDERS.map(g => `<option value="${g.id}" ${ai.gender === g.id ? 'selected' : ''}>${g.emoji} ${g.name}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="text-white/60 text-xs block mb-1">年龄</label>
+          <select class="ai-age-select w-full bg-slate-600 rounded px-2 py-1 text-white text-sm" data-index="${index}">
+            ${AI_AGES.map(a => `<option value="${a.id}" ${ai.age === a.id ? 'selected' : ''}>${a.name}</option>`).join('')}
           </select>
         </div>
         <div>
@@ -523,6 +540,13 @@ function renderAiConfigList() {
     select.addEventListener('change', (e) => {
       const index = parseInt(e.target.dataset.index);
       playerConfig.aiPlayers[index].gender = e.target.value;
+    });
+  });
+  
+  container.querySelectorAll('.ai-age-select').forEach(select => {
+    select.addEventListener('change', (e) => {
+      const index = parseInt(e.target.dataset.index);
+      playerConfig.aiPlayers[index].age = e.target.value;
     });
   });
   
