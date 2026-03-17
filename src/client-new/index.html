@@ -372,8 +372,8 @@
 <input id="chat-input" class="flex-1 bg-black/40 rounded px-3 py-1 text-white text-xs outline-none border border-white/10 focus:border-yellow-500/50" placeholder="与AI和牌友聊天..." type="text"/>
 <button id="chat-send-btn" class="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1 rounded text-xs transition-colors">发送</button>
 <!-- Emoji选择面板 -->
-<div id="emoji-picker" class="hidden absolute bottom-full left-0 mb-2 bg-slate-800 rounded-lg shadow-xl border border-white/20 p-2 z-50">
-  <div class="grid grid-cols-8 gap-1 text-lg" id="emoji-grid">
+<div id="emoji-picker" class="hidden absolute bottom-full left-0 mb-2 bg-slate-800 rounded-lg shadow-xl border border-white/20 p-2 z-50 max-h-32 overflow-y-auto">
+  <div class="grid grid-cols-8 gap-0.5 text-base" id="emoji-grid">
     <!-- Emoji将由JS填充 -->
   </div>
 </div>
