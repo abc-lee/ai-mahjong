@@ -535,3 +535,63 @@ IdleDetector（独立）
 
 *文档版本: v3.3*
 *更新时间: 2026-03-16*
+
+### 2026-03-17 - AI 聊天截断问题修复
+
+**核心问题**：AI 回复末尾有"..."，话没说完就结束。换了 3 个模型都有问题。
+
+**根本原因**：Vercel AI SDK 5.0 将 `maxTokens` 参数改名为 `maxOutputTokens`。旧参数名被忽略，模型使用默认 token 限制（通常很小），导致输出被截断。
+
+**修复**：
+```typescript
+// src/server/llm/LLMService.ts:93
+const result = await generateText({
+  model,
+  messages,
+  temperature: options?.temperature ?? 0.9,
+  maxOutputTokens: options?.maxTokens ?? 800,  // AI SDK 5.0 用 maxOutputTokens
+} as any);
+```
+
+**性格配置修复**：
+- 问题：用户设置的性格没生效，代码用玩家名字而非性格类型查找
+- 修复：改用 `PERSONALITY_BY_TYPE[personalityType]` 查找
+- 性格合并为 9 种：话痨、激进、谨慎、平衡、毒舌、傲娇、幸运星、认真、戏精
+
+**提示词工程**：
+- 创建 `locales/zh-CN/prompts.json` (311 行)
+- 创建 `src/server/prompt/PromptLoader.ts` (支持 `{{变量}}` 格式)
+- 借鉴 OpenClaw：identityTemplate、personalityGuide、chatRules
+
+**其他修复**：
+- 庄家轮换：第一局随机，之后轮换（按国标规则，不连庄）
+- 风圈显示：第 1-4 局东风圈，第 5-8 局南风圈
+- emoji 选择器：128 个常用 emoji
+- 年龄段：青年 (18-30)、中年 (30-50)、老年 (50+)、未知
+
+**关键文件修改**：
+- `src/server/llm/LLMService.ts` - maxOutputTokens 参数
+- `src/server/ai/AIAdapter.ts` - 性格类型查找
+- `src/server/speech/SpeechManager.ts` - 性格类型查找
+- `src/server/speech/ConversationManager.ts` - 性格类型查找
+- `locales/zh-CN/prompts.json` - 中文提示词配置
+- `src/server/prompt/PromptLoader.ts` - 提示词加载器
+
+**提交记录**：
+- `433adab` - maxTokens 参数名应为 maxOutputTokens
+- `e45ab92` - 性格配置使用类型而非名字查找
+- `546914d` - 提示词提取到 JSON 文件
+- `d910368` - 借鉴 OpenClaw 提示词工程优化
+- `ee7a9ec` - 15 秒私房话不再聊麻将
+- `32deb06` - 庄家轮换与风圈显示修复
+
+### ADR-004: maxOutputTokens 参数名 (2026-03-17)
+- **问题**：Vercel AI SDK 5.0 将 `maxTokens` 改名为 `maxOutputTokens`
+- **症状**：AI 回复被截断，换了 3 个模型都有问题
+- **修复**：`src/server/llm/LLMService.ts:93` 使用 `maxOutputTokens`
+- **参考**：https://github.com/vercel/ai/blob/main/content/docs/08-migration-guides/26-migration-guide-5-0.mdx
+
+---
+
+*文档版本：v3.4*
+*更新时间：2026-03-17*
