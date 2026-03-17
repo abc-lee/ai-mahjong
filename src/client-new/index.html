@@ -367,9 +367,16 @@
 </div>
 </div>
 <!-- 输入框 -->
-<div class="p-2 flex gap-2 chat-input-area">
+<div class="p-2 flex gap-2 chat-input-area relative">
+<button id="emoji-btn" class="bg-slate-600 hover:bg-slate-500 text-white px-2 py-1 rounded text-sm transition-colors" title="添加表情">😀</button>
 <input id="chat-input" class="flex-1 bg-black/40 rounded px-3 py-1 text-white text-xs outline-none border border-white/10 focus:border-yellow-500/50" placeholder="与AI和牌友聊天..." type="text"/>
 <button id="chat-send-btn" class="bg-yellow-600 hover:bg-yellow-500 text-white px-3 py-1 rounded text-xs transition-colors">发送</button>
+<!-- Emoji选择面板 -->
+<div id="emoji-picker" class="hidden absolute bottom-full left-0 mb-2 bg-slate-800 rounded-lg shadow-xl border border-white/20 p-2 z-50">
+  <div class="grid grid-cols-8 gap-1 text-lg" id="emoji-grid">
+    <!-- Emoji将由JS填充 -->
+  </div>
+</div>
 </div>
 <!-- 缩放手柄 -->
 <div class="resize-handle" id="chat-resizer"></div>
@@ -489,6 +496,68 @@
     window.addEventListener('touchmove', onMove, { passive: false });
     window.addEventListener('mouseup', stopInteraction);
     window.addEventListener('touchend', stopInteraction);
+
+    // Emoji选择器
+    const emojiBtn = document.getElementById('emoji-btn');
+    const emojiPicker = document.getElementById('emoji-picker');
+    const emojiGrid = document.getElementById('emoji-grid');
+    const chatInput = document.getElementById('chat-input');
+
+    // 常用emoji列表
+    const emojis = [
+      // 表情
+      '😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊',
+      '😇', '🙂', '😉', '😌', '😍', '🥰', '😘', '😋',
+      '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫',
+      '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒',
+      '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴',
+      '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶',
+      // 手势
+      '👍', '👎', '👏', '🙌', '🤝', '🙏', '✌️', '🤞',
+      '👌', '🤙', '💪', '👊', '✊', '👋', '🤚', '🖐️',
+      // 心
+      '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '💔',
+      '💕', '💖', '💗', '💘', '💝', '💟', '♥️', '❣️',
+      // 其他
+      '🎉', '🎊', '🎁', '🏆', '🎮', '🎯', '🎲', '🀄',
+      '✨', '💫', '⭐', '🌟', '🔥', '💥', '💢', '💦',
+      '👑', '💎', '💰', '💸', '🎯', '🔥', '💯', '✅'
+    ];
+
+    // 填充emoji网格
+    emojis.forEach(emoji => {
+      const btn = document.createElement('button');
+      btn.className = 'hover:bg-slate-600 rounded p-1 cursor-pointer transition-colors';
+      btn.textContent = emoji;
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        // 插入emoji到输入框
+        const start = chatInput.selectionStart;
+        const end = chatInput.selectionEnd;
+        const text = chatInput.value;
+        chatInput.value = text.substring(0, start) + emoji + text.substring(end);
+        // 光标移到emoji后面
+        chatInput.selectionStart = chatInput.selectionEnd = start + emoji.length;
+        chatInput.focus();
+        // 隐藏选择器
+        emojiPicker.classList.add('hidden');
+      });
+      emojiGrid.appendChild(btn);
+    });
+
+    // 点击emoji按钮显示/隐藏选择器
+    emojiBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      emojiPicker.classList.toggle('hidden');
+    });
+
+    // 点击其他地方隐藏选择器
+    document.addEventListener('click', (e) => {
+      if (!emojiPicker.contains(e.target) && e.target !== emojiBtn) {
+        emojiPicker.classList.add('hidden');
+      }
+    });
 </script>
 </body>
 </html>
