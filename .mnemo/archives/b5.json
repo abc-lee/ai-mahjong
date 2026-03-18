@@ -1,11 +1,11 @@
 {
-  "blockId": 4,
-  "topic": "多语言支持国际化实现",
-  "summary": "多语言支持实现：\n- 创建 locales/en-US/prompts.json 英文提示词\n- 修改 PromptLoader.ts 添加 getAvailableLanguages()、getSeparator()、getFallback()\n- 修改 index.ts 添加语言 API 和启动时加载语言\n- 修改 settings.js 添加语言选择 UI\n- 修改 index.html 添加语言下拉框\n- AIAdapter.ts 硬编码中文改为从配置读取\n- AI 起名字功能根据语言生成对应名字\n\n修复的问题：\n- JSON 语法错误（多余的 }）\n- traits.join('、') 改为从配置读取分隔符\n- 游戏术语国际化",
-  "messageCount": 196,
-  "toolCount": 197,
-  "tokensSaved": 137200,
-  "createdAt": "2026-03-18T08:17:25.327Z",
+  "blockId": 5,
+  "topic": "多语言支持与问题修复",
+  "summary": "会话恢复与多语言功能测试：\n\n1. 读取 HANDOFF-2026-03-17.md 项目状态文档\n2. 项目清理：删除 295 行 console.log，归档测试脚本到 archive/\n3. 游戏结束评论功能修复：AI 胡牌时触发评论\n4. 多语言支持实现：\n   - 创建 locales/en-US/prompts.json 英文提示词\n   - PromptLoader.ts 添加 getAvailableLanguages()\n   - index.ts 添加语言 API\n   - settings.js 添加语言选择 UI\n\n问题修复：\n- AI 自己 @ 自己：提示词约束 + 代码过滤\n- 闲置 15 秒计时器在游戏中触发：AI 打牌/发言时也调用 resetTimer\n- 配置保存覆盖问题：只更新传入的字段\n- JSON 语法错误：多余的 }\n- traits.join('、') 硬编码：改为从配置读取分隔符",
+  "messageCount": 212,
+  "toolCount": 213,
+  "tokensSaved": 148400,
+  "createdAt": "2026-03-18T08:18:43.067Z",
   "tools": [
     {
       "tool": "msg_0",
@@ -2153,10 +2153,174 @@
           "output": "[COMPRESSED BY MNEMO - Content saved to archive. Use mnemo-recall to retrieve.]"
         }
       ]
+    },
+    {
+      "tool": "msg_197",
+      "input": {},
+      "output": "[1 tool calls]",
+      "toolCalls": [
+        {
+          "tool": "read",
+          "input": {},
+          "output": "<path>E:\\game\\ai-mahjong\\src\\server\\socket\\handlers.ts</path>\n<type>file</type>\n<content>95:   \n96:   // 检查游戏是否结束\n97:   if (state.phase === 'finished') {\n98:     \n99:     // 更新房间状态为 finished（允许再来一局）\n100:     if (room.state !== 'finished') {\n101:       roomManager.endGame(roomId);\n102:     }\n103:     \n104:     io.to(roomId).emit('game:ended', {\n105:       winner: state.winner,\n106:       winningHand: state.winningHand,\n107:       players: room.players.map(p => ({\n108:         id: p.id,\n109:         name: p.name,\n110:         score: p.score,\n111:         scoreChange: (p.score || 0) - (p.lastScore || 1000),\n112:       })),\n113:     });\n114:     return;\n\n(Showing lines 95-114 of 2330. Use offset=115 to continue.)\n</content>"
+        }
+      ]
+    },
+    {
+      "tool": "msg_198",
+      "input": {},
+      "output": "[1 tool calls]",
+      "toolCalls": [
+        {
+          "tool": "bash",
+          "input": {},
+          "output": "90:export function broadcastGameState(io: Server, roomId: string, roomManager: RoomManager): void {\n"
+        }
+      ]
+    },
+    {
+      "tool": "msg_199",
+      "input": {},
+      "output": "发现问题了！`broadcastGameState` 在 AI 胡牌时也会发送 `game:ended`，导致重复发送。修复：",
+      "toolCalls": [
+        {
+          "tool": "edit",
+          "input": {},
+          "output": "[COMPRESSED BY MNEMO - Content saved to archive. Use mnemo-recall to retrieve.]"
+        }
+      ]
+    },
+    {
+      "tool": "msg_200",
+      "input": {},
+      "output": "[1 tool calls]",
+      "toolCalls": [
+        {
+          "tool": "bash",
+          "input": {},
+          "output": "26:  private deck: TileDeck;\n36:    this.deck = new TileDeck();\n46:      wall: [],\n62:    this.deck = new TileDeck();\n63:    this.deck.shuffle();\n76:    const { hands, wall } = this.deck.deal(dealerIndex);\n91:      wall,\n116:    const tile = this.deck.draw();\n253:      wallRemaining: this.deck.getRemaining(),\n464:    const drawnTile = this.deck.draw();\n"
+        }
+      ]
+    },
+    {
+      "tool": "msg_201",
+      "input": {},
+      "output": "让我简化修复。问题是 `broadcastGameState` 已经处理了游戏结束，我不应该重复处理：",
+      "toolCalls": [
+        {
+          "tool": "edit",
+          "input": {},
+          "output": "[COMPRESSED BY MNEMO - Content saved to archive. Use mnemo-recall to retrieve.]"
+        }
+      ]
+    },
+    {
+      "tool": "msg_202",
+      "input": {},
+      "output": "[1 tool calls]",
+      "toolCalls": [
+        {
+          "tool": "read",
+          "input": {},
+          "output": "[COMPRESSED BY MNEMO - Content saved to archive. Use mnemo-recall to retrieve.]"
+        }
+      ]
+    },
+    {
+      "tool": "msg_203",
+      "input": {},
+      "output": "[1 tool calls]",
+      "toolCalls": [
+        {
+          "tool": "bash",
+          "input": {},
+          "output": "181:      this.endGame(roomId);\n259:  endGame(roomId: string): void {\n263:    room.state = 'finished';\n"
+        }
+      ]
+    },
+    {
+      "tool": "msg_204",
+      "input": {},
+      "output": "已简化修复。现在逻辑是：\n\n1. AI 胡牌 → `performAction` → `broadcastGameState`\n2. `broadcastGameState` 检测游戏结束 → 发送 `game:ended`（包含正确分数）\n3. AI 胡牌后额外触发评论\n\n重启服务器测试一下。如果分数还是 +0，问题可能在 `performAction` 里分数计算本身。"
+    },
+    {
+      "tool": "msg_205",
+      "input": {},
+      "output": "[analyze-mode]\nANALYSIS MODE. Gather context before diving deep:\n\nCONTEXT GATHERING (parallel):\n- 1-2 explore agents (codebase patterns, implementations)\n- 1-2 librarian agents (if external library involved)\n- Direct tools: Grep, AST-grep, LSP for targeted searches\n\nIF COMPLEX - DO NOT STRUGGLE ALONE. Consult specialists:\n- **Oracle**: Conventional problems (architecture, debugging, complex logic)\n- **Artistry**: Non-conventional problems (different approach needed)\n\nSYNTHESIZE findings before proceeding.\n\n---\n\n[handleAction] 检查游戏状态: phase=playing, winner=null\n[checkPinghu] 副露不全是吃，返回 false\n[GameEndComment] 触发! roomId=mmvm81n2-wstzgschl, winner=思雨, aiPlayers=3\n[GameEndComment] 找到 3 个 AI: 思雨, 好运来, 李瞳\n[handleAction] 检查游戏状态: phase=playing, winner=null\n[checkPinghu] parseHand 返回 null\n[handleAction] 检查游戏状态: phase=finished, winner=0\n[GameEndComment] 触发! roomId=mmvm81n2-wstzgschl, winner=老板, aiPlayers=3\n[GameEndComment] 找到 3 个 AI: 思雨, 好运来, 李瞳 现在的问题是，你看都是正常的，但是我胡的这一把，所有人都会说话，但是AI自己胡的那一把，为什么都没人说话呢？"
+    },
+    {
+      "tool": "msg_206",
+      "input": {},
+      "output": "看日志，`[GameEndComment] 触发!` 两次都有，但 AI 胡牌时没人说话。问题在 `triggerGameEndComments` 内部。\n\n检查是否有错误被吞掉：",
+      "toolCalls": [
+        {
+          "tool": "read",
+          "input": {},
+          "output": "[COMPRESSED BY MNEMO - Content saved to archive. Use mnemo-recall to retrieve.]"
+        }
+      ]
+    },
+    {
+      "tool": "msg_207",
+      "input": {},
+      "output": "添加更多日志来排查：",
+      "toolCalls": [
+        {
+          "tool": "edit",
+          "input": {},
+          "output": "[COMPRESSED BY MNEMO - Content saved to archive. Use mnemo-recall to retrieve.]"
+        }
+      ]
+    },
+    {
+      "tool": "msg_208",
+      "input": {},
+      "output": "[1 tool calls]",
+      "toolCalls": [
+        {
+          "tool": "read",
+          "input": {},
+          "output": "[COMPRESSED BY MNEMO - Content saved to archive. Use mnemo-recall to retrieve.]"
+        }
+      ]
+    },
+    {
+      "tool": "msg_209",
+      "input": {},
+      "output": "[1 tool calls]",
+      "toolCalls": [
+        {
+          "tool": "edit",
+          "input": {},
+          "output": "[COMPRESSED BY MNEMO - Content saved to archive. Use mnemo-recall to retrieve.]"
+        }
+      ]
+    },
+    {
+      "tool": "msg_210",
+      "input": {},
+      "output": "重启服务器测试。现在日志会显示：\n1. 每个 AI 是否通过概率判断\n2. LLM 返回的具体内容\n\n打一局让 AI 赢，把日志贴给我看。"
+    },
+    {
+      "tool": "msg_211",
+      "input": {},
+      "output": "[analyze-mode]\nANALYSIS MODE. Gather context before diving deep:\n\nCONTEXT GATHERING (parallel):\n- 1-2 explore agents (codebase patterns, implementations)\n- 1-2 librarian agents (if external library involved)\n- Direct tools: Grep, AST-grep, LSP for targeted searches\n\nIF COMPLEX - DO NOT STRUGGLE ALONE. Consult specialists:\n- **Oracle**: Conventional problems (architecture, debugging, complex logic)\n- **Artistry**: Non-conventional problems (different approach needed)\n\nSYNTHESIZE findings before proceeding.\n\n---\n\n[handleAction] 检查游戏状态: phase=playing, winner=null\n[checkPinghu] 副露不全是吃，返回 false\n[GameEndComment] 触发! roomId=mmvmk4x0-jq5zwgo9k, winner=思雨, aiPlayers=3\n[GameEndComment] 找到 3 个 AI: 思雨, 好运来, 李瞳\n[GameEndComment] 思雨 概率判断: 发言\n[GameEndComment] 思雨 LLM响应: \"哈哈哈谢谢好运来哥的点炮，今天这手气我自己都服！\"\n[GameEndComment] 好运来 概率判断: 发言\n[GameEndComment] 好运来 LLM响应: \"哎呀，这张牌打得我大意了，思雨运气真好呀。\"\n[GameEndComment] 李瞳 概率判断: 跳过 好了，没有问题了"
+    },
+    {
+      "tool": "msg_212",
+      "input": {},
+      "output": "问题解决了！现在压缩早期对话：",
+      "toolCalls": [
+        {
+          "tool": "mnemo-context",
+          "input": {},
+          "output": "▣ Mnemo | ~35.0k saved total\n\nContext: >50% ELEVATED\n|###############...............|\n\nArchives: 1 blocks (50 msgs compressed)\n│⣿⣿⣿⣿⣿⣿⣿███████████████████████│\n\n[Messages] 211 total\n  First: m0296, m0297, m0298, m0299 ... m0503, m0504, m0505, m0506\n\n[Archives]\n  b1: 项目清理与调试日志删除 (m0001-m0050)\n\n[*] CAUTION: Context building up"
+        }
+      ]
     }
   ],
-  "startId": "m0505",
-  "endId": "m0700",
+  "startId": "m1689",
+  "endId": "m1900",
   "sessionId": "ses_3011750a8ffeXgKZn8Vds28aY1",
   "active": true,
   "anchorMessageId": "msg_cfee8af5d001l6mpMwv91xFHkS",
@@ -2357,8 +2521,24 @@
     "msg_cff757bc3001l8kFfZJaX1jWnt",
     "msg_cff75a92f001HiE0ZRB08bkTbo",
     "msg_cff760e9e001FHEJ8jwPvbN5dm",
-    "msg_cff762ead001BH0LXx7Il5PWkr"
+    "msg_cff762ead001BH0LXx7Il5PWkr",
+    "msg_cff76501d001tzRkpQE5G4e5ZN",
+    "msg_cff766b60001ICEN4ZKa2vR1fn",
+    "msg_cff768b97001r295wthb3FzHSJ",
+    "msg_cff77074a001ctFCa4MDk5jlCD",
+    "msg_cff7721410015YGpSH93BNPKxS",
+    "msg_cff7790d60013N5DTTnWAoMw6i",
+    "msg_cff77ae140014DBT7Nhv6xhTTc",
+    "msg_cff77ced1001g2d75VnuxT7g7M",
+    "msg_cff7f4a77001t4yhWMpR67LyrD",
+    "msg_cff7f4aa1001I1A0FOr6bjQNv0",
+    "msg_cff7f8e76001xkwjzbAymRD6go",
+    "msg_cff7fe693001K3QLVogxaINQOj",
+    "msg_cff800616001YRJNMLyeEVV02L",
+    "msg_cff803ec5001gC3el9yj8lgyTd",
+    "msg_cff8c03ce0018AZg426p41yXvL",
+    "msg_cff8c03f90018pbamyZErcnD2r"
   ],
-  "compressMessageId": "msg_d00051da0001pYCojp5wxQPZpm",
-  "overview": "项目清理与游戏结束评论功能完整实现：\n- 创建 archive/ 目录归档旧架构文件和测试脚本（agent/、test-game.ts、laowang.ts、备份文件等共12个文件）\n- 删除 295 行 console.log 调试日志，保留 68 个 console.error 错误日志，解决 sed 删除导致的语法问题\n- 实现游戏结束 AI 评论功能：在 `src/server/socket/handlers.ts` 添加 `triggerGameEndComments()`，游戏结束调用 `memoryManager.recordGameEnd()` 记录输赢信息（分数榜、胡牌方式、点炮者），60% 概率随机延迟触发 AI 评论\n- 在 `locales/zh-CN/prompts.json` 添加 `gameEndComment` 提示词\n- 修复 AI 自己@自己问题：提示词约束 + 代码层 `AIAdapter.ts` 正则过滤\n- 修复 15 秒闲置误触发：任何活动（AI打牌/发言、人类打牌/发言）都调用 `resetTimer` 重置计时器\n- 修复 AI 胡..."
+  "compressMessageId": "msg_d000645370013aNG4R51FA6k2J",
+  "overview": "项目清理与游戏结束评论功能完整实现：\n\n1. **项目清理**：归档旧架构文件（agent/）、测试脚本（test-game.ts、laowang.ts）到 archive/ 目录，删除 295 行 console.log 调试日志，保留 68 个 console.error 错误日志。sed 误删导致语法问题，改用 node 脚本精确清理成功。\n\n2. **游戏结束评论功能**：\n   - 在 `locales/zh-CN/prompts.json` 添加 `gameEndComment` 提示词\n   - 在 `src/server/socket/handlers.ts` 添加 `triggerGameEndComments` 函数\n   - 游戏结束时调用 `memoryManager.recordGameEnd()` 记录输赢\n   - 包含完整信息：分数榜、胡牌方式（自摸/点炮）、点炮者名字\n   - 60% 概率发言，随机延迟 0.5-2.5 秒避免同时说话\n\n3. **问题修复**：\n   - AI 自己@自己：提示词约束 + `AIAdapter.ts` 正则过滤..."
 }

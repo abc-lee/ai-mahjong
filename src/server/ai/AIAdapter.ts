@@ -113,9 +113,9 @@ export class AIAdapter {
     }
 
     const personalityType = this.config.personality || 'balanced';
-    const personalityConfig = promptLoader.getPersonality(personalityType);
-    const traits = personalityConfig?.traits || ['普通'];
-    const speakStyle = personalityConfig?.speakStyle || '正常说话';
+    const personalityConfig = promptLoader.getPersonality(personalityType) || promptLoader.getPersonality('_default');
+    const traits = personalityConfig?.traits || promptLoader.getPersonality('_default')?.traits || [];
+    const speakStyle = personalityConfig?.speakStyle || promptLoader.getPersonality('_default')?.speakStyle || '';
     
     // 从配置获取分隔符
     const traitSeparator = promptLoader.getSeparator('traits');
@@ -215,8 +215,8 @@ export class AIAdapter {
     );
 
     const personalityType = this.config.personality || 'balanced';
-    const personalityConfig = promptLoader.getPersonality(personalityType);
-    const traits = personalityConfig?.traits || ['普通'];
+    const personalityConfig = promptLoader.getPersonality(personalityType) || promptLoader.getPersonality('_default');
+    const traits = personalityConfig?.traits || [];
 
     // 找到所有其他AI的名字
     const otherPlayers = recentEvents
@@ -302,8 +302,8 @@ export class AIAdapter {
     
 
     const personalityType = this.config.personality || 'balanced';
-    const personalityConfig = promptLoader.getPersonality(personalityType);
-    const traits = personalityConfig?.traits || ['普通'];
+    const personalityConfig = promptLoader.getPersonality(personalityType) || promptLoader.getPersonality('_default');
+    const traits = personalityConfig?.traits || [];
     
     // 从配置获取分隔符和备用文本
     const traitSeparator = promptLoader.getSeparator('traits');
@@ -420,8 +420,8 @@ export class AIAdapter {
 
     // 获取性格配置
     const personalityType = this.config.personality || 'balanced';
-    const personalityConfig = promptLoader.getPersonality(personalityType);
-    const traits = personalityConfig?.traits || ['普通'];
+    const personalityConfig = promptLoader.getPersonality(personalityType) || promptLoader.getPersonality('_default');
+    const traits = personalityConfig?.traits || [];
 
     const personalityHint = this.getPersonalityHint();
     

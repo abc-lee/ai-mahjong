@@ -249,6 +249,11 @@
   },
 
   "personalities": {
+    "_default": {
+      "name": "Normal",
+      "traits": ["Normal"],
+      "speakStyle": "Speaks normally"
+    },
     "chatty": {
       "name": "Chatty",
       "traits": ["Chatty", "Enthusiastic", "Loves conversation"],

@@ -249,6 +249,11 @@
   },
 
   "personalities": {
+    "_default": {
+      "name": "普通",
+      "traits": ["普通"],
+      "speakStyle": "正常说话"
+    },
     "chatty": {
       "name": "话痨",
       "traits": ["话痨", "热情", "爱聊天"],
