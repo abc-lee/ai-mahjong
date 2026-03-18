@@ -429,11 +429,7 @@ export class AIAdapter {
     const memorySummary = memoryManager.generateMemorySummary(this.player.id);
     const memory = memoryManager.getMemory(this.player.id);
     
-    // 调试：打印记忆状态
-    console.log(`[AIAdapter] ${this.player.name} 记忆状态:`);
-    console.log(`  - memory存在: ${!!memory}`);
-    console.log(`  - lastGameResult: ${memory?.lastGameResult ? JSON.stringify(memory.lastGameResult) : '无'}`);
-    console.log(`  - memorySummary长度: ${memorySummary?.length || 0}`);
+
     
     const recentEvents = memoryManager.getRecentEvents(this.player.id, 5)
       .map(e => `- ${e.content || e.type}`)
@@ -524,11 +520,7 @@ export class AIAdapter {
       memorySection
     });
 
-    // 调试：打印完整 prompt
-    console.log(`[AIAdapter] ${this.player.name} 完整 userPrompt:`);
-    console.log('='.repeat(50));
-    console.log(userPrompt);
-    console.log('='.repeat(50));
+
 
     try {
       const modelId = this.config.llmModel || 'gpt-4o';

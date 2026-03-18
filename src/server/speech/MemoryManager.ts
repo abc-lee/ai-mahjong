@@ -123,15 +123,9 @@ export class MemoryManager {
   startNewGame(playerId: string): void {
     const memory = this.getMemory(playerId);
     if (memory) {
-      // 调试：打印记录保留情况
-      console.log(`[MemoryManager] startNewGame: ${playerId}`);
-      console.log(`  - 清除前 lastGameResult: ${memory.lastGameResult ? JSON.stringify(memory.lastGameResult) : '无'}`);
-      
       memory.events = [];
       memory.currentMood = 'excited';
       // 注意：不清除 lastGameResult，让 AI 知道上一局结果
-      
-      console.log(`  - 清除后 lastGameResult: ${memory.lastGameResult ? JSON.stringify(memory.lastGameResult) : '无'}`);
     }
   }
 
@@ -311,7 +305,6 @@ export class MemoryManager {
   recordGameEnd(playerId: string, gameEndInfo: GameEndInfo): void {
     const memory = this.getMemory(playerId);
     if (!memory) {
-      console.log(`[recordGameEnd] 警告: ${playerId} 的 memory 不存在`);
       return;
     }
 
@@ -323,8 +316,6 @@ export class MemoryManager {
     const isLoser = playerId === loserId;
     
     memory.gameCount++;
-    
-    console.log(`[recordGameEnd] ${memory.playerName}: winner=${winnerName}, isSelfDraw=${isSelfDraw}, myScoreChange=${myScoreChange}`);
     
     if (isWinner) {
       memory.winCount++;

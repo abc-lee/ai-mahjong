@@ -11,6 +11,9 @@ import { eventQueueManager, GameEvent } from '../ai/EventQueue';
 import { getConversationManager } from '../speech/ConversationManager';
 import { IdleDetector } from '../idle/IdleDetector';
 
+// 常量定义
+const GAME_END_DELAY_MS = 1500;  // 游戏结束评论延迟（毫秒）
+
 // Socket 数据类型
 interface SocketData {
   playerId: string;
@@ -125,12 +128,17 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
     
     // 游戏结束时触发 AI 评论
     if (state.winner !== null) {
+      // 有人胡牌
       const winner = room.players[state.winner];
       const isSelfDraw = state.winningHand?.isSelfDraw ?? false;
       const loserIndex = isSelfDraw ? null : state.lastDiscardPlayer;
       const loser = loserIndex !== null ? room.players[loserIndex] : null;
       
       setTimeout(() => {
+        // 检查房间状态，防止过期触发
+        const currentRoom = roomManager.getRoom(roomId);
+        if (!currentRoom || currentRoom.state !== 'finished') return;
+        
         triggerGameEndComments(
           roomId,
           winner?.id || '',
@@ -142,7 +150,25 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
           io,
           roomManager
         );
-      }, 1500);
+      }, GAME_END_DELAY_MS);
+    } else {
+      // 流局（无人胡牌）
+      setTimeout(() => {
+        const currentRoom = roomManager.getRoom(roomId);
+        if (!currentRoom || currentRoom.state !== 'finished') return;
+        
+        triggerGameEndComments(
+          roomId,
+          null,
+          '流局',
+          false,
+          null,
+          null,
+          scoreChanges,
+          io,
+          roomManager
+        );
+      }, GAME_END_DELAY_MS);
     }
     
     return;
@@ -877,9 +903,10 @@ export async function handleGameStart(
     const speechManager = getSpeechManager(io, roomId);
     
     // 开始新一局（保留统计数据和玩家关系，只清理事件）
+    // 注意：只对 ai-agent 初始化记忆，NPC 不需要记忆系统
     const { memoryManager } = require('../speech/MemoryManager');
     gameRoom?.players.forEach(p => {
-      if (p.type === 'ai-agent' || p.type === 'npc') {
+      if (p.type === 'ai-agent') {
         // 如果没有记忆，初始化；否则开始新一局
         if (!memoryManager.getMemory(p.id)) {
           memoryManager.initMemory(p.id, p.name);
@@ -1205,6 +1232,10 @@ export async function handleAction(
       const loser = loserIndex !== null ? room.players[loserIndex] : null;
       
       setTimeout(() => {
+        // 检查房间状态，防止过期触发
+        const currentRoom = roomManager.getRoom(roomId);
+        if (!currentRoom || currentRoom.state !== 'finished') return;
+        
         triggerGameEndComments(
           roomId,
           winner?.id || '',
@@ -1216,7 +1247,7 @@ export async function handleAction(
           io,
           roomManager
         );
-      }, 1500);
+      }, GAME_END_DELAY_MS);
     } else {
       console.log(`[Server] handleAction: 广播游戏状态给房间 ${roomId}`);
       broadcastGameState(io, roomId, roomManager);
@@ -2262,10 +2293,7 @@ async function triggerGameEndComments(
     p => (p.type === 'ai-agent' || p.type === 'npc') && p.aiConfig?.llmEnabled
   );
   
-  console.log(`[GameEndComment] 触发! roomId=${roomId}, winner=${winnerName}, aiPlayers=${aiPlayers.length}`);
-  
   if (aiPlayers.length === 0) {
-    console.log('[GameEndComment] 没有启用的 AI 玩家');
     return;
   }
   
@@ -2274,7 +2302,7 @@ async function triggerGameEndComments(
   for (const ai of aiPlayers) {
     // 确保 memory 存在（可能因为重连或新加入未初始化）
     if (!memoryManager.getMemory(ai.id)) {
-      console.log(`[GameEndComment] ${ai.name} 的 memory 不存在，初始化...`);
+
       memoryManager.initMemory(ai.id, ai.name);
     }
     memoryManager.recordGameEnd(ai.id, {
@@ -2301,13 +2329,10 @@ async function triggerGameEndComments(
   const { chatWithSystem } = require('../llm/LLMService');
   
   for (const ai of aiPlayers) {
-    // 60% 概率发言
-    if (Math.random() > 0.6) {
-      console.log(`[GameEndComment] ${ai.name} 概率判断: 跳过`);
-      continue;
-    }
-    
-    console.log(`[GameEndComment] ${ai.name} 概率判断: 发言`);
+     // 60% 概率发言
+     if (Math.random() > 0.6) {
+       continue;
+     }
     
     // 随机延迟 0.5-2.5 秒
     const delay = 500 + Math.random() * 2000;
@@ -2380,10 +2405,9 @@ async function triggerGameEndComments(
           { temperature: 0.9, maxTokens: 100 }
         );
         
-        const message = response.text?.trim() || '';
-        console.log(`[GameEndComment] ${ai.name} LLM响应: "${message}"`);
-        
-        if (message && message !== '无' && message.length > 0) {
+         const message = response.text?.trim() || '';
+         
+         if (message && message !== '无' && message.length > 0) {
           // 广播消息
           io.in(roomId).emit('player:speech', {
             playerId: ai.id,
