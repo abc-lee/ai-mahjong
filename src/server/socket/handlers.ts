@@ -403,6 +403,9 @@ function executeAIDecision(
       room.chatHistory.shift();
     }
     
+    // AI 发言也重置闲置定时器
+    IdleDetector.resetTimer(roomId, io, roomManager);
+    
     console.log(`[AI] ${player.name} 说: ${decision.message}`);
   }
 
@@ -410,6 +413,8 @@ function executeAIDecision(
     case 'draw':
       const tile = room.gameEngine.drawTile(playerId);
       if (tile) {
+        // AI 摸牌也重置闲置定时器
+        IdleDetector.resetTimer(roomId, io, roomManager);
         broadcastGameState(io, roomId, roomManager);
         
         // 检查是否有 pendingActions（如暗杠）
@@ -424,6 +429,8 @@ function executeAIDecision(
     case 'discard':
       if (decision.tileId) {
         room.gameEngine.discardTile(playerId, decision.tileId);
+        // AI 打牌也重置闲置定时器
+        IdleDetector.resetTimer(roomId, io, roomManager);
         broadcastGameState(io, roomId, roomManager);
         
         // 检查是否有 pendingActions
@@ -438,6 +445,9 @@ function executeAIDecision(
     case 'peng':
     case 'gang':
     case 'hu':
+      // AI 碰杠胡也重置闲置定时器
+      IdleDetector.resetTimer(roomId, io, roomManager);
+      
       // 从玩家手牌中获取完整的 Tile 对象
       const fullTiles = decision.tiles?.map(id => 
         player?.hand.find(t => t.id === id)

@@ -209,7 +209,9 @@ function broadcastAISpeech(
     timestamp: Date.now(),
   });
   
-  // 限制历史长度
+  // AI 发言后重置闲置定时器
+  IdleDetector.resetTimer(roomId, io, roomManager);
+  
   if (room.chatHistory.length > 20) {
     room.chatHistory.shift();
   }
