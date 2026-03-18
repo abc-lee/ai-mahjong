@@ -361,5 +361,86 @@
       "unknown": ["Riley", "Jordan", "Taylor", "Morgan", "Casey", "Jamie"]
     },
     "defaultName": "Riley"
+  },
+  
+  "ui": {
+    "game": {
+      "startGame": "Start Game",
+      "newRound": "New Round",
+      "waiting": "Waiting for players...",
+      "yourTurn": "Your Turn",
+      "draw": "Draw",
+      "discard": "Discard",
+      "pass": "Pass",
+      "chi": "Chi",
+      "peng": "Peng",
+      "gang": "Gang",
+      "hu": "Hu",
+      "score": "Score",
+      "dealer": "Dealer",
+      "round": "Round",
+      "windCircle": "Wind",
+      "east": "East",
+      "south": "South",
+      "west": "West",
+      "north": "North",
+      "winner": "Winner",
+      "winType": {
+        "selfDraw": "Self-draw",
+        "discard": "Hu"
+      },
+      "gameOver": "Game Over",
+      "scores": "Scores",
+      "wallRemaining": "Wall"
+    },
+    "settings": {
+      "title": "Settings",
+      "tabLLM": "LLM Config",
+      "tabPlayer": "Players",
+      "language": "Language / 语言",
+      "preset": "Preset",
+      "selectPreset": "Select preset...",
+      "provider": "Provider",
+      "endpoint": "API Endpoint",
+      "apiKey": "API Key",
+      "model": "Model",
+      "testConnection": "Test",
+      "testSuccess": "Connected",
+      "testFailed": "Failed",
+      "save": "Save",
+      "addNew": "Add New",
+      "delete": "Delete",
+      "use": "Use",
+      "using": "Using",
+      "playerConfig": "Player Config",
+      "humanPlayers": "Human",
+      "aiPlayers": "AI",
+      "npcPlayers": "NPC",
+      "aiSettings": "AI Settings",
+      "aiName": "AI Name",
+      "aiGender": "Gender",
+      "aiPersonality": "Personality",
+      "generateName": "Generate Name",
+      "male": "Male",
+      "female": "Female",
+      "unknown": "Unknown",
+      "close": "Close"
+    },
+    "personalities": {
+      "chatty": "Chatty",
+      "aggressive": "Aggressive",
+      "cautious": "Cautious",
+      "balanced": "Balanced",
+      "sarcastic": "Sarcastic",
+      "tsundere": "Tsundere",
+      "lucky": "Lucky",
+      "serious": "Serious",
+      "dramatic": "Dramatic"
+    },
+    "errors": {
+      "connectionFailed": "Connection failed",
+      "gameError": "Game error",
+      "needFourPlayers": "Need 4 players to start"
+    }
   }
 }

@@ -269,6 +269,19 @@ app.get('/api/config', (req, res) => {
   }
 });
 
+// 获取 UI 翻译
+app.get('/api/ui', (req, res) => {
+  try {
+    const uiConfig = promptLoader.getUIConfig();
+    res.json({
+      language: promptLoader.getLanguage(),
+      ui: uiConfig
+    });
+  } catch (e) {
+    res.json({ language: 'zh-CN', ui: {} });
+  }
+});
+
 // 添加 AI/NPC 玩家到房间
 app.post('/api/room/add-player', async (req, res) => {
   try {

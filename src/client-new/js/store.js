@@ -34,6 +34,10 @@ const initialState = {
 
   // UI 状态
   selectedTile: null,
+
+  // 国际化
+  language: 'zh-CN',
+  uiTexts: null, // UI 翻译文字
 };
 
 // 当前状态
@@ -332,6 +336,26 @@ export function isHost() {
   return state.currentRoom.host === state.playerId;
 }
 
+/**
+ * 设置 UI 翻译
+ */
+export function setUITexts(language, uiTexts) {
+  state.language = language;
+  state.uiTexts = uiTexts;
+}
+
+/**
+ * 获取 UI 文字
+ * @param {string} category - 分类：game, settings, personalities, errors
+ * @param {string} key - 键名
+ * @param {string} fallback - 默认值
+ */
+export function t(category, key, fallback = null) {
+  if (!state.uiTexts) return fallback || key;
+  const ui = state.uiTexts;
+  return ui?.[category]?.[key] || fallback || key;
+}
+
 // 导出所有方法
 export default {
   getState,
@@ -360,4 +384,6 @@ export default {
   getSelectedDirection,
   getPlayerScore,
   isHost,
+  setUITexts,
+  t,
 };

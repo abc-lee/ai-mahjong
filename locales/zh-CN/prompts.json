@@ -361,5 +361,86 @@
       "unknown": ["小宝", "阿福", "乐乐", "天天", "星星", "月月"]
     },
     "defaultName": "小宝"
+  },
+  
+  "ui": {
+    "game": {
+      "startGame": "开始游戏",
+      "newRound": "再来一局",
+      "waiting": "等待玩家加入...",
+      "yourTurn": "你的回合",
+      "draw": "摸牌",
+      "discard": "打牌",
+      "pass": "过",
+      "chi": "吃",
+      "peng": "碰",
+      "gang": "杠",
+      "hu": "胡",
+      "score": "分数",
+      "dealer": "庄",
+      "round": "局",
+      "windCircle": "风圈",
+      "east": "东",
+      "south": "南",
+      "west": "西",
+      "north": "北",
+      "winner": "赢家",
+      "winType": {
+        "selfDraw": "自摸",
+        "discard": "胡牌"
+      },
+      "gameOver": "游戏结束",
+      "scores": "本局得分",
+      "wallRemaining": "牌墙剩余"
+    },
+    "settings": {
+      "title": "设置",
+      "tabLLM": "LLM 配置",
+      "tabPlayer": "玩家配置",
+      "language": "语言 / Language",
+      "preset": "预设",
+      "selectPreset": "选择预设...",
+      "provider": "提供商",
+      "endpoint": "API 地址",
+      "apiKey": "API Key",
+      "model": "模型",
+      "testConnection": "测试连接",
+      "testSuccess": "连接成功",
+      "testFailed": "连接失败",
+      "save": "保存",
+      "addNew": "新增配置",
+      "delete": "删除",
+      "use": "使用",
+      "using": "使用中",
+      "playerConfig": "玩家配置",
+      "humanPlayers": "真人玩家",
+      "aiPlayers": "AI玩家",
+      "npcPlayers": "NPC",
+      "aiSettings": "AI 设置",
+      "aiName": "AI 名字",
+      "aiGender": "性别",
+      "aiPersonality": "性格",
+      "generateName": "AI生成名字",
+      "male": "男",
+      "female": "女",
+      "unknown": "未知",
+      "close": "关闭"
+    },
+    "personalities": {
+      "chatty": "话痨",
+      "aggressive": "激进",
+      "cautious": "谨慎",
+      "balanced": "平衡",
+      "sarcastic": "毒舌",
+      "tsundere": "傲娇",
+      "lucky": "幸运星",
+      "serious": "认真",
+      "dramatic": "戏精"
+    },
+    "errors": {
+      "connectionFailed": "连接失败",
+      "gameError": "游戏出错",
+      "needFourPlayers": "需要4名玩家才能开始游戏"
+    }
   }
 }

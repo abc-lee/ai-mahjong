@@ -113,6 +113,19 @@ export interface PromptConfig {
   };
   promptNL: Record<string, string>;
   personalities: Record<string, PersonalityConfig>;
+  aiNameGenerator: {
+    prompt: string;
+    genderTexts: Record<string, string>;
+    personalityTexts: Record<string, string>;
+    fallbackNames: Record<string, string[]>;
+    defaultName: string;
+  };
+  ui: {
+    game: Record<string, string | { selfDraw: string; discard: string }>;
+    settings: Record<string, string>;
+    personalities: Record<string, string>;
+    errors: Record<string, string>;
+  };
 }
 
 /**
@@ -421,6 +434,25 @@ class PromptLoader {
     }
 
     return languages;
+  }
+
+  /**
+   * 获取 UI 翻译文字
+   * @param category 分类：game, settings, personalities, errors
+   * @param key 键名
+   */
+  getUI(category: 'game' | 'settings' | 'personalities' | 'errors', key: string): string {
+    const config = this.load();
+    const ui = config.ui as any;
+    return ui?.[category]?.[key] || key;
+  }
+
+  /**
+   * 获取整个 UI 配置（供前端使用）
+   */
+  getUIConfig(): any {
+    const config = this.load();
+    return config.ui;
   }
 }
 

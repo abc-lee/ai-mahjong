@@ -48,6 +48,9 @@ function showGame() {
 async function init() {
   console.log('[Main] 应用初始化');
   
+  // 加载 UI 翻译
+  await loadUITexts();
+  
   // 初始化游戏模块
   game.init();
   
@@ -67,6 +70,20 @@ async function init() {
   
   // 检查 URL 参数
   checkUrlParams();
+}
+
+/**
+ * 加载 UI 翻译
+ */
+async function loadUITexts() {
+  try {
+    const res = await fetch('/api/ui');
+    const data = await res.json();
+    store.setUITexts(data.language, data.ui);
+    console.log('[Main] UI 翻译加载完成:', data.language);
+  } catch (e) {
+    console.error('[Main] 加载 UI 翻译失败:', e);
+  }
 }
 
 /**
