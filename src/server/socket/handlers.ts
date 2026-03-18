@@ -103,16 +103,48 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
       console.log(`[broadcastGameState] 房间状态已更新为 finished`);
     }
     
+    // 计算分数变化（在更新 lastScore 之前）
+    const scoreChanges = room.players.map(p => ({
+      id: p.id,
+      name: p.name,
+      score: p.score || 0,
+      lastScore: p.lastScore || 1000,
+      scoreChange: (p.score || 0) - (p.lastScore || 1000),
+    }));
+    
     io.to(roomId).emit('game:ended', {
       winner: state.winner,
       winningHand: state.winningHand,
-      players: room.players.map(p => ({
-        id: p.id,
-        name: p.name,
-        score: p.score,
-        scoreChange: (p.score || 0) - (p.lastScore || 1000),
-      })),
+      players: scoreChanges,
     });
+    
+    // 更新 lastScore（在计算分数变化之后）
+    room.players.forEach(p => {
+      p.lastScore = p.score || 1000;
+    });
+    
+    // 游戏结束时触发 AI 评论
+    if (state.winner !== null) {
+      const winner = room.players[state.winner];
+      const isSelfDraw = state.winningHand?.isSelfDraw ?? false;
+      const loserIndex = isSelfDraw ? null : state.lastDiscardPlayer;
+      const loser = loserIndex !== null ? room.players[loserIndex] : null;
+      
+      setTimeout(() => {
+        triggerGameEndComments(
+          roomId,
+          winner?.id || '',
+          winner?.name || '玩家',
+          isSelfDraw,
+          loser?.id || null,
+          loser?.name || null,
+          scoreChanges,
+          io,
+          roomManager
+        );
+      }, 1500);
+    }
+    
     return;
   }
 
@@ -1165,6 +1197,26 @@ export async function handleAction(
         winningHand: gameState.winningHand,
         players: scoreChangesBefore,
       });
+      
+      // 触发 AI 评论
+      const winner = room.players[gameState.winner!];
+      const isSelfDraw = gameState.winningHand?.isSelfDraw ?? false;
+      const loserIndex = isSelfDraw ? null : gameState.lastDiscardPlayer;
+      const loser = loserIndex !== null ? room.players[loserIndex] : null;
+      
+      setTimeout(() => {
+        triggerGameEndComments(
+          roomId,
+          winner?.id || '',
+          winner?.name || '玩家',
+          isSelfDraw,
+          loser?.id || null,
+          loser?.name || null,
+          scoreChangesBefore,
+          io,
+          roomManager
+        );
+      }, 1500);
     } else {
       console.log(`[Server] handleAction: 广播游戏状态给房间 ${roomId}`);
       broadcastGameState(io, roomId, roomManager);
@@ -2185,5 +2237,172 @@ export async function handlePlayerSpeech(
   } catch (error) {
     console.error(`[handlePlayerSpeech] 错误:`, error);
     if (callback) callback({ success: false, error: error instanceof Error ? error.message : '发言失败' });
+  }
+}
+
+/**
+ * 游戏结束时触发 AI 评论
+ */
+async function triggerGameEndComments(
+  roomId: string,
+  winnerId: string,
+  winnerName: string,
+  isSelfDraw: boolean,
+  loserId: string | null,
+  loserName: string | null,
+  scoreChanges: Array<{ id: string; name: string; score: number; lastScore: number; scoreChange: number }>,
+  io: Server,
+  roomManager: RoomManager
+): Promise<void> {
+  const room = roomManager.getRoom(roomId);
+  if (!room) return;
+  
+  // 获取所有 AI 玩家（有 LLM 配置的）
+  const aiPlayers = room.players.filter(
+    p => (p.type === 'ai-agent' || p.type === 'npc') && p.aiConfig?.llmEnabled
+  );
+  
+  console.log(`[GameEndComment] 触发! roomId=${roomId}, winner=${winnerName}, aiPlayers=${aiPlayers.length}`);
+  
+  if (aiPlayers.length === 0) {
+    console.log('[GameEndComment] 没有启用的 AI 玩家');
+    return;
+  }
+  
+  // 记录 AI 输赢
+  const { memoryManager } = require('../speech/MemoryManager');
+  for (const ai of aiPlayers) {
+    // 确保 memory 存在（可能因为重连或新加入未初始化）
+    if (!memoryManager.getMemory(ai.id)) {
+      console.log(`[GameEndComment] ${ai.name} 的 memory 不存在，初始化...`);
+      memoryManager.initMemory(ai.id, ai.name);
+    }
+    memoryManager.recordGameEnd(ai.id, {
+      winnerId,
+      winnerName,
+      isSelfDraw,
+      loserId,
+      loserName,
+      scoreChanges
+    });
+  }
+  
+  // 构建分数榜
+  const scoreboard = scoreChanges
+    .map(s => `${s.name}: ${s.scoreChange >= 0 ? '+' : ''}${s.scoreChange}`)
+    .join('\n');
+  
+  // 胡牌方式
+  const winType = isSelfDraw ? '自摸' : '胡牌';
+  const loserInfo = loserName ? `点炮者：${loserName}` : '';
+  
+  // 为每个 AI 生成评论
+  const { promptLoader } = require('../prompt/PromptLoader');
+  const { chatWithSystem } = require('../llm/LLMService');
+  
+  for (const ai of aiPlayers) {
+    // 60% 概率发言
+    if (Math.random() > 0.6) {
+      console.log(`[GameEndComment] ${ai.name} 概率判断: 跳过`);
+      continue;
+    }
+    
+    console.log(`[GameEndComment] ${ai.name} 概率判断: 发言`);
+    
+    // 随机延迟 0.5-2.5 秒
+    const delay = 500 + Math.random() * 2000;
+    
+    setTimeout(async () => {
+      try {
+        // 获取性格配置
+        const personality = promptLoader.getPersonality(ai.aiConfig?.personality || 'balanced');
+        const traits = personality?.traits?.join(promptLoader.getSeparator('traits')) || '普通';
+        
+        // 构建提示词
+        const systemPrompt = promptLoader.getWithVars('aiAdapter.gameEndComment.system', {
+          playerName: ai.name,
+          traits,
+          winType,
+          winnerName,
+          loserInfo,
+          scoreboard,
+        });
+        
+        // 判断这个 AI 的结果
+        const myScoreChange = scoreChanges.find(s => s.id === ai.id)?.scoreChange || 0;
+        const isWinner = ai.id === winnerId;
+        const isLoser = ai.id === loserId;
+        const isDrawGame = !winnerId;
+        
+        let gameResult: string;
+        let userPrompt: string;
+        
+        if (isDrawGame) {
+          gameResult = `流局了，没人胡牌。`;
+          userPrompt = promptLoader.get('aiAdapter.gameEndComment.drawGame');
+        } else if (isWinner) {
+          gameResult = `你${winType}了！赢了${myScoreChange}分！`;
+          userPrompt = promptLoader.getWithVars('aiAdapter.gameEndComment.userWon', {
+            winType,
+            scoreChange: myScoreChange.toString(),
+          });
+        } else if (isLoser) {
+          gameResult = `你点炮了，输了${Math.abs(myScoreChange)}分。`;
+          userPrompt = promptLoader.getWithVars('aiAdapter.gameEndComment.userLost', {
+            winnerName,
+            winType,
+            loserInfo: '你点的炮',
+            scoreChange: Math.abs(myScoreChange).toString(),
+          });
+        } else {
+          gameResult = `你输了${Math.abs(myScoreChange)}分。`;
+          userPrompt = promptLoader.getWithVars('aiAdapter.gameEndComment.userLost', {
+            winnerName,
+            winType,
+            loserInfo,
+            scoreChange: Math.abs(myScoreChange).toString(),
+          });
+        }
+        
+        // 替换 gameResult
+        const finalSystemPrompt = systemPrompt.replace('{{gameResult}}', gameResult);
+        
+        // 调用 LLM
+        const response = await chatWithSystem(
+          {
+            provider: ai.aiConfig?.llmProviderType || 'openai',
+            apiKey: ai.aiConfig?.llmApiKey,
+            baseURL: ai.aiConfig?.llmEndpoint?.replace('/chat/completions', '').replace('/v1/messages', '') || 'https://api.openai.com/v1',
+            model: ai.aiConfig?.llmModel || 'gpt-4o',
+          },
+          finalSystemPrompt,
+          userPrompt,
+          { temperature: 0.9, maxTokens: 100 }
+        );
+        
+        const message = response.text?.trim() || '';
+        console.log(`[GameEndComment] ${ai.name} LLM响应: "${message}"`);
+        
+        if (message && message !== '无' && message.length > 0) {
+          // 广播消息
+          io.in(roomId).emit('player:speech', {
+            playerId: ai.id,
+            playerName: ai.name,
+            content: message,
+            timestamp: Date.now(),
+          });
+          
+          // 存入聊天历史
+          room.chatHistory.push({
+            playerId: ai.id,
+            playerName: ai.name,
+            content: message,
+            timestamp: Date.now(),
+          });
+        }
+      } catch (e: any) {
+        console.error(`[GameEndComment] ${ai.name} 评论失败:`, e.message);
+      }
+    }, delay);
   }
 }

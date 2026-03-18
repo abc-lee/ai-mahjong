@@ -595,3 +595,54 @@ const result = await generateText({
 
 *文档版本：v3.4*
 *更新时间：2026-03-17*
+
+### 2026-03-18 - 游戏结束记忆系统修复
+
+**核心问题**：游戏结束后进入下一局，AI 不知道上一局谁胡了、谁点炮、分数变化。
+
+**根本原因**：`recordGameEnd` 方法在找不到 AI 的 memory 时静默返回（不抛错也不记录），导致 `lastGameResult` 永远不会被记录。
+
+**排查过程**：
+1. 用 4 个 explore agent 分别排查：人类胡牌路径、AI/NPC胡牌路径、记忆系统、新一局初始化
+2. 用 Oracle 综合分析，发现 memory 没有被初始化是根因
+
+**修复内容**：
+
+1. **handlers.ts triggerGameEndComments**
+   - 调用 `recordGameEnd` 前检查 memory 是否存在
+   - 不存在则调用 `initMemory` 初始化
+   ```typescript
+   if (!memoryManager.getMemory(ai.id)) {
+     memoryManager.initMemory(ai.id, ai.name);
+   }
+   memoryManager.recordGameEnd(ai.id, { winnerId, winnerName, ... });
+   ```
+
+2. **MemoryManager.ts recordGameEnd**
+   - 添加调试日志，当 memory 不存在时打印警告
+   - 记录完整的游戏结束信息（谁胡、谁点炮、分数变化）
+
+3. **MemoryManager.ts startNewGame**
+   - 保留 `lastGameResult` 不清除
+   - 只清除本局事件 `events`
+   - 保留对话历史、玩家关系、统计数据
+
+4. **handlers.ts handleAction 人类胡牌**
+   - 添加 `triggerGameEndComments` 调用
+   - 与 AI/NPC 胡牌路径统一处理
+
+**关键文件修改**：
+- `src/server/socket/handlers.ts` - triggerGameEndComments 初始化检查、handleAction 调用
+- `src/server/speech/MemoryManager.ts` - recordGameEnd 日志、startNewGame 保留 lastGameResult
+- `locales/zh-CN/prompts.json` - crossGameMemory 模板格式修复
+- `locales/en-US/prompts.json` - 同步修复
+
+**设计确认**：
+- 游戏结束时 → `gameEndComment` 提示词 → AI 评论上一局结果
+- 打牌时 → `decision` 提示词 → 专注打牌，不强制聊上一局
+- 新一局时 → `lastGameResult` 保留在记忆中 → AI prompt 中显示上一局信息
+
+---
+
+*文档版本：v3.5*
+*更新时间：2026-03-18*

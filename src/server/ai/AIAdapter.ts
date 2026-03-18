@@ -427,6 +427,14 @@ export class AIAdapter {
     
     // 获取记忆摘要
     const memorySummary = memoryManager.generateMemorySummary(this.player.id);
+    const memory = memoryManager.getMemory(this.player.id);
+    
+    // 调试：打印记忆状态
+    console.log(`[AIAdapter] ${this.player.name} 记忆状态:`);
+    console.log(`  - memory存在: ${!!memory}`);
+    console.log(`  - lastGameResult: ${memory?.lastGameResult ? JSON.stringify(memory.lastGameResult) : '无'}`);
+    console.log(`  - memorySummary长度: ${memorySummary?.length || 0}`);
+    
     const recentEvents = memoryManager.getRecentEvents(this.player.id, 5)
       .map(e => `- ${e.content || e.type}`)
       .join('\n') || promptLoader.getFallback('none');
@@ -516,7 +524,11 @@ export class AIAdapter {
       memorySection
     });
 
-    // 打印完整prompt用于调试
+    // 调试：打印完整 prompt
+    console.log(`[AIAdapter] ${this.player.name} 完整 userPrompt:`);
+    console.log('='.repeat(50));
+    console.log(userPrompt);
+    console.log('='.repeat(50));
 
     try {
       const modelId = this.config.llmModel || 'gpt-4o';
@@ -671,6 +683,11 @@ export class AIAdapter {
       'aggressive': '你很激进！说话直接、有攻击性，喜欢挑衅对手、展示自信。',
       'balanced': '你性格平和，偶尔说话，话语中规中矩但有礼貌。',
       'cautious': '你很谨慎，话不多，说话时比较保守和谨慎。',
+      'sarcastic': '你是毒舌！说话带刺，喜欢讽刺和挖苦，但不是恶意的。',
+      'tsundere': '你是傲娇！嘴硬心软，说话别扭但内心友善。',
+      'lucky': '你是幸运星！运气很好，说话乐观自信，总觉得自己会赢。',
+      'serious': '你很认真！专注打牌，话不多但说的都是正经话。',
+      'dramatic': '你是戏精！情绪起伏大，说话夸张，喜欢演戏。',
     };
     
     return hints[personality] || hints['balanced'];
@@ -696,6 +713,11 @@ export class AIAdapter {
       'aggressive': 1.0,  // 激进：高，敢于发言
       'balanced': 0.9,    // 平衡：中高
       'cautious': 0.7,    // 谨慎：中等偏低
+      'sarcastic': 1.1,   // 毒舌：高，敢吐槽
+      'tsundere': 0.95,   // 傲娇：中高
+      'lucky': 1.0,       // 幸运星：高，自信
+      'serious': 0.8,     // 认真：中等
+      'dramatic': 1.15,   // 戏精：高，情绪化
     };
     
     return temperatureMap[personality] || 0.9;

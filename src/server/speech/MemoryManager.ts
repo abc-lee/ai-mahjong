@@ -12,6 +12,7 @@ export type MemoryEventType =
   | 'someone_gang'    // 有人杠牌
   | 'i_won'           // 我赢了
   | 'i_lost'          // 我输了
+  | 'i_dianpao'       // 我点炮了
   | 'someone_slow'    // 有人太慢
   | 'conflict'        // 冲突
   | 'compliment'      // 被夸奖
@@ -19,6 +20,16 @@ export type MemoryEventType =
   | 'speech'          // 对话
   | 'good_draw'       // 摸到好牌
   | 'bad_draw';       // 摸到烂牌
+
+// 游戏结束信息
+export interface GameEndInfo {
+  winnerId: string;
+  winnerName: string;
+  isSelfDraw: boolean;
+  loserId: string | null;
+  loserName: string | null;
+  scoreChanges: Array<{ id: string; name: string; scoreChange: number }>;
+}
 
 // 记忆事件
 export interface MemoryEvent {
@@ -43,6 +54,17 @@ export interface PlayerRelation {
   tags: string[];           // 标签（如：'常碰我', '运气好', '话唠'）
 }
 
+// 上一局游戏结果摘要
+export interface LastGameResult {
+  winnerName: string;
+  winnerId: string;
+  loserName: string | null;
+  loserId: string | null;
+  isSelfDraw: boolean;
+  myScoreChange: number;
+  allScores: string;
+}
+
 // AI 记忆存储
 export interface AIMemory {
   // 基本信息
@@ -64,6 +86,7 @@ export interface AIMemory {
   // 个人状态
   currentMood: string;             // 当前心情
   lastAction?: MemoryEvent;        // 上一个动作
+  lastGameResult?: LastGameResult; // 上一局结果摘要
 }
 
 /**
@@ -100,8 +123,15 @@ export class MemoryManager {
   startNewGame(playerId: string): void {
     const memory = this.getMemory(playerId);
     if (memory) {
+      // 调试：打印记录保留情况
+      console.log(`[MemoryManager] startNewGame: ${playerId}`);
+      console.log(`  - 清除前 lastGameResult: ${memory.lastGameResult ? JSON.stringify(memory.lastGameResult) : '无'}`);
+      
       memory.events = [];
       memory.currentMood = 'excited';
+      // 注意：不清除 lastGameResult，让 AI 知道上一局结果
+      
+      console.log(`  - 清除后 lastGameResult: ${memory.lastGameResult ? JSON.stringify(memory.lastGameResult) : '无'}`);
     }
   }
 
@@ -257,6 +287,7 @@ export class MemoryManager {
       someone_gang: 'angry',
       i_won: 'happy',
       i_lost: 'sad',
+      i_dianpao: 'embarrassed',
       someone_slow: 'impatient',
       conflict: 'angry',
       compliment: 'happy',
@@ -274,19 +305,61 @@ export class MemoryManager {
 
   /**
    * 记录游戏结束
+   * @param playerId AI 玩家ID
+   * @param gameEndInfo 游戏结束信息（谁胡、谁点炮、分数变化）
    */
-  recordGameEnd(playerId: string, won: boolean, scoreChange: number): void {
+  recordGameEnd(playerId: string, gameEndInfo: GameEndInfo): void {
     const memory = this.getMemory(playerId);
-    if (!memory) return;
-
-    memory.gameCount++;
-    if (won) {
-      memory.winCount++;
-      this.recordEvent(playerId, { type: 'i_won', content: `赢了 ${scoreChange} 分` });
-    } else {
-      memory.loseCount++;
-      this.recordEvent(playerId, { type: 'i_lost', content: `输了 ${Math.abs(scoreChange)} 分` });
+    if (!memory) {
+      console.log(`[recordGameEnd] 警告: ${playerId} 的 memory 不存在`);
+      return;
     }
+
+    const { winnerId, winnerName, isSelfDraw, loserId, loserName, scoreChanges } = gameEndInfo;
+    
+    // 找到这个玩家的分数变化
+    const myScoreChange = scoreChanges.find(s => s.id === playerId)?.scoreChange || 0;
+    const isWinner = playerId === winnerId;
+    const isLoser = playerId === loserId;
+    
+    memory.gameCount++;
+    
+    console.log(`[recordGameEnd] ${memory.playerName}: winner=${winnerName}, isSelfDraw=${isSelfDraw}, myScoreChange=${myScoreChange}`);
+    
+    if (isWinner) {
+      memory.winCount++;
+      this.recordEvent(playerId, { 
+        type: 'i_won', 
+        content: `${isSelfDraw ? '自摸' : '胡牌'}赢了${myScoreChange}分！`,
+        details: { winnerName, isSelfDraw, scoreChanges }
+      });
+    } else if (isLoser) {
+      memory.loseCount++;
+      this.recordEvent(playerId, { 
+        type: 'i_dianpao', 
+        content: `点炮给${winnerName}，输了${Math.abs(myScoreChange)}分`,
+        details: { winnerName, loserName: memory.playerName, scoreChanges }
+      });
+    } else {
+      // 输了但不是点炮
+      memory.loseCount++;
+      this.recordEvent(playerId, { 
+        type: 'i_lost', 
+        content: `${winnerName}${isSelfDraw ? '自摸' : '胡牌'}，输了${Math.abs(myScoreChange)}分`,
+        details: { winnerName, loserName, isSelfDraw, scoreChanges }
+      });
+    }
+    
+    // 记录上一局结果摘要（用于下一局提示词）
+    memory.lastGameResult = {
+      winnerName,
+      winnerId,
+      loserName,
+      loserId,
+      isSelfDraw,
+      myScoreChange,
+      allScores: scoreChanges.map(s => `${s.name}: ${s.scoreChange >= 0 ? '+' : ''}${s.scoreChange}`).join(', ')
+    };
   }
 
   /**
@@ -334,6 +407,23 @@ export class MemoryManager {
 
     const lines: string[] = [];
 
+    // 上一局结果（最重要，放在最前面）
+    if (memory.lastGameResult) {
+      const last = memory.lastGameResult;
+      lines.push(`【上一局结果】`);
+      if (last.isSelfDraw) {
+        lines.push(`${last.winnerName} 自摸！分数: ${last.allScores}`);
+      } else if (last.loserName) {
+        lines.push(`${last.winnerName} 胡了${last.loserName}的牌！分数: ${last.allScores}`);
+      } else {
+        lines.push(`${last.winnerName} 胡牌！分数: ${last.allScores}`);
+      }
+      if (last.myScoreChange !== 0) {
+        lines.push(`你${last.myScoreChange > 0 ? '赢了' : '输了'}${Math.abs(last.myScoreChange)}分`);
+      }
+      lines.push('');
+    }
+
     // 游戏统计
     lines.push(`【游戏统计】`);
     lines.push(`总局数: ${memory.gameCount} | 赢: ${memory.winCount} | 输: ${memory.loseCount}`);
@@ -345,7 +435,6 @@ export class MemoryManager {
     if (recentEvents.length > 0) {
       lines.push(`【最近发生的事】`);
       recentEvents.forEach(event => {
-        const time = new Date(event.timestamp).toLocaleTimeString();
         const desc = this.eventToDescription(event);
         lines.push(`- ${desc}`);
       });
@@ -383,9 +472,11 @@ export class MemoryManager {
       case 'someone_gang':
         return `${event.playerName} 杠了牌`;
       case 'i_won':
-        return `我赢了！`;
+        return `我赢了！${event.content || ''}`;
       case 'i_lost':
-        return `我输了...`;
+        return `我输了...${event.content || ''}`;
+      case 'i_dianpao':
+        return `我点炮了！${event.content || ''}`;
       case 'conflict':
         return `和 ${event.playerName} 发生了冲突`;
       case 'compliment':
