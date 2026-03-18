@@ -646,3 +646,60 @@ const result = await generateText({
 
 *文档版本：v3.5*
 *更新时间：2026-03-18*
+
+### 2026-03-18 - Tauri 桌面应用支持
+
+**功能需求**：
+1. 系统托盘图标，右键菜单（打开浏览器、设置、退出）
+2. 设置界面：端口选择，自动重启服务
+3. 单实例模式，防止多开
+4. 跨平台支持（Windows + macOS）
+5. 配置文件外部化（应用同级目录）
+
+**技术方案**：
+- Tauri 2.0 + Rust（打包体积 ~10MB）
+- Sidecar 模式打包 Node.js 后端
+- 配置文件放在应用同级 `config/` 目录
+
+**新增文件**：
+```
+src-tauri/
+├── Cargo.toml          # Rust 依赖
+├── tauri.conf.json     # Tauri 应用配置
+├── build.rs            # 构建脚本
+├── settings.html       # 设置界面
+├── icons/              # 应用图标（各尺寸）
+└── src/
+    ├── main.rs         # 主入口
+    ├── tray.rs         # 系统托盘
+    ├── sidecar.rs      # 后端管理
+    └── commands.rs     # Tauri 命令
+
+scripts/
+└── build-sidecar.js    # Sidecar 构建脚本
+
+app-icon.svg            # 应用图标源文件
+```
+
+**构建命令**：
+```bash
+# 开发模式
+npm run tauri:dev
+
+# 生产构建
+npm run tauri:build
+```
+
+**配置文件位置**：
+- 打包后：`<应用目录>/config/llm-config.json`
+- 打包后：`<应用目录>/locales/zh-CN/prompts.json`
+
+**macOS 编译**：
+1. 安装 Rust：`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+2. 安装 Xcode Command Line Tools：`xcode-select --install`
+3. 构建：`npm run tauri:build`
+
+---
+
+*文档版本：v3.6*
+*更新时间：2026-03-18*
