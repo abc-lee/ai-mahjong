@@ -65,18 +65,15 @@ export const IdleDetector = {
       idleTimers.delete(roomId);
     }
     
-    console.log(`[${timestamp}] [IdleDetector] resetTimer 房间${roomId}，设置15秒定时器`);
     
     // 设置新定时器
     const timer = setTimeout(() => {
       const triggerTime = new Date().toISOString().substring(11, 23);
-      console.log(`[${triggerTime}] [IdleDetector] 15秒定时器触发，房间${roomId}`);
       
       // 检查是否真的闲置了15秒（防止重复触发）
       const lastActivity = lastActivityTime.get(roomId) || 0;
       const elapsed = Date.now() - lastActivity;
       
-      console.log(`[${triggerTime}] [IdleDetector] 距上次活动${elapsed}ms，需要${IDLE_TIMEOUT_MS}ms`);
       
       if (elapsed >= IDLE_TIMEOUT_MS - 1000) { // 允许1秒误差
         processAllAIQueues(roomId, io, roomManager);
@@ -128,12 +125,9 @@ function processAllAIQueues(roomId: string, io: Server, roomManager: RoomManager
     p.type === 'ai-agent' && p.aiConfig?.llmEnabled
   );
   if (aiPlayers.length === 0) {
-    console.log(`[IdleDetector] 没有可发言的AI（需要llmEnabled=true）`);
     return;
   }
   
-  console.log(`[IdleDetector] 闲置触发，准备生成私房话`);
-  console.log(`[IdleDetector] 可发言AI: ${aiPlayers.map(p => p.name).join(', ')}`);
   
   // 检查冷却时间，筛选可发言的AI
   const eligibleAIs = aiPlayers.filter(p => {
@@ -143,7 +137,6 @@ function processAllAIQueues(roomId: string, io: Server, roomManager: RoomManager
   });
   
   if (eligibleAIs.length === 0) {
-    console.log(`[IdleDetector] 所有AI都在冷却中，跳过`);
     return;
   }
   
@@ -152,7 +145,6 @@ function processAllAIQueues(roomId: string, io: Server, roomManager: RoomManager
   const adapter = aiManager.getAdapter(selectedAI.id);
   
   if (!adapter) {
-    console.log(`[IdleDetector] ${selectedAI.name} 无adapter，跳过`);
     return;
   }
   
@@ -166,12 +158,10 @@ function processAllAIQueues(roomId: string, io: Server, roomManager: RoomManager
     content: msg.content,
   }));
   
-  console.log(`[IdleDetector] ${selectedAI.name} 生成私房话...`);
   
   adapter.generateIdleChat(otherAIs, recentChats)
     .then(result => {
       if (result && result.message) {
-        console.log(`[IdleDetector] ${selectedAI.name} 私房话: ${result.message}`);
         lastSpeechTime.set(selectedAI.id, Date.now());
         broadcastAISpeech(roomId, io, roomManager, selectedAI.id, selectedAI.name, result.message);
         
@@ -183,7 +173,6 @@ function processAllAIQueues(roomId: string, io: Server, roomManager: RoomManager
       }
     })
     .catch(e => {
-      console.log(`[IdleDetector] ${selectedAI.name} 私房话失败:`, e.message);
       // 失败也重新设置定时器
       IdleDetector.resetTimer(roomId, io, roomManager);
     });
@@ -245,6 +234,7 @@ function broadcastAISpeech(
   // 触发会话层，让其他AI能回应
   const { getConversationManager } = require('../speech/ConversationManager');
   const conversationManager = getConversationManager(io, roomId);
+  conversationManager.setRoomManager(roomManager);
   
   // 获取其他AI玩家
   const otherAIPlayers = room.players.filter(p =>
@@ -269,7 +259,6 @@ function broadcastAISpeech(
     };
     
     conversationManager.handleSpeech(roomId, message, otherAIPlayers, llmConfig).catch(e => {
-      console.log(`[IdleDetector] 会话层处理失败:`, e.message);
     });
   }
 }

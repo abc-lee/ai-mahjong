@@ -77,28 +77,22 @@ export class AIAdapter {
    * 决策：打哪张牌
    */
   private async decideDiscard(gameState: GameStatePublic, lastDrawnTile?: Tile, chatHistory?: { playerName: string; content: string }[]): Promise<AIDecision> {
-    console.log(`[AIAdapter] ${this.player.name} decideDiscard: llmEnabled=${this.config.llmEnabled}, endpoint=${this.config.llmEndpoint?.substring(0, 50)}`);
     
     // 1. 尝试 LLM
     if (this.config.llmEnabled && this.consecutiveFailures < this.FAILURE_THRESHOLD) {
-      console.log(`[AIAdapter] ${this.player.name} 尝试调用 LLM...`);
       try {
         const decision = await this.callLLM(gameState, chatHistory);
         if (decision && this.validateDiscard(decision)) {
           this.consecutiveFailures = 0;
-          console.log(`[AIAdapter] ${this.player.name} LLM 决策成功: ${decision.tileId}, 发言: ${decision.message || '无'}`);
           return decision;
         }
       } catch (e: any) {
         this.consecutiveFailures++;
-        console.log(`[AIAdapter] ${this.player.name} LLM 失败 (${this.consecutiveFailures}/${this.FAILURE_THRESHOLD}): ${e.message}`);
       }
     } else {
-      console.log(`[AIAdapter] ${this.player.name} 跳过 LLM: llmEnabled=${this.config.llmEnabled}, failures=${this.consecutiveFailures}`);
     }
 
     // 2. 降级：规则引擎
-    console.log(`[AIAdapter] ${this.player.name} 使用规则引擎降级`);
     const ruleDecision = this.ruleBasedDecision();
     if (ruleDecision) return ruleDecision;
 
@@ -155,7 +149,6 @@ export class AIAdapter {
 
       return content || null;
     } catch (e: any) {
-      console.log(`[AIAdapter] ${this.player.name} 聊天回应失败:`, e.message);
       return null;
     }
   }
@@ -173,7 +166,6 @@ export class AIAdapter {
     const now = Date.now();
     const lastTime = lastReactionTime.get(this.player.id) || 0;
     if (now - lastTime < REACTION_COOLDOWN) {
-      console.log(`[AIAdapter] ${this.player.name} 冷却中，跳过反应`);
       return { reaction: null };
     }
 
@@ -278,10 +270,8 @@ export class AIAdapter {
       // 更新最后发言时间
       lastReactionTime.set(this.player.id, Date.now());
       
-      console.log(`[AIAdapter] ${this.player.name} 对事件反应: ${content}`);
       return { reaction: content };
     } catch (e: any) {
-      console.log(`[AIAdapter] ${this.player.name} 事件反应失败:`, e.message);
       return { reaction: null };
     }
   }
@@ -292,11 +282,8 @@ export class AIAdapter {
    */
   async generateIdleChat(otherAIs: { name: string }[] = [], recentChats: { playerName: string; content: string }[] = []): Promise<{ message: string; targetName?: string } | null> {
     const timestamp = new Date().toISOString().substring(11, 23);
-    console.log(`[${timestamp}] [AIAdapter] ${this.player.name} generateIdleChat 被调用`);
-    console.log(`[${timestamp}] [AIAdapter] ${this.player.name} llmEnabled=${this.config.llmEnabled}, llmApiKey=${this.config.llmApiKey ? '有' : '无'}`);
     
     if (!this.config.llmEnabled || !this.config.llmApiKey) {
-      console.log(`[${timestamp}] [AIAdapter] ${this.player.name} 无LLM配置，跳过私房话`);
       return null;
     }
     
@@ -304,11 +291,9 @@ export class AIAdapter {
     const now = Date.now();
     const lastTime = lastReactionTime.get(this.player.id) || 0;
     if (now - lastTime < REACTION_COOLDOWN) {
-      console.log(`[${timestamp}] [AIAdapter] ${this.player.name} 冷却中，跳过私房话`);
       return null;
     }
     
-    console.log(`[${timestamp}] [AIAdapter] ${this.player.name} 开始生成私房话...`);
 
     const personalityType = this.config.personality || 'balanced';
     const personalityConfig = promptLoader.getPersonality(personalityType);
@@ -371,6 +356,10 @@ export class AIAdapter {
       if (!content || content.length < 2) {
         return null;
       }
+      
+      // 过滤掉对自己的 @（防止 LLM 幻觉）
+      const selfMentionRegex = new RegExp(`@?${this.player.name}[，。！？,:\\s]`, 'g');
+      content = content.replace(selfMentionRegex, '').trim();
 
       // 检测话里提到了谁
       let targetName: string | undefined;
@@ -386,7 +375,6 @@ export class AIAdapter {
       
       return { message: content, targetName };
     } catch (e: any) {
-      console.log(`[AIAdapter] ${this.player.name} 私房话生成失败:`, e.message);
       return null;
     }
   }
@@ -502,15 +490,11 @@ export class AIAdapter {
     });
 
     // 打印完整prompt用于调试
-    console.log(`[AIAdapter] ====== PROMPT for ${this.player.name} ======`);
-    console.log(`[AIAdapter] 手牌: ${this.player.hand.map(t => `${t.display}[${t.id}]`).join(' ')}`);
-    console.log(`[AIAdapter] ====== END PROMPT ======`);
 
     try {
       const modelId = this.config.llmModel || 'gpt-4o';
       const providerType = this.config.llmProviderType || 'openai';
       
-      console.log(`[AIAdapter] 调用 LLM: provider=${providerType}, model=${modelId}`);
       
       // 使用 SDK 调用，自动处理思考链
       const endpoint = this.config.llmEndpoint?.replace('/chat/completions', '').replace('/v1/messages', '');
@@ -532,10 +516,8 @@ export class AIAdapter {
       
       const content = result.text;
       
-      console.log(`[AIAdapter] SDK 响应: ${content?.substring(0, 200)}`);
       
       if (!content || content.length < 5) {
-        console.log(`[AIAdapter] content 为空，跳过`);
         return null;
       }
       
@@ -551,7 +533,6 @@ export class AIAdapter {
    */
   private parseLLMResponse(content: string): AIDecision | null {
     try {
-      console.log(`[AIAdapter] 解析内容: ${content.substring(0, 100)}`);
       
       // 查找 JSON 对象
       const jsonMatch = content.match(/\{[\s\S]*?"(?:cmd|action)"[\s\S]*?\}/i);
@@ -560,14 +541,11 @@ export class AIAdapter {
           const data = JSON.parse(jsonMatch[0]);
           return this.buildDecision(data);
         } catch (e) {
-          console.log(`[AIAdapter] JSON 解析失败`);
         }
       }
       
-      console.log(`[AIAdapter] 未找到有效 JSON`);
       return null;
     } catch (e: any) {
-      console.log(`[AIAdapter] 解析失败: ${e.message}`);
       return null;
     }
   }
@@ -581,7 +559,6 @@ export class AIAdapter {
     const tileId = data.tileId || data.tile;
     
     if (action && typeof action === 'string') {
-      console.log(`[AIAdapter] buildDecision 成功: action=${action}, tileId=${tileId}, message=${data.message || '无'}`);
       return {
         action: action as 'draw' | 'discard' | 'chi' | 'peng' | 'gang' | 'hu' | 'pass',
         tileId: tileId,
@@ -591,7 +568,6 @@ export class AIAdapter {
         targetPlayer: data.target,
       };
     }
-    console.log(`[AIAdapter] buildDecision 失败: 无效 action, data=${JSON.stringify(data)}`);
     return null;
   }
 

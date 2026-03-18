@@ -83,7 +83,6 @@ export async function generateLLMText(
   }
 ): Promise<{ text: string; reasoningText?: string }> {
   try {
-    console.log(`[LLMService] 开始调用: provider=${config.provider}, model=${config.model}`);
     const model = createModelWithReasoning(config);
     
     const result = await generateText({
@@ -93,7 +92,6 @@ export async function generateLLMText(
       maxOutputTokens: options?.maxTokens ?? 800,  // AI SDK 5.0 用 maxOutputTokens
     } as any);
     
-    console.log(`[LLMService] 调用成功: text="${result.text?.substring(0, 100)}"`);
     
     return {
       text: result.text,

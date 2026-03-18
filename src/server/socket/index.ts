@@ -44,7 +44,6 @@ export function setupSocket(io: Server): void {
   ioInstance = io;
   
   io.on('connection', (socket) => {
-    console.log(`玩家连接: ${socket.id}`);
     
     // 房间事件
     socket.on('room:create', (data, callback) => handleCreateRoom(io, socket, roomManagerInstance!, data, callback));

@@ -54,25 +54,31 @@ class LaowangPlayer {
 
   private setupListeners() {
     this.socket.on('connect', () => {
+      console.log(`[${PLAYER_NAME}] 已连接到服务器 ${SERVER_URL}`);
       
       // 等待 4 秒后获取房间列表
+      console.log(`[${PLAYER_NAME}] 等待 4 秒...`);
       setTimeout(() => {
         this.findRoom();
       }, 4000);
     });
 
     this.socket.on('disconnect', () => {
+      console.log(`[${PLAYER_NAME}] 断开连接`);
     });
 
     this.socket.on('connect_error', (error) => {
+      console.log(`[${PLAYER_NAME}] 连接失败: ${error.message}`);
     });
 
     // 房间更新
     this.socket.on('room:updated', (data: { room: Room }) => {
       this.roomId = data.room.id;
+      console.log(`[${PLAYER_NAME}] 房间更新, 玩家数: ${data.room.players.length}/4`);
       
       // 显示房间内玩家
       data.room.players.forEach(p => {
+        console.log(`  - ${p.name} (位置 ${p.position}) ${p.isReady ? '✓已准备' : '等待中'}`);
       });
       
       // 如果还没准备，自动准备
@@ -84,6 +90,7 @@ class LaowangPlayer {
 
     // 游戏开始
     this.socket.on('game:started', () => {
+      console.log(`[${PLAYER_NAME}] 游戏开始了！`);
     });
 
     // 游戏状态
@@ -92,6 +99,8 @@ class LaowangPlayer {
       this.isMyTurn = data.yourTurn;
       
       const handDisplay = this.hand.map(t => t.display).join(' ');
+      console.log(`[${PLAYER_NAME}] 手牌: ${handDisplay}`);
+      console.log(`[${PLAYER_NAME}] 当前玩家位置: ${data.state.currentPlayerIndex}, 我的回合: ${this.isMyTurn}`);
       
       if (this.isMyTurn && this.hand.length > 0) {
         // 延迟一下再打牌，模拟思考
@@ -102,6 +111,7 @@ class LaowangPlayer {
     // 可执行的操作
     this.socket.on('game:actions', (data: { actions: Array<{ action: string; tiles?: Tile[] }> }) => {
       if (data.actions.length > 0) {
+        console.log(`[${PLAYER_NAME}] 可执行操作: ${data.actions.map(a => a.action).join(', ')}`);
         
         // 优先胡牌，其次杠，再次碰，最后吃
         const priority = ['hu', 'gang', 'peng', 'chi'];
@@ -109,13 +119,16 @@ class LaowangPlayer {
           (a, b) => priority.indexOf(a.action) - priority.indexOf(b.action)
         )[0];
         
+        console.log(`[${PLAYER_NAME}] 执行操作: ${bestAction.action}`);
         setTimeout(() => this.performAction(bestAction.action, bestAction.tiles), 500);
       }
     });
 
     // 游戏结束
     this.socket.on('game:ended', (data: { winner: number; winningHand?: unknown }) => {
+      console.log(`[${PLAYER_NAME}] 游戏结束, 赢家位置: ${data.winner}`);
       if (data.winningHand) {
+        console.log(`[${PLAYER_NAME}] 胡牌牌型:`, data.winningHand);
       }
       // 游戏结束后自动准备下一局
       setTimeout(() => this.setReady(true), 2000);
@@ -123,15 +136,19 @@ class LaowangPlayer {
 
     // 错误处理
     this.socket.on('room:error', (data: { message: string }) => {
+      console.log(`[${PLAYER_NAME}] 房间错误: ${data.message}`);
     });
 
     this.socket.on('game:error', (data: { message: string }) => {
+      console.log(`[${PLAYER_NAME}] 游戏错误: ${data.message}`);
     });
   }
 
   private findRoom() {
+    console.log(`[${PLAYER_NAME}] 获取房间列表...`);
     
     this.socket.emit('room:list', (response: { rooms: Room[] }) => {
+      console.log(`[${PLAYER_NAME}] 当前房间数: ${response.rooms.length}`);
       
       // 查找等待中且未满员的房间
       const waitingRooms = response.rooms.filter(r => r.state === 'waiting' && r.players.length < 4);
@@ -139,8 +156,10 @@ class LaowangPlayer {
       if (waitingRooms.length > 0) {
         // 加入第一个可用房间
         const room = waitingRooms[0];
+        console.log(`[${PLAYER_NAME}] 找到房间 ${room.id}, 当前 ${room.players.length}/4 人`);
         this.joinRoom(room.id);
       } else {
+        console.log(`[${PLAYER_NAME}] 没有等待中的房间，创建新房间...`);
         this.createRoom();
       }
     });
@@ -151,7 +170,9 @@ class LaowangPlayer {
       const response = res as { roomId?: string; error?: string };
       if (response.roomId) {
         this.roomId = response.roomId;
+        console.log(`[${PLAYER_NAME}] 创建房间成功: ${response.roomId}`);
       } else if (response.error) {
+        console.log(`[${PLAYER_NAME}] 创建房间失败: ${response.error}`);
       }
     });
   }
@@ -161,7 +182,9 @@ class LaowangPlayer {
       const response = res as { roomId?: string; error?: string; playerPosition?: number };
       if (response.roomId) {
         this.roomId = response.roomId;
+        console.log(`[${PLAYER_NAME}] 加入房间成功: ${response.roomId}, 位置: ${response.playerPosition}`);
       } else if (response.error) {
+        console.log(`[${PLAYER_NAME}] 加入房间失败: ${response.error}`);
         // 如果加入失败，尝试创建新房间
         this.createRoom();
       }
@@ -172,7 +195,9 @@ class LaowangPlayer {
     this.socket.emit('room:ready', { ready }, (res: unknown) => {
       const response = res as { success?: boolean; error?: string };
       if (response.success) {
+        console.log(`[${PLAYER_NAME}] 已准备: ${ready}`);
       } else if (response.error) {
+        console.log(`[${PLAYER_NAME}] 准备失败: ${response.error}`);
       }
     });
   }
@@ -184,6 +209,7 @@ class LaowangPlayer {
     const randomIndex = Math.floor(Math.random() * this.hand.length);
     const tileToDiscard = this.hand[randomIndex];
     
+    console.log(`[${PLAYER_NAME}] 打出: ${tileToDiscard.display}`);
     this.socket.emit('game:discard', { tileId: tileToDiscard.id });
   }
 
@@ -191,12 +217,15 @@ class LaowangPlayer {
     this.socket.emit('game:action', { action, tiles }, (res: unknown) => {
       const response = res as { success?: boolean; error?: string };
       if (response.success) {
+        console.log(`[${PLAYER_NAME}] 操作成功: ${action}`);
       } else if (response.error) {
+        console.log(`[${PLAYER_NAME}] 操作失败: ${response.error}`);
       }
     });
   }
 
   connect() {
+    console.log(`[${PLAYER_NAME}] 正在连接到 ${SERVER_URL}...`);
     this.socket.connect();
   }
 
@@ -206,12 +235,17 @@ class LaowangPlayer {
 }
 
 // 启动老王
+console.log('====================================');
+console.log('  老王 - 麻将 AI 玩家');
+console.log('====================================');
+console.log('');
 
 const laowang = new LaowangPlayer();
 laowang.connect();
 
 // 保持进程运行
 process.on('SIGINT', () => {
+  console.log(`\n[${PLAYER_NAME}] 收到退出信号，断开连接...`);
   laowang.disconnect();
   process.exit(0);
 });

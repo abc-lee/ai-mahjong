@@ -42,15 +42,12 @@ export class AIManager {
    * 游戏开始时初始化所有 AI
    */
   initGame(players: Player[]): void {
-    console.log(`[AIManager] initGame: ${players.length} 玩家`);
     for (const player of players) {
-      console.log(`[AIManager] 玩家 ${player.name}: type=${player.type}, aiConfig=${JSON.stringify(player.aiConfig)}`);
       if ((player.type === 'ai-agent' || player.type === 'npc') && player.aiConfig) {
         // 创建 AI 适配器
         this.createAdapter(player);
         // 创建事件队列
         eventQueueManager.createQueue(player.id);
-        console.log(`[AIManager] 创建 adapter 和事件队列: ${player.name}, llmEnabled=${player.aiConfig.llmEnabled}`);
       }
     }
   }

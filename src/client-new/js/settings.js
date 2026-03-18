@@ -68,6 +68,11 @@ async function loadFromBackend() {
     const res = await fetch('/api/config');
     const data = await res.json();
     
+    // 加载语言列表
+    if (data.availableLanguages) {
+      renderLanguageSelect(data.availableLanguages, data.currentLanguage);
+    }
+    
     if (data.llm) {
       // 从 localStorage 读取之前保存的 apiKey
       const savedConfigs = JSON.parse(localStorage.getItem('llm-configs') || '{"configs":[]}');
@@ -100,8 +105,49 @@ async function loadFromBackend() {
       savePlayerConfig();
       console.log('[Settings] Loaded player config from backend');
     }
+    
+    // 保存当前语言到 localStorage
+    if (data.currentLanguage) {
+      localStorage.setItem('app-language', data.currentLanguage);
+    }
   } catch (e) {
     console.error('[Settings] Failed to load from backend:', e);
+  }
+}
+
+// 渲染语言选择下拉框
+function renderLanguageSelect(languages, currentLanguage) {
+  const select = document.getElementById('language-select');
+  if (!select) return;
+  
+  select.innerHTML = languages.map(lang => 
+    `<option value="${lang.code}" ${lang.code === currentLanguage ? 'selected' : ''}>${lang.name}</option>`
+  ).join('');
+  
+  // 绑定事件
+  select.addEventListener('change', async (e) => {
+    const newLang = e.target.value;
+    await saveLanguage(newLang);
+  });
+}
+
+// 保存语言设置
+async function saveLanguage(language) {
+  try {
+    const res = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ language })
+    });
+    
+    if (res.ok) {
+      localStorage.setItem('app-language', language);
+      console.log('[Settings] Language saved:', language);
+      // 刷新页面以应用新语言
+      location.reload();
+    }
+  } catch (e) {
+    console.error('[Settings] Failed to save language:', e);
   }
 }
 

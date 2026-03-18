@@ -51,6 +51,7 @@ class TestPlayer {
   private setupListeners() {
     this.socket.on('connect', () => {
       this.myId = this.socket.id!;
+      console.log(`[${this.name}] 已连接`);
     });
     
     this.socket.on('room:updated', (data: { room: { id: string; players: any[]; host: string; state: string } }) => {
@@ -70,8 +71,10 @@ class TestPlayer {
       if (data.room.host === this.myId && data.room.players.length === 4) {
         const allReady = data.room.players.every(p => p.isReady);
         if (allReady && data.room.state === 'waiting') {
+          console.log(`[${this.name}] 所有人准备好了，开始游戏！`);
           setTimeout(() => {
             this.socket.emit('game:start', (res: any) => {
+              console.log(`[${this.name}] 开始游戏结果:`, res);
             });
           }, 500);
         }
@@ -79,6 +82,7 @@ class TestPlayer {
     });
     
     this.socket.on('game:started', () => {
+      console.log(`[${this.name}] 游戏开始！`);
     });
     
     this.socket.on('game:state', (data: { state: GameState; yourHand: Tile[]; yourTurn: boolean; lastDrawnTile?: Tile }) => {
@@ -104,6 +108,7 @@ class TestPlayer {
           priority.indexOf(a.action) - priority.indexOf(b.action)
         )[0];
         
+        console.log(`[${this.name}] 执行: ${best.action}`);
         setTimeout(() => {
           this.socket.emit('game:action', { action: best.action, tiles: best.tiles });
         }, 500);
@@ -111,15 +116,18 @@ class TestPlayer {
     });
     
     this.socket.on('game:draw', (data: { tile: Tile }) => {
+      console.log(`[${this.name}] 摸到: ${data.tile.display}`);
     });
     
     this.socket.on('game:ended', (data: { winner: number }) => {
+      console.log(`[${this.name}] 游戏结束！赢家: ${data.winner}`);
     });
   }
   
   private draw() {
     this.socket.emit('game:draw', (res: { tile?: Tile; error?: string }) => {
       if (res.tile) {
+        console.log(`[${this.name}] 摸到: ${res.tile.display}`);
       }
     });
   }
@@ -127,6 +135,7 @@ class TestPlayer {
   private discard() {
     if (this.hand.length === 0) return;
     const tile = this.hand[this.hand.length - 1];
+    console.log(`[${this.name}] 打出: ${tile.display}`);
     this.socket.emit('game:discard', { tileId: tile.id });
   }
   
@@ -141,6 +150,7 @@ class TestPlayer {
     this.socket.connect();
     setTimeout(() => {
       this.socket.emit('room:create', { playerName: this.name }, (res: { roomId: string }) => {
+        console.log(`[${this.name}] 创建房间: ${res.roomId}`);
         this.roomId = res.roomId;
       });
     }, 500);
@@ -153,6 +163,7 @@ class TestPlayer {
 
 // 测试主函数
 async function runTest() {
+  console.log('=== 开始游戏流程测试 ===\n');
   
   const players: TestPlayer[] = [];
   const names = ['玩家1', '玩家2', '玩家3', '玩家4'];
@@ -169,6 +180,7 @@ async function runTest() {
   // 创建房间
   roomId = await new Promise<string>(resolve => {
     host.socket.emit('room:create', { playerName: names[0] }, (res: { roomId: string }) => {
+      console.log(`[${names[0]}] 创建房间: ${res.roomId}`);
       resolve(res.roomId);
     });
   });
@@ -182,12 +194,14 @@ async function runTest() {
       player.socket.on('connect', () => resolve());
     });
     player.socket.emit('room:join', { roomId, playerName: names[i] }, () => {
+      console.log(`[${names[i]}] 加入房间`);
     });
     players.push(player);
     await new Promise(r => setTimeout(r, 300));
   }
   
   // 游戏会自动开始和运行
+  console.log('\n所有玩家已加入，游戏将自动开始...\n');
 }
 
 runTest();

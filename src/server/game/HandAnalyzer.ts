@@ -64,7 +64,6 @@ export class HandAnalyzer {
     // 手牌数量检查：需要 14 - 3*meldCount 张
     const expectedHandSize = 14 - 3 * meldCount;
     if (hand.length !== expectedHandSize) {
-      console.log(`[canBasicWin] 手牌数量不匹配: hand.length=${hand.length}, expected=${expectedHandSize}`);
       return false;
     }
     
@@ -73,18 +72,15 @@ export class HandAnalyzer {
     
     // 打印牌型用于调试
     const handStr = hand.map(t => t.display).join(', ');
-    console.log(`[canBasicWin] 检查牌型: ${handStr}, melds=${meldCount}, requiredMentsu=${requiredMentsu}`);
     
     // 尝试找出所有可能的将牌
     for (const [key, item] of counts) {
       if (item.count >= 2) {
         // 尝试用这张牌做将
         item.count -= 2;
-        console.log(`[canBasicWin] 尝试将牌: ${item.tile.display}, 剩余需要组成 ${requiredMentsu} 组面子`);
         
         // 递归检查剩余牌能否组成 requiredMentsu 组面子
         if (this.canFormMentsu(counts, requiredMentsu)) {
-          console.log(`[canBasicWin] ✓ 找到有效牌型！`);
           return true;
         }
         
@@ -93,7 +89,6 @@ export class HandAnalyzer {
       }
     }
     
-    console.log(`[canBasicWin] ✗ 未找到有效牌型`);
     return false;
   }
 
@@ -407,7 +402,6 @@ export class HandAnalyzer {
     
     // 如果没有检测到任何番型，给一个基础胡牌番
     if (fans.length === 0) {
-      console.log(`[calculateFans] 未检测到番型，使用基础胡牌`);
       fans.push({
         id: 'base',
         name: '胡牌',

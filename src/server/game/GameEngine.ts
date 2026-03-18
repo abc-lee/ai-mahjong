@@ -68,11 +68,9 @@ export class GameEngine {
     if (lastDealerIndex !== undefined && lastDealerIndex >= 0) {
       // 上一局庄家的下家成为新庄家
       dealerIndex = (lastDealerIndex + 1) % 4;
-      console.log(`[GameEngine] 庄家轮换: 上一局庄家 ${lastDealerIndex} -> 新庄家 ${dealerIndex}`);
     } else {
       // 第一局随机选择
       dealerIndex = Math.floor(Math.random() * 4);
-      console.log(`[GameEngine] 第一局随机庄家: ${dealerIndex}`);
     }
     
     const { hands, wall } = this.deck.deal(dealerIndex);
@@ -107,7 +105,6 @@ export class GameEngine {
   }
 
   drawTile(playerId: string): Tile | null {
-    console.log(`[GameEngine] drawTile: playerId=${playerId.slice(0,4)}, wallRemaining=${this.state.wall.length}`);
     
     if (this.state.phase !== 'playing') return null;
     if (this.hasPendingActions()) return null;
@@ -118,7 +115,6 @@ export class GameEngine {
     
     const tile = this.deck.draw();
     if (!tile) {
-      console.log(`[GameEngine] 牌墙耗尽！流局！`);
       this.endGame(null);
       return null;
     }
@@ -133,36 +129,29 @@ export class GameEngine {
   }
 
   discardTile(playerId: string, tileId: string): boolean {
-    console.log(`[GameEngine] discardTile: playerId=${playerId.slice(0,4)}, tileId=${tileId}`);
     
     if (this.state.phase !== 'playing') {
-      console.log(`[GameEngine] discardTile 失败: phase 不是 playing: ${this.state.phase}`);
       return false;
     }
     if (this.hasPendingActions()) {
-      console.log(`[GameEngine] discardTile 失败: 有 pendingActions`);
       return false;
     }
     
     const playerIndex = this.getPlayerIndex(playerId);
     if (playerIndex === -1 || playerIndex !== this.state.currentPlayerIndex) {
-      console.log(`[GameEngine] discardTile 失败: playerIndex=${playerIndex}, currentPlayerIndex=${this.state.currentPlayerIndex}`);
       return false;
     }
     if (this.turnPhase !== 'discard') {
-      console.log(`[GameEngine] discardTile 失败: turnPhase=${this.turnPhase}`);
       return false;
     }
     
     const player = this.state.players[playerIndex];
     if (!this.validator.validateDiscard(player, tileId)) {
-      console.log(`[GameEngine] discardTile 失败: validateDiscard 返回 false`);
       return false;
     }
     
     const tileIndex = player.hand.findIndex(t => t.id === tileId);
     if (tileIndex === -1) {
-      console.log(`[GameEngine] discardTile 失败: 找不到牌 tileId=${tileId}, 手牌: ${player.hand.map(t => t.id).join(',')}`);
       return false;
     }
     
@@ -185,14 +174,11 @@ export class GameEngine {
   }
 
   performAction(playerId: string, action: PendingAction): boolean {
-    console.log(`[GameEngine] performAction: playerId=${playerId.slice(0,4)}, action=${action.action}, tiles=`, action.tiles?.map(t => t.display));
     
     if (this.state.phase !== 'playing') {
-      console.log(`[GameEngine] performAction: phase 不是 playing: ${this.state.phase}`);
       return false;
     }
     if (!this.hasPendingActions()) {
-      console.log(`[GameEngine] performAction: 没有 pendingActions`);
       return false;
     }
     
@@ -200,7 +186,6 @@ export class GameEngine {
       p => p.playerId === playerId && p.action === action.action
     );
     if (!pendingAction) {
-      console.log(`[GameEngine] performAction: 没找到匹配的 pendingAction`);
       return false;
     }
     
@@ -225,11 +210,9 @@ export class GameEngine {
         result = false;
     }
     
-    console.log(`[GameEngine] performAction ${action.action} 结果: ${result}`);
     
     // 如果操作成功，清除所有 pendingActions（因为吃碰杠胡是互斥的）
     if (result) {
-      console.log(`[GameEngine] performAction 成功，清除 pendingActions`);
       this.state.pendingActions = [];
       this.respondedPlayers.clear();
     }
@@ -281,12 +264,10 @@ export class GameEngine {
     if (this.state.phase !== 'playing') return false;
     // 如果有待处理的操作（吃碰杠胡），任何人都不能行动
     if (this.hasPendingActions()) {
-      console.log(`[isPlayerTurn] ${playerId?.slice(0,6)}: 有 pendingActions，返回 false`);
       return false;
     }
     const playerIndex = this.getPlayerIndex(playerId);
     const result = playerIndex === this.state.currentPlayerIndex;
-    console.log(`[isPlayerTurn] ${playerId?.slice(0,6)}: playerIndex=${playerIndex}, currentPlayerIndex=${this.state.currentPlayerIndex}, turnPhase=${this.turnPhase}, 结果=${result}`);
     return result;
   }
 
@@ -360,10 +341,8 @@ export class GameEngine {
         player, tile, false, discardPlayerIndex, (discardPlayerIndex + 1) % 4
       );
       
-      console.log(`[checkDiscardActions] 玩家 ${player.name} 可用操作: hu=${actions.canHu}, peng=${actions.canPeng}, chi=${actions.canChi}, gang=${actions.canGang}`);
       
       for (const action of actions.actions) {
-        console.log(`[checkDiscardActions] 添加操作: ${action.action} 给玩家 ${player.name}`);
         allActions.push(action);
       }
     }
@@ -374,7 +353,6 @@ export class GameEngine {
     if (hasHuAction) {
       // 如果有人可以胡，只保留胡牌操作
       this.state.pendingActions = allActions.filter(a => a.action === 'hu');
-      console.log(`[checkDiscardActions] 有玩家可以胡，只保留胡牌操作`);
     } else {
       // 没有胡牌，检查是否有杠/碰操作
       const hasGangOrPeng = allActions.some(a => a.action === 'gang' || a.action === 'peng');
@@ -382,7 +360,6 @@ export class GameEngine {
       if (hasGangOrPeng) {
         // 有杠或碰，过滤掉吃牌操作
         this.state.pendingActions = allActions.filter(a => a.action !== 'chi');
-        console.log(`[checkDiscardActions] 有杠/碰操作，过滤吃牌`);
       } else {
         // 只有吃牌操作
         this.state.pendingActions = allActions;
@@ -390,15 +367,12 @@ export class GameEngine {
     }
     
     this.state.pendingActions.sort((a, b) => b.priority - a.priority);
-    console.log(`[checkDiscardActions] 总共 ${this.state.pendingActions.length} 个待处理操作`);
   }
 
   private performHu(player: Player, playerIndex: number): boolean {
     const isSelfDraw = this.lastDrawnTile.has(player.id);
     const winningTile = isSelfDraw ? this.lastDrawnTile.get(player.id)! : this.state.lastDiscard!;
     
-    console.log(`[performHu] 玩家 ${player.name} 胡牌, isSelfDraw=${isSelfDraw}, hand=${player.hand.length}, melds=${player.melds.length}`);
-    console.log(`[performHu] 胡牌前分数: ${this.state.players.map(p => `${p.name}=${p.score}`).join(', ')}`);
     
     if (!isSelfDraw) {
       player.hand.push(winningTile);
@@ -406,17 +380,14 @@ export class GameEngine {
     
     const fans = this.analyzer.calculateFans(player.hand, player.melds, isSelfDraw, winningTile);
     
-    console.log(`[performHu] 检测到番型: ${fans.length} 个, names=${fans.map(f => f.name).join(', ')}`);
     
     const loserIndex = isSelfDraw ? null : this.state.lastDiscardPlayer;
     const loser = loserIndex !== null ? this.state.players[loserIndex] : null;
     const scoreResult = this.calculator.calculateDetailedScore(player, loser, fans, isSelfDraw);
     
-    console.log(`[performHu] 分数结果: winnerScore=${scoreResult.winnerScore}, loserScore=${scoreResult.loserScore}, han=${scoreResult.han}`);
     
     this.calculator.applyScoreChange(this.state.players, playerIndex, loserIndex, scoreResult);
     
-    console.log(`[performHu] 胡牌后分数: ${this.state.players.map(p => `${p.name}=${p.score}`).join(', ')}`);
     
     this.state.winner = playerIndex;
     this.state.winningHand = {
@@ -546,23 +517,18 @@ export class GameEngine {
   }
 
   private performChi(player: Player, playerIndex: number, tiles?: Tile[]): boolean {
-    console.log(`[GameEngine] performChi: player=${player.name}, tiles=`, tiles?.map(t => t.display));
     
     if (!tiles || tiles.length !== 2) {
-      console.log(`[GameEngine] performChi: tiles 数量不对: ${tiles?.length}`);
       return false;
     }
     
     const tile = this.state.lastDiscard;
     if (!tile) {
-      console.log(`[GameEngine] performChi: 没有 lastDiscard`);
       return false;
     }
     
-    console.log(`[GameEngine] performChi: lastDiscard=${tile.display}`);
     
     if (!this.validator.validateChi(player, tile, tiles)) {
-      console.log(`[GameEngine] performChi: validateChi 返回 false`);
       return false;
     }
     
@@ -596,7 +562,6 @@ export class GameEngine {
     this.state.lastDiscardPlayer = -1;
     this.turnPhase = 'discard';
     
-    console.log(`[GameEngine] performChi 完成, 玩家 ${player.name} 需要打牌`);
     
     return true;
   }

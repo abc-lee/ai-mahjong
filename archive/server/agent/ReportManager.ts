@@ -71,6 +71,7 @@ class ReportManager {
         if (now - lastHeartbeat > this.heartbeatTimeout) {
           // 检查是否已经被标记为失联
           if (!roomData.disconnectedAgents.has(playerId)) {
+            console.log(`[HeartbeatMonitor] Agent ${playerId} (${roomId}) 超时，标记为失联`);
             
             // 标记为失联
             roomData.disconnectedAgents.add(playerId);

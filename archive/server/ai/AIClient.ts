@@ -17,6 +17,7 @@ function startAIPlayer(name: string) {
 
   socket.on('connect', () => {
     myId = socket.id;
+    console.log(`[AI ${name}] 已连接, ID: ${myId}`);
     
     // 查找房间
     socket.emit('room:list', (res: { rooms: any[] }) => {
@@ -28,6 +29,7 @@ function startAIPlayer(name: string) {
         socket.emit('room:join', { roomId: room.id, playerName: name }, (res: any) => {
           if (res.roomId) {
             roomId = res.roomId;
+            console.log(`[AI ${name}] 加入房间 ${roomId}`);
           }
         });
       } else {
@@ -35,6 +37,7 @@ function startAIPlayer(name: string) {
         socket.emit('room:create', { playerName: name }, (res: any) => {
           if (res.roomId) {
             roomId = res.roomId;
+            console.log(`[AI ${name}] 创建房间 ${roomId}`);
           }
         });
       }
@@ -49,6 +52,7 @@ function startAIPlayer(name: string) {
       // 自动准备
       setTimeout(() => {
         socket.emit('room:ready', { ready: true });
+        console.log(`[AI ${name}] 已准备`);
       }, 500);
     }
     
@@ -58,6 +62,7 @@ function startAIPlayer(name: string) {
       if (allReady && room.state === 'waiting') {
         setTimeout(() => {
           socket.emit('game:start', (res: any) => {
+            console.log(`[AI ${name}] 开始游戏:`, res);
           });
         }, 1000);
       }
@@ -65,16 +70,19 @@ function startAIPlayer(name: string) {
   });
 
   socket.on('game:started', () => {
+    console.log(`[AI ${name}] 游戏开始！`);
   });
 
   socket.on('game:state', (data: any) => {
     const { yourTurn, turnPhase } = data;
     
     if (yourTurn) {
+      console.log(`[AI ${name}] 我的回合, turnPhase: ${turnPhase}`);
       
       if (turnPhase === 'draw') {
         setTimeout(() => {
           socket.emit('game:draw', (res: any) => {
+            console.log(`[AI ${name}] 摸牌:`, res.tile?.display);
           });
         }, 500);
       } else if (turnPhase === 'discard') {
@@ -84,6 +92,7 @@ function startAIPlayer(name: string) {
           const randomTile = hand[Math.floor(Math.random() * hand.length)];
           setTimeout(() => {
             socket.emit('game:discard', { tileId: randomTile.id }, (res: any) => {
+              console.log(`[AI ${name}] 打牌: ${randomTile.display}`, res);
             });
           }, 1000);
         }
@@ -102,12 +111,14 @@ function startAIPlayer(name: string) {
       
       setTimeout(() => {
         socket.emit('game:action', { action: best.action, tiles: best.tiles }, (res: any) => {
+          console.log(`[AI ${name}] 操作: ${best.action}`, res);
         });
       }, 500);
     }
   });
 
   socket.on('game:ended', (data: any) => {
+    console.log(`[AI ${name}] 游戏结束, 赢家:`, data.winner);
     // 重新准备
     setTimeout(() => {
       socket.emit('room:ready', { ready: true });
@@ -122,6 +133,7 @@ const args = process.argv.slice(2);
 const count = parseInt(args[0]) || 3;
 const startIndex = parseInt(args[1]) || 0;
 
+console.log(`启动 ${count} 个 AI 玩家...`);
 
 for (let i = 0; i < count; i++) {
   const name = AI_NAMES[(startIndex + i) % AI_NAMES.length];

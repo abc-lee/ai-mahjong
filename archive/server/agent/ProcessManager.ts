@@ -42,6 +42,7 @@ class ProcessManagerClass {
     
     // 如果已有进程，先杀掉（避免累积）
     if (this.processes.has(key)) {
+      console.log(`[ProcessManager] 杀掉旧进程: ${key}`);
       this.kill(roomId, agentId);
     }
     
@@ -61,9 +62,11 @@ class ProcessManagerClass {
         startedAt: Date.now()
       });
       
+      console.log(`[ProcessManager] 启动 Bridge: ${key} (PID: ${proc.pid})`);
       
       // 监听进程退出
       proc.on('exit', (code) => {
+        console.log(`[ProcessManager] Bridge 退出: ${key} (code: ${code})`);
         this.processes.delete(key);
       });
       
@@ -118,6 +121,7 @@ class ProcessManagerClass {
       bridge.process.kill();
     }
     this.processes.clear();
+    console.log(`[ProcessManager] 已杀掉所有进程`);
   }
   
   /**

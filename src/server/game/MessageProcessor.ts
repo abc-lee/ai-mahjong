@@ -147,7 +147,6 @@ class MessageProcessorClass {
    */
   private handleChatMessage(msg: ChatMessage): void {
     const content = msg.content as ChatTextContent;
-    console.log(`[Chat] ${msg.sender.name}: ${content.text}`);
     
     // 触发聊天事件广播
     this.broadcastToRoom(msg.sender.id, msg);
@@ -158,7 +157,6 @@ class MessageProcessorClass {
    */
   private handleActionMessage(msg: ChatMessage): void {
     const content = msg.content as ActionContent;
-    console.log(`[Action] ${msg.sender.name}: ${content.action} - ${content.text}`);
     
     // 触发动作执行
     this.executeGameAction(msg);
@@ -172,7 +170,6 @@ class MessageProcessorClass {
    */
   private handleSystemMessage(msg: ChatMessage): void {
     const content = msg.content as SystemContent;
-    console.log(`[System] ${content.level || 'info'}: ${content.notification}`);
     
     // 系统消息也需要广播
     this.broadcastToRoom('system', msg);
@@ -224,7 +221,6 @@ class MessageProcessorClass {
   broadcastToRoom(roomId: string, msg: ChatMessage): void {
     // TODO: 实现房间广播逻辑
     // 这里需要通过 socket.io 发送消息给房间内所有连接
-    console.log(`[Broadcast] Room ${roomId}: Message ${msg.id} from ${msg.sender.name}`);
     
     // 实际实现应该类似：
     // io.to(roomId).emit('room:chat', msg);
@@ -246,7 +242,6 @@ class MessageProcessorClass {
     // }
     // ...
     
-    console.log(`[Execute] Action ${content.action} for player ${msg.sender.id}`);
   }
 }
 

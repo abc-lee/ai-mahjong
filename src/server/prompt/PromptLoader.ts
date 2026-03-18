@@ -76,6 +76,12 @@ export interface PromptConfig {
       crossGameMemory: string;
     };
     fallbackTemplates: Record<string, string[]>;
+    gameEndComment: {
+      system: string;
+      userWon: string;
+      userLost: string;
+      drawGame: string;
+    };
   };
   gameInfo: {
     gameStart: string;
@@ -348,6 +354,39 @@ class PromptLoader {
       genderAge: genderAge,
       traits: vars.traits
     });
+  }
+
+  /**
+   * 获取所有可用语言
+   * 扫描 locales 目录下的语言文件夹
+   */
+  getAvailableLanguages(): { code: Language; name: string }[] {
+    const localesPath = path.join(process.cwd(), 'locales');
+    const languages: { code: Language; name: string }[] = [];
+    
+    const languageNames: Record<string, string> = {
+      'zh-CN': '中文（简体）',
+      'en-US': 'English'
+    };
+
+    try {
+      const dirs = fs.readdirSync(localesPath, { withFileTypes: true });
+      for (const dir of dirs) {
+        if (dir.isDirectory()) {
+          const promptsPath = path.join(localesPath, dir.name, 'prompts.json');
+          if (fs.existsSync(promptsPath)) {
+            languages.push({
+              code: dir.name as Language,
+              name: languageNames[dir.name] || dir.name
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[PromptLoader] 扫描语言目录失败:', e);
+    }
+
+    return languages;
   }
 }
 

@@ -88,7 +88,6 @@ export class SpeechManager {
    * 如果已有情绪数据，则恢复部分情绪（跨局累积）
    */
   initPlayerEmotion(playerId: string, playerName?: string, isNewGame: boolean = false): void {
-    console.log(`[initPlayerEmotion] playerId=${playerId?.slice(0,8)}, playerName=${playerName}, isNewGame=${isNewGame}`);
     
     // 检查是否已有情绪数据
     const existingEmotion = this.playerEmotions.get(playerId);
@@ -96,7 +95,6 @@ export class SpeechManager {
     if (existingEmotion) {
       // 已有情绪，进行衰减后保留
       this.restoreEmotionState(playerId, existingEmotion);
-      console.log(`[Emotion] ${playerName || playerId} 恢复跨局情绪`);
     } else {
       // 新玩家，初始化默认情绪
       this.playerEmotions.set(playerId, {
@@ -105,7 +103,6 @@ export class SpeechManager {
         patience: 100,
         confidence: 50,
       });
-      console.log(`[Emotion] ${playerName || playerId} 初始化默认情绪`);
     }
     
     // 初始化或恢复记忆
@@ -115,13 +112,11 @@ export class SpeechManager {
         memoryManager.initMemory(playerId, playerName);
       } else if (isNewGame) {
         // 新一局开始，清理旧事件
-        console.log(`[Memory] ${playerName} 开始新一局，清理旧事件`);
         memoryManager.startNewGame(playerId);
       }
       
       // 记录游戏开始事件
       if (isNewGame) {
-        console.log(`[Memory] ${playerName} 记录 game_start 事件`);
         memoryManager.recordEvent(playerId, { type: 'game_start' });
       }
     }
@@ -244,7 +239,6 @@ export class SpeechManager {
       intensity: stimulus.intensity,
     });
 
-    console.log(`[Speech] 情绪刺激: ${stimulus.message} (强度: ${stimulus.intensity})`);
   }
 
   /**
@@ -411,7 +405,6 @@ export class SpeechManager {
     // 广播给房间内所有人
     this.io.to(this.roomId).emit('player:speech', message);
 
-    console.log(`[Speech] ${message.playerName}: ${message.content}`);
 
     // 检查是否触发嘴炮
     this.checkTriggerArgue(message);
@@ -512,11 +505,9 @@ export class SpeechManager {
 
     const emotion = this.getEmotion(playerId);
     
-    console.log(`[Speech] triggerProactiveSpeech: ${playerName}, situation=${situation}, personalityType=${personalityType || 'none'}, chatFrequency=${personality.chatFrequency}`);
     
     // 根据个性决定是否发言
     if (Math.random() > personality.chatFrequency) {
-      console.log(`[Speech] ${playerName} 不发言 (概率检查1)`);
       return; // 不发言
     }
 
@@ -526,7 +517,6 @@ export class SpeechManager {
     if (emotion.happiness > 30) speechProbability += 0.1;
     
     if (Math.random() > speechProbability) {
-      console.log(`[Speech] ${playerName} 不发言 (概率检查2)`);
       return;
     }
 
@@ -572,16 +562,12 @@ export class SpeechManager {
 
     if (template) {
       content = template;
-      console.log(`[Speech] ${playerName} 选择模板: ${template}`);
     } else {
-      console.log(`[Speech] ${playerName} 没有找到模板`);
     }
 
     if (content) {
       // 延迟发送，模拟思考
-      console.log(`[Speech] ${playerName} 将在 0.5-2秒后发言: ${content}`);
       setTimeout(() => {
-        console.log(`[Speech] ${playerName} 发言中...`);
         this.handleSpeech({
           playerId,
           playerName,
@@ -708,7 +694,6 @@ export class SpeechManager {
     
     this.playerEmotions.set(playerId, restoredEmotion);
     
-    console.log(`[Emotion] ${playerId} 恢复情绪: happy=${restoredEmotion.happiness}, angry=${restoredEmotion.anger}`);
   }
 
   /**

@@ -4,6 +4,22 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import { setupSocket, getRoomManager, getIO, toClientRoom } from './socket/index';
 import { LLMClient, LLMConfig } from './llm/LLMClient';
+import { promptLoader } from './prompt/PromptLoader';
+
+// 启动时加载保存的语言设置
+try {
+  const fs = require('fs');
+  const path = require('path');
+  const configPath = path.join(process.cwd(), 'llm-config.json');
+  if (fs.existsSync(configPath)) {
+    const data = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    if (data.language) {
+      promptLoader.setLanguage(data.language);
+    }
+  }
+} catch (e) {
+  // 忽略错误，使用默认语言
+}
 
 const app = express();
 const httpServer = createServer(app);
@@ -168,23 +184,38 @@ app.post('/api/ai/generate-name', async (req, res) => {
 
 // Config sync
 app.post('/api/config', (req, res) => {
-  const { llm, players } = req.body;
+  const { llm, players, language } = req.body;
   
   // Store in global
   (global as any).gameConfig = { llm, players };
+  
+  // 更新语言设置
+  if (language) {
+    promptLoader.setLanguage(language);
+  }
   
   // Persist to config file
   try {
     const fs = require('fs');
     const path = require('path');
     const configPath = path.join(process.cwd(), 'llm-config.json');
+    
+    // 读取现有配置，合并新配置
+    let existingData: any = {};
+    if (fs.existsSync(configPath)) {
+      existingData = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    }
+    
+    // 只更新传入的字段
     const configData = {
-      llm,
-      players,
+      ...existingData,
+      ...(llm !== undefined && { llm }),
+      ...(players !== undefined && { players }),
+      ...(language !== undefined && { language }),
       updatedAt: new Date().toISOString()
     };
     fs.writeFileSync(configPath, JSON.stringify(configData, null, 2));
-    console.log('[Config] Saved to file:', { llm: llm?.name, players });
+    console.log('[Config] Saved to file:', { llm: llm?.name, players, language });
   } catch (e) {
     console.error('[Config] Failed to save file:', e);
   }
@@ -199,9 +230,16 @@ app.get('/api/config', (req, res) => {
     const configPath = path.join(process.cwd(), 'llm-config.json');
     if (fs.existsSync(configPath)) {
       const data = fs.readFileSync(configPath, 'utf-8');
-      res.json(JSON.parse(data));
+      const config = JSON.parse(data);
+      // 添加可用语言列表
+      config.availableLanguages = promptLoader.getAvailableLanguages();
+      config.currentLanguage = promptLoader.getLanguage();
+      res.json(config);
     } else {
-      res.json({});
+      res.json({ 
+        availableLanguages: promptLoader.getAvailableLanguages(),
+        currentLanguage: promptLoader.getLanguage()
+      });
     }
   } catch (e) {
     res.json((global as any).gameConfig || {});

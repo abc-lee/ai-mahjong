@@ -131,7 +131,6 @@ export class RoomManager {
     if (this.playerRoomMap.has(playerId)) {
       const oldRoomId = this.playerRoomMap.get(playerId);
       if (oldRoomId !== roomId) {
-        console.log(`[RoomManager] 玩家 ${playerId.slice(0,4)} 自动离开旧房间 ${oldRoomId}`);
         this.leaveRoom(oldRoomId, playerId);
       }
     }

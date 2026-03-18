@@ -171,10 +171,8 @@ export class ActionValidator {
     currentPlayerIndex: number
   ): void {
     const fullHand = [...player.hand, lastDiscard];
-    console.log(`[checkDiscardActions] 玩家 ${player.name}, hand=${player.hand.length}, melds=${player.melds.length}, fullHand=${fullHand.length}`);
     
     if (this.analyzer.canWin(fullHand, player.melds)) {
-      console.log(`[checkDiscardActions] 玩家 ${player.name} 可以胡牌！`);
       result.canHu = true;
       result.actions.push({
         playerId: player.id,

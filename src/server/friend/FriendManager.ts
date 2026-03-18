@@ -81,7 +81,6 @@ export class FriendManager {
     };
 
     playerFriends.set(aiPlayerId, relation);
-    console.log(`[Friend] ${playerId} 添加了好友 ${aiPlayerName}`);
     
     return relation;
   }
@@ -95,7 +94,6 @@ export class FriendManager {
 
     const removed = playerFriends.delete(aiPlayerId);
     if (removed) {
-      console.log(`[Friend] ${playerId} 移除了好友 ${aiPlayerId}`);
     }
     return removed;
   }
@@ -125,7 +123,6 @@ export class FriendManager {
     relation.intimacy = Math.max(0, Math.min(100, relation.intimacy + delta));
     relation.level = this.calculateLevel(relation.intimacy);
     
-    console.log(`[Friend] ${relation.aiPlayerName} 与 ${playerId} 亲密度 ${delta >= 0 ? '+' : ''}${delta}，当前: ${relation.intimacy} (${relation.level})`);
   }
 
   /**
