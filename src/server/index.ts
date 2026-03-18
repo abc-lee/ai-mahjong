@@ -98,6 +98,10 @@ app.post('/api/ai/generate-name', async (req, res) => {
   try {
     const { gender, personality } = req.body;
     
+    // 获取当前语言
+    const currentLanguage = promptLoader.getLanguage();
+    const nameConfig = (promptLoader as any).getModule('aiNameGenerator') || {};
+    
     // 从配置文件读取LLM配置
     let llmConfig = null;
     try {
@@ -112,16 +116,17 @@ app.post('/api/ai/generate-name', async (req, res) => {
       console.error('[AI Name] Failed to read config file:', e);
     }
     
+    // 获取 fallback 名字
+    const fallbackNames = nameConfig.fallbackNames || {
+      male: ['Jack', 'Mike', 'Tom'],
+      female: ['Emma', 'Lisa', 'Amy'],
+      unknown: ['Riley', 'Jordan', 'Taylor']
+    };
+    const defaultName = nameConfig.defaultName || 'Riley';
+    
     if (!llmConfig || !llmConfig.apiKey) {
       // 无LLM配置或无API Key，使用fallback
-      const fallbackMale = ['阿杰', '大伟', '小刚', '明轩', '天宇', '浩然'];
-      const fallbackFemale = ['小雪', '美琪', '晓琳', '思雨', '婉儿', '紫萱'];
-      const fallbackOther = ['小宝', '阿福', '乐乐', '天天', '星星', '月月'];
-      
-      let names = fallbackOther;
-      if (gender === 'male') names = fallbackMale;
-      else if (gender === 'female') names = fallbackFemale;
-      
+      const names = fallbackNames[gender] || fallbackNames.unknown;
       return res.json({ success: true, name: names[Math.floor(Math.random() * names.length)] });
     }
     
@@ -130,22 +135,20 @@ app.post('/api/ai/generate-name', async (req, res) => {
       ...llmConfig
     } as LLMConfig);
     
-    const genderText = gender === 'male' ? '男性' : gender === 'female' ? '女性' : '中性';
-    const personalityText = {
-      chatty: '话痨型',
-      sarcastic: '毒舌型',
-      tsundere: '傲娇型',
-      lucky: '幸运型',
-      serious: '认真型',
-      dramatic: '戏精型',
-    }[personality] || '普通';
+    // 获取国际化的性别和性格文本
+    const genderTexts = nameConfig.genderTexts || { male: 'male', female: 'female', unknown: 'neutral' };
+    const personalityTexts = nameConfig.personalityTexts || {};
     
-    const prompt = `${genderText}麻将AI，${personalityText}性格。起一个2-4字中文名。只输出名字。`;
+    const genderText = genderTexts[gender] || genderTexts.unknown;
+    const personalityText = personalityTexts[personality] || 'balanced';
+    
+    // 使用国际化的 prompt
+    const promptTemplate = nameConfig.prompt || 'Generate a {{genderText}} name for a Mahjong AI. Just output the name.';
+    const prompt = promptTemplate.replace('{{genderText}}', genderText).replace('{{personalityText}}', personalityText);
 
     const name = await client.chat(prompt);
-    console.log('[AI Name] LLM raw response:', name);
     
-    // 解析响应 - 提取中文名字
+    // 解析响应
     let cleanName = '';
     let responseText = name || '';
     
@@ -155,30 +158,50 @@ app.post('/api/ai/generate-name', async (req, res) => {
       responseText = responseText.substring(thinkEnd + 5).trim();
     }
     
-    // 提取中文名字 (2-4个字)
-    const chineseMatches = responseText.match(/[\u4e00-\u9fa5]{2,4}/g);
-    if (chineseMatches && chineseMatches.length > 0) {
-      cleanName = chineseMatches[chineseMatches.length - 1];
+    // 根据语言选择不同的名字提取逻辑
+    if (currentLanguage === 'zh-CN') {
+      // 提取中文名字 (2-4个字)
+      const chineseMatches = responseText.match(/[\u4e00-\u9fa5]{2,4}/g);
+      if (chineseMatches && chineseMatches.length > 0) {
+        cleanName = chineseMatches[chineseMatches.length - 1];
+      }
+    } else {
+      // 提取英文名字 (单词)
+      const englishMatches = responseText.match(/[A-Z][a-z]+/g);
+      if (englishMatches && englishMatches.length > 0) {
+        cleanName = englishMatches[0];
+      } else {
+        // 尝试提取任何单词
+        const wordMatches = responseText.match(/\b[A-Za-z]+\b/g);
+        if (wordMatches && wordMatches.length > 0) {
+          cleanName = wordMatches[0];
+        }
+      }
     }
     
     // 清理
-    cleanName = cleanName.trim().substring(0, 4);
+    cleanName = cleanName.trim();
+    if (currentLanguage === 'zh-CN') {
+      cleanName = cleanName.substring(0, 4);
+    } else {
+      cleanName = cleanName.substring(0, 15);
+    }
     
-    console.log('[AI Name] Cleaned name:', cleanName);
-    res.json({ success: true, name: cleanName || '小宝' });
+    res.json({ success: true, name: cleanName || defaultName });
   } catch (e: any) {
     console.error('[AI Name] Error:', e.message);
-    // Fallback names by gender
+    // Fallback names by gender (使用国际化的名字)
     const gender = req.body.gender;
-    const fallbackMale = ['阿杰', '大伟', '小刚', '明轩', '天宇', '浩然'];
-    const fallbackFemale = ['小雪', '美琪', '晓琳', '思雨', '婉儿', '紫萱'];
-    const fallbackOther = ['小宝', '阿福', '乐乐', '天天', '星星', '月月'];
+    const nameConfig = (promptLoader as any).getModule('aiNameGenerator') || {};
+    const fallbackNames = nameConfig.fallbackNames || {
+      male: ['Jack', 'Mike', 'Tom'],
+      female: ['Emma', 'Lisa', 'Amy'],
+      unknown: ['Riley', 'Jordan', 'Taylor']
+    };
+    const defaultName = nameConfig.defaultName || 'Riley';
     
-    let names = fallbackOther;
-    if (gender === 'male') names = fallbackMale;
-    else if (gender === 'female') names = fallbackFemale;
-    
-    res.json({ success: true, name: names[Math.floor(Math.random() * names.length)] });
+    const names = fallbackNames[gender] || fallbackNames.unknown;
+    res.json({ success: true, name: names[Math.floor(Math.random() * names.length)] || defaultName });
   }
 });
 

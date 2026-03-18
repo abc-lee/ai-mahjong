@@ -249,6 +249,14 @@ class PromptLoader {
   }
 
   /**
+   * 获取游戏术语
+   */
+  getGameTerm(term: string): string {
+    const config = this.load();
+    return (config.common as any).gameTerms?.[term] || term;
+  }
+
+  /**
    * 获取性格配置（按类型，如 chatty、aggressive）
    */
   getPersonality(type: string): PersonalityConfig | undefined {

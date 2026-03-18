@@ -21,6 +21,13 @@
       "human": "人类玩家",
       "ai-agent": "AI玩家",
       "npc": "NPC"
+    },
+    "gameTerms": {
+      "discards": "弃牌",
+      "melds": "副露",
+      "dealer": "庄家",
+      "score": "分数",
+      "none": "无"
     }
   },
 
@@ -314,5 +321,31 @@
       "chatFrequency": 0.6,
       "behaviors": ["喜欢夸张表演", "说话有戏剧性", "情绪起伏大", "爱加戏"]
     }
+  },
+  
+  "aiNameGenerator": {
+    "prompt": "{{genderText}}麻将AI，{{personalityText}}性格。起一个2-4字中文名。只输出名字。",
+    "genderTexts": {
+      "male": "男性",
+      "female": "女性",
+      "unknown": "中性"
+    },
+    "personalityTexts": {
+      "chatty": "话痨型",
+      "sarcastic": "毒舌型",
+      "tsundere": "傲娇型",
+      "lucky": "幸运型",
+      "serious": "认真型",
+      "dramatic": "戏精型",
+      "aggressive": "激进型",
+      "cautious": "谨慎型",
+      "balanced": "普通"
+    },
+    "fallbackNames": {
+      "male": ["阿杰", "大伟", "小刚", "明轩", "天宇", "浩然"],
+      "female": ["小雪", "美琪", "晓琳", "思雨", "婉儿", "紫萱"],
+      "unknown": ["小宝", "阿福", "乐乐", "天天", "星星", "月月"]
+    },
+    "defaultName": "小宝"
   }
 }

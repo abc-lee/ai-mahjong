@@ -303,18 +303,21 @@ export class AIAdapter {
     const otherAINames = otherAIs.filter(ai => ai.name !== this.player.name).map(ai => ai.name);
     
     // 最近的聊天内容
-    const chatContext = recentChats.length > 0 
-      ? `\n\n【最近聊天】\n${recentChats.slice(-5).map(c => `${c.playerName}: ${c.content}`).join('\n')}`
+    const chatLines = recentChats.length > 0 
+      ? recentChats.slice(-5).map(c => `${c.playerName}: ${c.content}`).join('\n')
       : '';
     
     // 判断是否需要回应某人
     const lastChat = recentChats[recentChats.length - 1];
     const isReplyingToMe = lastChat && lastChat.content.includes(this.player.name);
     
+    // 获取"就你一个AI"的国际化文案（从 sections.chatHistory 获取时为空的情况）
+    const onlyAI = otherAINames.length > 0 ? otherAINames.join('、') : (promptLoader.getLanguage() === 'en-US' ? 'Just you' : '就你一个AI');
+    
     const systemPrompt = promptLoader.getWithVars('aiAdapter.idleChat.system', {
       playerName: this.player.name,
       traits: traits.join('、'),
-      otherAINames: otherAINames.length > 0 ? otherAINames.join('、') : '就你一个AI'
+      otherAINames: onlyAI
     });
 
     let userPrompt = '';
@@ -327,7 +330,7 @@ export class AIAdapter {
     } else if (recentChats.length > 0) {
       // 有聊天记录，可以接话或找人说
       userPrompt = promptLoader.getWithVars('aiAdapter.idleChat.userWithChats', {
-        chatContext: chatContext.replace('\n\n【最近聊天】\n', '')
+        chatContext: chatLines
       });
     } else {
       // 没有聊天，主动开启话题
@@ -429,13 +432,20 @@ export class AIAdapter {
     let chatSection = '';
     if (chatHistory && chatHistory.length > 0) {
       const recentChat = chatHistory.slice(-5);
-      chatSection = `\n\n【最近聊天】\n${recentChat.map(m => `${m.playerName}: ${m.content}`).join('\n')}\n`;
+      const chatLines = recentChat.map(m => `${m.playerName}: ${m.content}`).join('\n');
+      chatSection = promptLoader.getWithVars('aiAdapter.sections.chatHistory', { chatLines });
     }
     
-    // 方位映射
-    const directions = ['东', '南', '西', '北'];
-    const myDirection = directions[this.player.position];
+    // 方位映射（使用国际化）
+    const myDirection = promptLoader.getDirection(this.player.position);
     const dealerIndex = gameState.dealerIndex;
+    
+    // 游戏术语（国际化）
+    const termDiscards = promptLoader.getGameTerm('discards');
+    const termMelds = promptLoader.getGameTerm('melds');
+    const termDealer = promptLoader.getGameTerm('dealer');
+    const termScore = promptLoader.getGameTerm('score');
+    const termNone = promptLoader.getGameTerm('none');
     
     // 构建其他玩家信息
     let otherPlayersSection = '';
@@ -443,18 +453,18 @@ export class AIAdapter {
       const otherPlayersInfo = gameState.players
         .filter(p => p.id !== this.player.id)
         .map(p => {
-          const dir = directions[p.position];
+          const dir = promptLoader.getDirection(p.position);
           const discardsStr = p.discards && p.discards.length > 0 
             ? p.discards.map(t => t.display).join(' ') 
-            : '无';
+            : termNone;
           const meldsStr = p.melds && p.melds.length > 0
-            ? p.melds.map(m => `${m.type === 'chi' ? '吃' : m.type === 'peng' ? '碰' : '杠'}(${m.tiles.map(t => t.display).join('')})`).join(' ')
-            : '无';
-          const dealerMark = p.isDealer ? ', 庄家' : '';
-          return `${dir}(${p.name}): 弃牌[${discardsStr}], 副露[${meldsStr}], 分数${p.score}${dealerMark}`;
+            ? p.melds.map(m => `${promptLoader.getActionName(m.type)}(${m.tiles.map(t => t.display).join('')})`).join(' ')
+            : termNone;
+          const dealerMark = p.isDealer ? `, ${termDealer}` : '';
+          return `${dir}(${p.name}): ${termDiscards}[${discardsStr}], ${termMelds}[${meldsStr}], ${termScore}${p.score}${dealerMark}`;
         }).join('\n');
       if (otherPlayersInfo) {
-        otherPlayersSection = `\n\n【其他玩家】\n${otherPlayersInfo}`;
+        otherPlayersSection = promptLoader.getWithVars('aiAdapter.sections.otherPlayers', { otherPlayersInfo });
       }
     }
     
@@ -463,20 +473,24 @@ export class AIAdapter {
     if (gameState.lastDiscard && gameState.lastDiscardPlayer >= 0) {
       const lastDiscardPlayer = gameState.players[gameState.lastDiscardPlayer];
       if (lastDiscardPlayer) {
-        const lastDir = directions[gameState.lastDiscardPlayer];
-        lastDiscardSection = `\n\n【上一张弃牌】\n${lastDir}(${lastDiscardPlayer.name}) 打了 ${gameState.lastDiscard.display}`;
+        const lastDir = promptLoader.getDirection(gameState.lastDiscardPlayer);
+        lastDiscardSection = promptLoader.getWithVars('aiAdapter.sections.lastDiscard', {
+          lastDir,
+          lastPlayerName: lastDiscardPlayer.name,
+          lastTileDisplay: gameState.lastDiscard.display
+        });
       }
     }
     
     // 记忆区（跨局印象）
     let memorySection = '';
     if (memorySummary) {
-      memorySection = `\n\n【你的记忆】\n${memorySummary}`;
+      memorySection = promptLoader.getWithVars('aiAdapter.sections.crossGameMemory', { memory: memorySummary });
     }
     
     // 庄家信息
     const dealerPlayer = gameState.players.find(p => p.isDealer);
-    const dealerInfo = dealerPlayer ? `庄家: ${dealerPlayer.name}` : '';
+    const dealerInfo = dealerPlayer ? `${termDealer}: ${dealerPlayer.name}` : '';
     
     const userPrompt = promptLoader.getWithVars('aiAdapter.decision.user', {
       myDirection,

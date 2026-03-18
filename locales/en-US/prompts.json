@@ -21,6 +21,13 @@
       "human": "Human Player",
       "ai-agent": "AI Player",
       "npc": "NPC"
+    },
+    "gameTerms": {
+      "discards": "Discards",
+      "melds": "Melds",
+      "dealer": "Dealer",
+      "score": "Score",
+      "none": "None"
     }
   },
 
@@ -314,5 +321,32 @@
       "chatFrequency": 0.6,
       "behaviors": ["Loves exaggerated performance", "Dramatic speech", "Big mood swings", "Always adds drama"]
     }
+  },
+  
+  "aiNameGenerator": {
+    "prompt": "Generate a {{genderText}} Mahjong AI name with {{personalityText}} personality. Just output a 1-2 word English name, nothing else.",
+    "genderTexts": {
+      "male": "male",
+      "female": "female",
+      "unknown": "gender-neutral"
+    },
+    "personalityTexts": {
+      "chatty": "chatty",
+      "sarcastic": "sarcastic",
+      "tsundere": "tsundere",
+      "lucky": "lucky",
+      "serious": "serious",
+      "dramatic": "dramatic",
+      "aggressive": "aggressive",
+      "cautious": "cautious",
+      "balanced": "balanced"
+    },
+    "fallbackNames": {
+      "male": ["Jack", "Mike", "Tom", "Alex", "David", "Chris"],
+      "female": ["Emma", "Lisa", "Amy", "Kate", "Sophie", "Luna"],
+      "unknown": ["Riley", "Jordan", "Taylor", "Morgan", "Casey", "Jamie"]
+    },
+    "defaultName": "Riley"
   }
+}
 }
