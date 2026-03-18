@@ -116,10 +116,13 @@ export class AIAdapter {
     const personalityConfig = promptLoader.getPersonality(personalityType);
     const traits = personalityConfig?.traits || ['普通'];
     const speakStyle = personalityConfig?.speakStyle || '正常说话';
+    
+    // 从配置获取分隔符
+    const traitSeparator = promptLoader.getSeparator('traits');
 
     const systemPrompt = promptLoader.getWithVars('aiAdapter.chatResponse.system', {
       playerName: this.player.name,
-      traits: traits.join('、'),
+      traits: traits.join(traitSeparator),
       speakStyle: speakStyle
     });
 
@@ -219,11 +222,14 @@ export class AIAdapter {
     const otherPlayers = recentEvents
       .filter(e => e.type === 'player_speak' && e.data.playerName !== this.player.name)
       .map(e => e.data.playerName);
-    const otherPlayer = otherPlayers[otherPlayers.length - 1] || '其他玩家';
+    const otherPlayer = otherPlayers[otherPlayers.length - 1] || promptLoader.getFallback('otherPlayer');
+    
+    // 从配置获取分隔符
+    const traitSeparator = promptLoader.getSeparator('traits');
 
     const systemPrompt = promptLoader.getWithVars('aiAdapter.queueReaction.system', {
       playerName: this.player.name,
-      traits: traits.join('、'),
+      traits: traits.join(traitSeparator),
       otherPlayer
     });
 
@@ -298,6 +304,10 @@ export class AIAdapter {
     const personalityType = this.config.personality || 'balanced';
     const personalityConfig = promptLoader.getPersonality(personalityType);
     const traits = personalityConfig?.traits || ['普通'];
+    
+    // 从配置获取分隔符和备用文本
+    const traitSeparator = promptLoader.getSeparator('traits');
+    const listSeparator = promptLoader.getSeparator('list');
 
     // 其他AI的名字
     const otherAINames = otherAIs.filter(ai => ai.name !== this.player.name).map(ai => ai.name);
@@ -311,12 +321,12 @@ export class AIAdapter {
     const lastChat = recentChats[recentChats.length - 1];
     const isReplyingToMe = lastChat && lastChat.content.includes(this.player.name);
     
-    // 获取"就你一个AI"的国际化文案（从 sections.chatHistory 获取时为空的情况）
-    const onlyAI = otherAINames.length > 0 ? otherAINames.join('、') : (promptLoader.getLanguage() === 'en-US' ? 'Just you' : '就你一个AI');
+    // 从配置获取备用文本
+    const onlyAI = otherAINames.length > 0 ? otherAINames.join(listSeparator) : promptLoader.getFallback('onlyAI');
     
     const systemPrompt = promptLoader.getWithVars('aiAdapter.idleChat.system', {
       playerName: this.player.name,
-      traits: traits.join('、'),
+      traits: traits.join(traitSeparator),
       otherAINames: onlyAI
     });
 
@@ -419,11 +429,14 @@ export class AIAdapter {
     const memorySummary = memoryManager.generateMemorySummary(this.player.id);
     const recentEvents = memoryManager.getRecentEvents(this.player.id, 5)
       .map(e => `- ${e.content || e.type}`)
-      .join('\n') || '无';
+      .join('\n') || promptLoader.getFallback('none');
+    
+    // 从配置获取分隔符
+    const traitSeparator = promptLoader.getSeparator('traits');
     
     const systemPrompt = promptLoader.getWithVars('aiAdapter.decision.system', {
       playerName: this.player.name,
-      traits: traits.join('、'),
+      traits: traits.join(traitSeparator),
       personalityHint,
       chatProbability: this.getChatProbability()
     });

@@ -4,6 +4,15 @@
   
   "common": {
     "directions": ["East", "South", "West", "North"],
+    "separators": {
+      "list": ", ",
+      "traits": ", "
+    },
+    "fallbacks": {
+      "otherPlayer": "Someone",
+      "onlyAI": "Just you",
+      "none": "None"
+    },
     "suitNames": {
       "wan": "Wan",
       "tiao": "Tiao", 
@@ -348,5 +357,4 @@
     },
     "defaultName": "Riley"
   }
-}
 }

@@ -34,9 +34,19 @@ export interface PersonalityConfig {
 export interface PromptConfig {
   common: {
     directions: string[];
+    separators: {
+      list: string;
+      traits: string;
+    };
+    fallbacks: {
+      otherPlayer: string;
+      onlyAI: string;
+      none: string;
+    };
     suitNames: Record<string, string>;
     actionNames: Record<string, string>;
     playerTypes: Record<string, string>;
+    gameTerms?: Record<string, string>;
   };
   identityTemplate: {
     core: string;
@@ -254,6 +264,22 @@ class PromptLoader {
   getGameTerm(term: string): string {
     const config = this.load();
     return (config.common as any).gameTerms?.[term] || term;
+  }
+
+  /**
+   * 获取分隔符
+   */
+  getSeparator(type: 'list' | 'traits'): string {
+    const config = this.load();
+    return config.common.separators[type] || ', ';
+  }
+
+  /**
+   * 获取备用文本
+   */
+  getFallback(key: 'otherPlayer' | 'onlyAI' | 'none'): string {
+    const config = this.load();
+    return config.common.fallbacks[key] || '';
   }
 
   /**

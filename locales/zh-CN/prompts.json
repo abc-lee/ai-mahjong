@@ -4,6 +4,15 @@
   
   "common": {
     "directions": ["东", "南", "西", "北"],
+    "separators": {
+      "list": "、",
+      "traits": "、"
+    },
+    "fallbacks": {
+      "otherPlayer": "其他玩家",
+      "onlyAI": "就你一个AI",
+      "none": "无"
+    },
     "suitNames": {
       "wan": "万",
       "tiao": "条", 
