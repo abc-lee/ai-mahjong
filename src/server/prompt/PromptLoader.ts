@@ -135,9 +135,27 @@ class PromptLoader {
   private config: PromptConfig | null = null;
   private language: Language = 'zh-CN';
   private configPath: string;
+  private baseDir: string | null = null;
 
   constructor() {
-    this.configPath = path.join(process.cwd(), 'locales', this.language, 'prompts.json');
+    this.configPath = this.getConfigPath();
+  }
+
+  /**
+   * 设置基础目录（用于打包模式）
+   */
+  setBaseDir(dir: string): void {
+    this.baseDir = dir;
+    this.configPath = this.getConfigPath();
+    this.config = null; // 清除缓存
+  }
+
+  /**
+   * 获取配置文件路径
+   */
+  private getConfigPath(): string {
+    const baseDir = this.baseDir || process.cwd();
+    return path.join(baseDir, 'locales', this.language, 'prompts.json');
   }
 
   /**
@@ -145,7 +163,7 @@ class PromptLoader {
    */
   setLanguage(lang: Language): void {
     this.language = lang;
-    this.configPath = path.join(process.cwd(), 'locales', this.language, 'prompts.json');
+    this.configPath = this.getConfigPath();
     this.config = null; // 清除缓存，下次加载时会重新读取
   }
 

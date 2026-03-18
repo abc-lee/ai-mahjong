@@ -15,7 +15,11 @@
     "build:client-new": "vite build --config vite.client-new.config.ts",
     "start": "node dist/server/index.js",
     "preview": "vite preview",
-    "preview:new": "vite preview --config vite.client-new.config.ts"
+    "preview:new": "vite preview --config vite.client-new.config.ts",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "npm run build:sidecar && tauri build",
+    "build:sidecar": "node scripts/build-sidecar.js"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
@@ -34,6 +38,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "@tauri-apps/cli": "^2.10.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.20",
     "@types/node": "^20.9.0",
@@ -41,6 +46,7 @@
     "@types/react-dom": "^18.2.15",
     "@vitejs/plugin-react": "^4.2.0",
     "concurrently": "^8.2.2",
+    "pkg": "^5.8.1",
     "sharp": "^0.34.5",
     "tsx": "^4.1.4",
     "typescript": "^5.2.2",

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设置 - AI Mahjong Party</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .settings-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 32px;
+            width: 360px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 24px;
+            text-align: center;
+            color: #4ade80;
+        }
+        .setting-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: #a0a0a0;
+        }
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        select:focus {
+            outline: none;
+            border-color: #4ade80;
+        }
+        select option {
+            background: #1a1a2e;
+            color: #fff;
+        }
+        .status {
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            text-align: center;
+        }
+        .status.success {
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+        }
+        .status.error {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        .buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        button {
+            flex: 1;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+            color: #000;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(74, 222, 128, 0.4);
+        }
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="settings-container">
+        <h1>⚙️ 设置</h1>
+        
+        <div class="setting-group">
+            <label for="port">服务器端口</label>
+            <select id="port">
+                <option value="3000">localhost:3000 (推荐)</option>
+                <option value="3001">localhost:3001</option>
+                <option value="8080">localhost:8080</option>
+                <option value="8000">localhost:8000</option>
+                <option value="5000">localhost:5000</option>
+            </select>
+        </div>
+        
+        <div id="status" class="status success" style="display: none;"></div>
+        
+        <div class="buttons">
+            <button class="btn-secondary" onclick="window.close()">取消</button>
+            <button class="btn-primary" onclick="applySettings()">应用</button>
+        </div>
+    </div>
+    
+    <script>
+        const { invoke } = window.__TAURI__.core;
+        
+        // 加载当前设置
+        async function loadSettings() {
+            try {
+                const port = await invoke('get_port');
+                document.getElementById('port').value = port;
+            } catch (e) {
+                console.error('Failed to load settings:', e);
+            }
+        }
+        
+        // 应用设置
+        async function applySettings() {
+            const port = parseInt(document.getElementById('port').value);
+            const statusEl = document.getElementById('status');
+            
+            try {
+                // 保存端口
+                await invoke('set_port', { port });
+                
+                // 重启服务器
+                statusEl.textContent = '正在重启服务器...';
+                statusEl.className = 'status success';
+                statusEl.style.display = 'block';
+                
+                await invoke('restart_server');
+                
+                statusEl.textContent = `设置已应用！服务器运行在端口 ${port}`;
+                statusEl.className = 'status success';
+                
+                // 2秒后关闭窗口
+                setTimeout(() => {
+                    window.close();
+                }, 2000);
+                
+            } catch (e) {
+                statusEl.textContent = '设置失败: ' + e;
+                statusEl.className = 'status error';
+                statusEl.style.display = 'block';
+            }
+        }
+        
+        // 初始化
+        loadSettings();
+    </script>
+</body>
+</html>

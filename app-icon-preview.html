@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Mahjong App Icon Preview</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 40px;
+      background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: white;
+    }
+    
+    .preview-container {
+      text-align: center;
+    }
+    
+    h1 {
+      margin-bottom: 40px;
+      font-weight: 600;
+    }
+    
+    .icon-preview {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 48px;
+      padding: 60px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .icon-preview svg {
+      width: 512px;
+      height: 512px;
+      display: block;
+    }
+    
+    .info {
+      margin-top: 40px;
+      max-width: 600px;
+      text-align: left;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      padding: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    
+    .info h2 {
+      margin-top: 0;
+      font-size: 18px;
+      margin-bottom: 16px;
+    }
+    
+    .info ul {
+      margin: 0;
+      padding-left: 20px;
+      line-height: 1.8;
+    }
+    
+    .info code {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="preview-container">
+    <h1>AI Mahjong Party - App Icon</h1>
+    <div class="icon-preview">
+      <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="greenGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#16a34a"/>
+            <stop offset="100%" stop-color="#15803d"/>
+          </linearGradient>
+          <linearGradient id="redGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#dc2626"/>
+            <stop offset="100%" stop-color="#991b1b"/>
+          </linearGradient>
+          <linearGradient id="whiteGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#f3f4f6"/>
+            <stop offset="100%" stop-color="#d1d5db"/>
+          </linearGradient>
+          <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="8" stdDeviation="16" flood-opacity="0.3"/>
+          </filter>
+        </defs>
+        <g transform="translate(128, 128)">
+          <rect width="320" height="480" rx="32" fill="url(#greenGradient)" filter="url(#shadow)"/>
+          <text x="160" y="280" font-family="SimHei, 'Microsoft YaHei', serif" font-size="180" font-weight="bold" fill="white" text-anchor="middle">发</text>
+        </g>
+        <g transform="translate(576, 416)">
+          <rect width="320" height="480" rx="32" fill="url(#redGradient)" filter="url(#shadow)"/>
+          <text x="160" y="280" font-family="SimHei, 'Microsoft YaHei', serif" font-size="180" font-weight="bold" fill="white" text-anchor="middle">中</text>
+        </g>
+        <g transform="translate(384, 256)">
+          <rect width="320" height="480" rx="32" fill="url(#whiteGradient)" filter="url(#shadow)"/>
+          <rect x="40" y="40" width="240" height="400" rx="20" fill="none" stroke="#6b7280" stroke-width="8"/>
+        </g>
+      </svg>
+    </div>
+    <div class="info">
+      <h2>转换为 PNG (1024x1024)</h2>
+      <ul>
+        <li>SVG 源文件已保存至: <code>app-icon.svg</code></li>
+        <li>使用浏览器打开此预览页面 (预览已经是 512px 显示)</li>
+        <li>转换方法推荐：
+          <ul>
+            <li>在线转换: <code>https://convertio.co/svg-png/</code></li>
+            <li>或使用 Inkscape: <code>inkscape -w 1024 -h 1024 app-icon.svg -o app-icon.png</code></li>
+            <li>或使用 Node.js: <code>npm install -g svgexport && svgexport app-icon.svg app-icon.png 1024:1024</code></li>
+          </ul>
+        </li>
+      </ul>
+      <h2>设计说明</h2>
+      <ul>
+        <li><strong>尺寸:</strong> 1024x1024 原始 SVG，可缩放到任意尺寸</li>
+        <li><strong>元素:</strong> 发财（绿）+ 红中（红）+ 白板（白）三牌交错重叠</li>
+        <li><strong>风格:</strong> 圆角设计，现代渐变配色，带阴影层次感</li>
+        <li><strong>背景:</strong> 透明</li>
+        <li><strong>颜色:</strong> 绿色(发财) #16a34a → #15803d，红色(红中) #dc2626 → #991b1b，白色(白板) #f3f4f6 → #d1d5db</li>
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

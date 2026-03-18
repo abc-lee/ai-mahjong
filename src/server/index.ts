@@ -6,13 +6,73 @@ import { setupSocket, getRoomManager, getIO, toClientRoom } from './socket/index
 import { LLMClient, LLMConfig } from './llm/LLMClient';
 import { promptLoader } from './prompt/PromptLoader';
 
+const fs = require('fs');
+const path = require('path');
+
+// 获取配置目录
+// 优先级：环境变量 > 可执行文件目录 > 当前工作目录
+function getConfigDir(): string {
+  // 1. 环境变量指定
+  if (process.env.AI_MAHJONG_CONFIG_DIR) {
+    return process.env.AI_MAHJONG_CONFIG_DIR;
+  }
+  
+  // 2. 检测是否在 Tauri sidecar 模式或 pkg 打包模式
+  // @ts-ignore - process.pkg 是 pkg 打包时添加的属性
+  if (process.env.TAURI_SIDECAR || process.pkg) {
+    // 打包模式：使用可执行文件所在目录
+    const exeDir = path.dirname(process.execPath);
+    const configDir = path.join(exeDir, 'config');
+    
+    // 确保配置目录存在
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+    
+    // 复制默认配置（如果不存在）
+    const configFile = path.join(configDir, 'llm-config.json');
+    if (!fs.existsSync(configFile)) {
+      const defaultConfig = {
+        llm: { id: '', name: '', type: 'openai', apiBase: '', model: '', apiKey: '' },
+        players: { humanCount: 1, aiCount: 3, npcCount: 0, aiPlayers: [] },
+        language: 'zh-CN'
+      };
+      fs.writeFileSync(configFile, JSON.stringify(defaultConfig, null, 2));
+    }
+    
+    // 复制 locales 目录（如果不存在）
+    const localesDir = path.join(configDir, 'locales');
+    if (!fs.existsSync(localesDir)) {
+      // 尝试从打包资源复制
+      const sourceLocales = path.join(exeDir, 'locales');
+      if (fs.existsSync(sourceLocales)) {
+        fs.cpSync(sourceLocales, localesDir, { recursive: true });
+      }
+    }
+    
+    return configDir;
+  }
+  
+  // 3. 开发模式：使用当前工作目录
+  return process.cwd();
+}
+
+const CONFIG_DIR = getConfigDir();
+console.log(`[Config] Using config directory: ${CONFIG_DIR}`);
+
+// 配置文件路径
+export const CONFIG_FILE = path.join(CONFIG_DIR, 'llm-config.json');
+export const LOCALES_DIR = path.join(CONFIG_DIR, 'locales');
+
+// 设置 PromptLoader 的基础目录（支持打包模式）
+if (fs.existsSync(LOCALES_DIR)) {
+  promptLoader.setBaseDir(CONFIG_DIR);
+}
+
 // 启动时加载保存的语言设置
 try {
-  const fs = require('fs');
-  const path = require('path');
-  const configPath = path.join(process.cwd(), 'llm-config.json');
-  if (fs.existsSync(configPath)) {
-    const data = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  if (fs.existsSync(CONFIG_FILE)) {
+    const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
     if (data.language) {
       promptLoader.setLanguage(data.language);
     }
