@@ -81,9 +81,85 @@ async function loadUITexts() {
     const data = await res.json();
     store.setUITexts(data.language, data.ui);
     console.log('[Main] UI 翻译加载完成:', data.language);
+    
+    // 应用翻译到界面
+    applyTranslations(data.ui);
   } catch (e) {
     console.error('[Main] 加载 UI 翻译失败:', e);
   }
+}
+
+/**
+ * 应用翻译到界面元素
+ */
+function applyTranslations(ui) {
+  if (!ui) return;
+  
+  const t = (category, key) => {
+    const val = ui?.[category]?.[key];
+    return val || key;
+  };
+  
+  // 开始按钮
+  const startBtn = document.getElementById('start-game-btn');
+  if (startBtn) startBtn.textContent = t('game', 'startGame');
+  
+  // 设置弹窗 Tab
+  const tabLlm = document.getElementById('tab-llm');
+  if (tabLlm) tabLlm.textContent = t('settings', 'tabLLM');
+  
+  const tabPlayer = document.getElementById('tab-player');
+  if (tabPlayer) tabPlayer.textContent = t('settings', 'tabPlayer');
+  
+  // 玩家配置标题
+  const playerConfigTitle = document.querySelector('#panel-player h3');
+  if (playerConfigTitle) playerConfigTitle.textContent = t('settings', 'playerConfig');
+  
+  // 玩家数量标签
+  const labels = {
+    'human-count-label': t('settings', 'humanPlayers'),
+    'ai-count-label': t('settings', 'aiPlayers'),
+    'npc-count-label': t('settings', 'npcPlayers'),
+  };
+  
+  Object.entries(labels).forEach(([id, text]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  });
+  
+  // 设置面板中的标签
+  const settingLabels = document.querySelectorAll('#panel-player label');
+  settingLabels.forEach(el => {
+    const text = el.textContent.trim();
+    if (text === '真人玩家') el.textContent = t('settings', 'humanPlayers');
+    if (text === 'AI玩家') el.textContent = t('settings', 'aiPlayers');
+    if (text === 'NPC') el.textContent = t('settings', 'npcPlayers');
+  });
+  
+  // 保存/取消按钮
+  const saveBtn = document.getElementById('settings-save-btn');
+  if (saveBtn) saveBtn.textContent = t('settings', 'save');
+  
+  const closeBtn = document.getElementById('settings-close-btn');
+  if (closeBtn) closeBtn.textContent = t('settings', 'close');
+  
+  // 等待文字
+  const waitingEls = document.querySelectorAll('.player-name');
+  waitingEls.forEach(el => {
+    if (el.textContent === '等待中' || el.textContent === 'Waiting') {
+      el.textContent = t('game', 'waiting');
+    }
+  });
+  
+  // 输入框占位符
+  const nameInput = document.getElementById('player-name-input');
+  if (nameInput) {
+    nameInput.placeholder = t('settings', 'language') === 'Language / 语言' 
+      ? 'Enter your nickname' 
+      : '输入你的昵称';
+  }
+  
+  console.log('[Main] 翻译应用完成');
 }
 
 /**

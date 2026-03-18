@@ -798,21 +798,28 @@ function showGameEndDialog(winner, winningHand, players) {
   // 计算分数变化
   const scoreChanges = players || [];
   
+  // 国际化文字
+  const t = (cat, key, fallback) => store.t(cat, key, fallback);
+  const drawText = t('game', 'drawGame', '流局');
+  const winText = t('game', 'winner', '赢家');
+  const scoresText = t('game', 'scores', '本局得分');
+  const newRoundText = t('game', 'newRound', '再来一局');
+  
   // 创建弹窗 HTML
   const modalHtml = `
     <div id="game-end-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[300]">
       <div class="bg-gradient-to-b from-amber-900 to-amber-950 rounded-2xl p-8 max-w-md w-full mx-4 text-center border-4 border-amber-600 shadow-2xl">
         <div class="text-6xl mb-4">${isDraw ? '🤝' : (isWinner ? '🎉' : '😢')}</div>
         <h2 class="text-2xl font-bold text-amber-100 mb-2">
-          ${isDraw ? '流局' : (isWinner ? '恭喜你胡牌了！' : `${winnerPlayer?.name || '玩家'} 胡牌了`)}
+          ${isDraw ? drawText : (isWinner ? `🎉 ${winText}!` : `${winnerPlayer?.name || 'Player'} ${winText}`)}
         </h2>
         ${!isDraw && winningHand?.fans ? `
           <div class="text-amber-300 mb-4">
-            番型: ${winningHand.fans.map(f => f.name).join(', ')}
+            ${winningHand.fans.map(f => f.name).join(', ')}
           </div>
         ` : ''}
         <div class="bg-black/30 rounded-lg p-4 mb-6">
-          <div class="text-amber-100 text-lg mb-2">本局得分</div>
+          <div class="text-amber-100 text-lg mb-2">${scoresText}</div>
           <div class="grid grid-cols-2 gap-2 text-sm">
             ${scoreChanges.map(p => `
               <div class="text-white/70">${p.name}</div>
@@ -823,7 +830,7 @@ function showGameEndDialog(winner, winningHand, players) {
           </div>
         </div>
         <button id="play-again-btn" class="px-8 py-4 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-full text-xl transition-all hover:scale-105">
-          再来一局
+          ${newRoundText}
         </button>
       </div>
     </div>

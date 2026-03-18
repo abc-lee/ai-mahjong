@@ -369,7 +369,7 @@
       "newRound": "再来一局",
       "waiting": "等待玩家加入...",
       "yourTurn": "你的回合",
-      "draw": "摸牌",
+      "draw": "摸",
       "discard": "打牌",
       "pass": "过",
       "chi": "吃",
@@ -385,6 +385,7 @@
       "west": "西",
       "north": "北",
       "winner": "赢家",
+      "drawGame": "流局",
       "winType": {
         "selfDraw": "自摸",
         "discard": "胡牌"

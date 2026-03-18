@@ -3,6 +3,8 @@
  * 基于新 UI 设计，生成麻将牌的 HTML
  */
 
+import * as store from './store.js';
+
 // 牌显示名称映射
 const TILE_NAMES = {
   wan: ['一', '二', '三', '四', '五', '六', '七', '八', '九'],
@@ -447,13 +449,14 @@ export function renderMeld(meld, position = 'north') {
 export function renderActionButtons(options = {}) {
   const { canDraw = false, canChi = false, canPeng = false, canGang = false, canHu = false, canPass = false } = options;
   
+  // 使用国际化按钮文字
   const buttonConfig = [
-    { action: 'draw', label: '摸', color: 'yellow', enabled: canDraw },
-    { action: 'chi', label: '吃', color: 'blue', enabled: canChi },
-    { action: 'peng', label: '碰', color: 'green', enabled: canPeng },
-    { action: 'gang', label: '杠', color: 'purple', enabled: canGang },
-    { action: 'hu', label: '胡', color: 'red', enabled: canHu },
-    { action: 'pass', label: '过', color: 'gray', enabled: canPass },
+    { action: 'draw', label: store.t('game', 'draw', '摸'), color: 'yellow', enabled: canDraw },
+    { action: 'chi', label: store.t('game', 'chi', '吃'), color: 'blue', enabled: canChi },
+    { action: 'peng', label: store.t('game', 'peng', '碰'), color: 'green', enabled: canPeng },
+    { action: 'gang', label: store.t('game', 'gang', '杠'), color: 'purple', enabled: canGang },
+    { action: 'hu', label: store.t('game', 'hu', '胡'), color: 'red', enabled: canHu },
+    { action: 'pass', label: store.t('game', 'pass', '过'), color: 'gray', enabled: canPass },
   ];
   
   // 过滤只显示可用的按钮
