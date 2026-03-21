@@ -58,3 +58,6 @@ HANDOFF*.md
 
 # Archive
 archive/
+
+# Tauri - desktop app (unfinished)
+src-tauri/
