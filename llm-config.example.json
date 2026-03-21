@@ -1,0 +1,40 @@
+{
+  "llm": {
+    "id": "your-llm-id",
+    "name": "Your LLM Provider Name",
+    "type": "openai",
+    "apiBase": "https://api.your-provider.com/v1",
+    "model": "your-model-name",
+    "apiKey": "YOUR_API_KEY_HERE"
+  },
+  "players": {
+    "humanCount": 1,
+    "aiCount": 3,
+    "npcCount": 0,
+    "aiPlayers": [
+      {
+        "id": "ai-1",
+        "name": "小美",
+        "gender": "female",
+        "age": "young",
+        "personality": "chatty"
+      },
+      {
+        "id": "ai-2",
+        "name": "老张",
+        "gender": "male",
+        "age": "senior",
+        "personality": "cautious"
+      },
+      {
+        "id": "ai-3",
+        "name": "阿豪",
+        "gender": "male",
+        "age": "middle",
+        "personality": "aggressive"
+      }
+    ]
+  },
+  "updatedAt": "2026-03-01T00:00:00.000Z",
+  "language": "zh-CN"
+}

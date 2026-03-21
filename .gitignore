@@ -23,6 +23,10 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+logs/
+server.log
+server.err
+game-server.log
 
 # Cache
 .cache/
@@ -34,6 +38,23 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+tmp/
 
 # Windows reserved names
 nul
+${socket.id}
+
+# Sensitive - User LLM config (contains API keys)
+llm-config.json
+
+# AI Memory - local only
+.mnemo/
+
+# Internal docs - not for public
+AGENTS.md
+HANDOFF*.md
+.hive-handoff.md
+.sisyphus/
+
+# Archive
+archive/
