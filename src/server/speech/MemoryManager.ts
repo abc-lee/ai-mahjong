@@ -3,6 +3,33 @@
  * 让 AI 记住游戏事件、对话历史、以及与其他玩家的关系
  */
 
+// Token 限制常量（96K）
+const MAX_TOKEN_LIMIT = 96 * 1024;
+
+/**
+ * 估算文本的 Token 数量
+ * 简单算法：中文约 2 字符 ≈ 1 Token，英文约 4 字符 ≈ 1 Token
+ */
+function estimateTokens(text: string): number {
+  if (!text) return 0;
+  // 中文字符 + 英文单词数
+  const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+  const englishWords = (text.match(/[a-zA-Z]+/g) || []).length;
+  const otherChars = text.length - chineseChars - englishWords;
+  // 中文 2 字符 ≈ 1 token，英文 4 字符 ≈ 1 token，其他按英文算
+  return Math.ceil(chineseChars / 2 + (englishWords + otherChars) / 4);
+}
+
+/**
+ * 估算一组消息的 Token 总数
+ */
+function estimateMessagesTokens(messages: Array<{ content?: string; playerName?: string }>): number {
+  return messages.reduce((sum, msg) => {
+    const text = `${msg.playerName || ''} ${msg.content || ''}`;
+    return sum + estimateTokens(text);
+  }, 0);
+}
+
 // 记忆事件类型
 export type MemoryEventType = 
   | 'game_start'      // 游戏开始
@@ -94,8 +121,7 @@ export interface AIMemory {
  */
 export class MemoryManager {
   private memories: Map<string, AIMemory> = new Map();
-  private maxEvents: number = 50;        // 最大事件数
-  private maxSpeechHistory: number = 30; // 最大对话历史
+  private maxTokenLimit: number = MAX_TOKEN_LIMIT;  // Token 限制 96K
   
   /**
    * 初始化 AI 记忆
@@ -152,9 +178,9 @@ export class MemoryManager {
     memory.events.push(fullEvent);
     memory.lastAction = fullEvent;
 
-    // 限制事件数量
-    if (memory.events.length > this.maxEvents) {
-      memory.events = memory.events.slice(-this.maxEvents);
+    // 限制 Token 数量（超过 96K 则删除最老的）
+    while (estimateMessagesTokens(memory.events) > this.maxTokenLimit && memory.events.length > 1) {
+      memory.events.shift();
     }
 
     // 更新玩家关系
@@ -186,9 +212,9 @@ export class MemoryManager {
 
     memory.speechHistory.push(speechEvent);
 
-    // 限制对话历史
-    if (memory.speechHistory.length > this.maxSpeechHistory) {
-      memory.speechHistory = memory.speechHistory.slice(-this.maxSpeechHistory);
+    // 限制 Token 数量（超过 96K 则删除最老的）
+    while (estimateMessagesTokens(memory.speechHistory) > this.maxTokenLimit && memory.speechHistory.length > 1) {
+      memory.speechHistory.shift();
     }
   }
 
@@ -354,12 +380,32 @@ export class MemoryManager {
   }
 
   /**
-   * 获取最近事件
+   * 获取最近事件（基于 Token 限制）
+   * @param playerId 玩家ID
+   * @param maxTokens 最大 Token 数（默认 96K）
    */
-  getRecentEvents(playerId: string, count: number = 10): MemoryEvent[] {
+  getRecentEvents(playerId: string, maxTokens: number = MAX_TOKEN_LIMIT): MemoryEvent[] {
     const memory = this.getMemory(playerId);
     if (!memory) return [];
-    return memory.events.slice(-count);
+
+    // 从最新到最老，累加 Token，直到超过限制
+    const result: MemoryEvent[] = [];
+    let totalTokens = 0;
+
+    for (let i = memory.events.length - 1; i >= 0; i--) {
+      const event = memory.events[i];
+      const eventText = `${event.playerName || ''} ${event.content || event.type}`;
+      const eventTokens = estimateTokens(eventText);
+
+      if (totalTokens + eventTokens > maxTokens && result.length > 0) {
+        break;  // 超过限制了，停止
+      }
+
+      result.unshift(event);  // 保持顺序（从老到新）
+      totalTokens += eventTokens;
+    }
+
+    return result;
   }
 
   /**
@@ -421,10 +467,10 @@ export class MemoryManager {
     lines.push(`当前心情: ${memory.currentMood}`);
     lines.push('');
 
-    // 最近事件
-    const recentEvents = memory.events.slice(-5);
+    // 最近事件（基于 Token 限制，最多 96K）
+    const recentEvents = this.getRecentEvents(playerId, MAX_TOKEN_LIMIT);
     if (recentEvents.length > 0) {
-      lines.push(`【最近发生的事】`);
+      lines.push(`【最近发生的事】(共${recentEvents.length}条，约${estimateMessagesTokens(recentEvents)} tokens)`);
       recentEvents.forEach(event => {
         const desc = this.eventToDescription(event);
         lines.push(`- ${desc}`);

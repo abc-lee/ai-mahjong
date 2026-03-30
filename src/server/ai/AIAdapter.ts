@@ -429,12 +429,6 @@ export class AIAdapter {
     const memorySummary = memoryManager.generateMemorySummary(this.player.id);
     const memory = memoryManager.getMemory(this.player.id);
     
-
-    
-    const recentEvents = memoryManager.getRecentEvents(this.player.id, 5)
-      .map(e => `- ${e.content || e.type}`)
-      .join('\n') || promptLoader.getFallback('none');
-    
     // 从配置获取分隔符
     const traitSeparator = promptLoader.getSeparator('traits');
     
