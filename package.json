@@ -1,6 +1,6 @@
 {
   "name": "ai-mahjong",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "license": "MIT",
   "description": "AI Mahjong Party - 让人类和 AI Agent 一起打麻将",
   "main": "dist/server/index.js",

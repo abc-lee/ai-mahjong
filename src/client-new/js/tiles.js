@@ -116,15 +116,15 @@ export function renderTile(tile, options = {}) {
       
     case 'tiao':
       if (isSmall) {
-        // 小牌一条：显示小鸟图标
+        // 小牌一条：孔雀图标（一条传统上是孔雀/鸟）
         if (value === 1) {
-          content = `<span class="iconify text-sm sm:text-base text-green-700" data-icon="material-symbols:nature-rounded"></span>`;
+          content = `<span class="iconify text-sm sm:text-base" data-icon="twemoji:peacock"></span>`;
         } else {
           content = renderBambooPattern(value, true);
         }
       } else if (value === 1) {
         content = `
-          <span class="iconify text-lg sm:text-3xl text-green-700" data-icon="material-symbols:nature-rounded"></span>
+          <span class="iconify text-lg sm:text-3xl" data-icon="twemoji:peacock"></span>
           <span class="text-[8px] sm:text-[10px] text-green-700 mt-0.5">一条</span>
         `;
       } else {
@@ -133,11 +133,7 @@ export function renderTile(tile, options = {}) {
       break;
       
     case 'tong':
-      if (isSmall) {
-        content = renderDotPattern(value, false);
-      } else {
-        content = renderDotPattern(value, false);
-      }
+      content = renderDotPattern(value, isSmall);
       break;
       
     case 'feng':
@@ -203,73 +199,79 @@ export function renderTile(tile, options = {}) {
  * @returns {string} HTML 字符串
  */
 function renderBambooPattern(value, isSmall = false) {
-  // 小尺寸用更紧凑的样式
-  const wrapperClass = isSmall ? 'transform scale-75' : '';
+  // 小尺寸用真实缩小的竹节（不用 transform，transform 不改变布局盒）
+  const stick = `<div class="${isSmall ? 'bamboo-stick-sm' : 'bamboo-stick'}"></div>`;
   
   const patterns = {
-    2: `<div class="flex flex-col gap-0.5 ${wrapperClass}">
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
+    2: `<div class="flex flex-col gap-0.5 items-center">
+          ${stick}
+          ${stick}
         </div>`,
-    3: `<div class="flex flex-col gap-0.5 ${wrapperClass}">
-          <div class="bamboo-stick"></div>
-          <div class="flex gap-0.5">
-            <div class="bamboo-stick"></div>
-            <div class="bamboo-stick"></div>
-          </div>
+    // 三条：三根竹节斜排（整排旋转45°）
+    3: `<div class="flex gap-0.5 -rotate-45 p-0.5">
+          ${stick}
+          ${stick}
+          ${stick}
         </div>`,
-    4: `<div class="grid grid-cols-2 gap-0.5 px-0.5 ${wrapperClass}">
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
+    4: `<div class="grid grid-cols-2 gap-0.5 px-0.5">
+          ${stick}
+          ${stick}
+          ${stick}
+          ${stick}
         </div>`,
-    5: `<div class="grid grid-cols-2 gap-0.5 ${wrapperClass}">
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick col-span-2 mx-auto"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
+    5: `<div class="grid grid-cols-2 gap-0.5">
+          ${stick}
+          ${stick}
+          ${stick.replace('class="', 'class="col-span-2 mx-auto ')}
+          ${stick}
+          ${stick}
         </div>`,
-    6: `<div class="grid grid-cols-2 gap-y-0.5 gap-x-1 ${wrapperClass}">
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
+    6: `<div class="grid grid-cols-2 gap-y-0.5 gap-x-1">
+          ${stick}
+          ${stick}
+          ${stick}
+          ${stick}
+          ${stick}
+          ${stick}
         </div>`,
-    7: `<div class="flex flex-col gap-0.5 ${wrapperClass}">
-          <div class="bamboo-stick mx-auto"></div>
+    7: `<div class="flex flex-col gap-0.5">
+          ${stick.replace('class="', 'class="mx-auto ')}
           <div class="grid grid-cols-3 gap-0.5">
-            <div class="bamboo-stick"></div>
-            <div class="bamboo-stick"></div>
-            <div class="bamboo-stick"></div>
-            <div class="bamboo-stick"></div>
-            <div class="bamboo-stick"></div>
-            <div class="bamboo-stick"></div>
+            ${stick}
+            ${stick}
+            ${stick}
+            ${stick}
+            ${stick}
+            ${stick}
           </div>
         </div>`,
-    8: `<div class="grid grid-cols-2 gap-y-0.5 gap-x-1 ${wrapperClass}">
-          <div class="bamboo-stick rotate-[15deg]"></div>
-          <div class="bamboo-stick rotate-[-15deg]"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick rotate-[-15deg]"></div>
-          <div class="bamboo-stick rotate-[15deg]"></div>
+    // 八条：M 形 —— 左右两列各3根向外倾斜，底部中间2根组成尖角
+    8: `<div class="flex items-stretch justify-between gap-0.5">
+          <div class="flex flex-col gap-0.5 rotate-[12deg] origin-bottom">
+            ${stick}
+            ${stick}
+            ${stick}
+          </div>
+          <div class="flex items-end gap-0">
+            ${stick.replace('class="', 'class="rotate-[30deg] origin-bottom ')}
+            ${stick.replace('class="', 'class="-rotate-[30deg] origin-bottom ')}
+          </div>
+          <div class="flex flex-col gap-0.5 -rotate-[12deg] origin-bottom">
+            ${stick}
+            ${stick}
+            ${stick}
+          </div>
         </div>`,
-    9: `<div class="grid grid-cols-3 gap-0.5 ${wrapperClass}">
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
-          <div class="bamboo-stick"></div>
+    9: `<div class="grid grid-cols-3 gap-0.5">
+          ${stick}
+          ${stick}
+          ${stick}
+          ${stick}
+          ${stick}
+          ${stick}
+          ${stick}
+          ${stick}
+          ${stick}
         </div>`,
   };
   
@@ -283,70 +285,79 @@ function renderBambooPattern(value, isSmall = false) {
  * @returns {string} HTML 字符串
  */
 function renderDotPattern(value, isSmall = false) {
-  // 小尺寸用更紧凑的圆点
+  // 小尺寸用更小的圆点
   const dotClass = isSmall ? 'dot-small' : 'dot';
+  const blue = `<div class="${dotClass} bg-blue-700"></div>`;
+  const red = `<div class="${dotClass} bg-red-600"></div>`;
   
   const patterns = {
     1: `<div class="${dotClass} bg-blue-700 ring-1 ring-blue-500 rounded-full"></div>`,
     2: `<div class="flex flex-col gap-0.5">
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
+          ${blue}
+          ${blue}
         </div>`,
-    3: `<div class="flex flex-col gap-0.5 items-center">
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
+    // 三筒：三个圆点斜排（整排旋转45°）
+    3: `<div class="flex gap-0.5 -rotate-45 p-0.5">
+          ${blue}
+          ${blue}
+          ${blue}
         </div>`,
     4: `<div class="grid grid-cols-2 gap-0.5">
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
+          ${blue}
+          ${blue}
+          ${blue}
+          ${blue}
         </div>`,
+    // 五筒：梅花形，中间红点居中
     5: `<div class="grid grid-cols-2 gap-0.5">
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-red-600 scale-110 z-10"></div>
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
+          ${blue}
+          ${blue}
+          ${red.replace('class="', 'class="col-span-2 mx-auto scale-110 z-10 ')}
+          ${blue}
+          ${blue}
         </div>`,
     6: `<div class="grid grid-cols-2 gap-0.5">
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-red-600"></div>
-          <div class="${dotClass} bg-red-600"></div>
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
+          ${blue}
+          ${blue}
+          ${red}
+          ${red}
+          ${blue}
+          ${blue}
         </div>`,
-    7: `<div class="grid grid-cols-2 gap-x-0.5 gap-y-0.5">
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700 col-span-2 mx-auto"></div>
-          <div class="${dotClass} bg-red-600"></div>
-          <div class="${dotClass} bg-red-600"></div>
-          <div class="${dotClass} bg-red-600"></div>
-          <div class="${dotClass} bg-red-600"></div>
+    // 七筒：上面3个斜排（蓝）+ 下面4个方阵（红），斜排旋转后视觉外扩，需加大间距
+    7: `<div class="flex flex-col gap-0.5 items-center">
+          <div class="flex gap-0.5 -rotate-45 px-0.5 mb-1 sm:mb-1.5">
+            ${blue}
+            ${blue}
+            ${blue}
+          </div>
+          <div class="grid grid-cols-2 gap-0.5">
+            ${red}
+            ${red}
+            ${red}
+            ${red}
+          </div>
         </div>`,
     8: `<div class="grid grid-cols-2 gap-x-0.5 gap-y-0.5">
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
+          ${blue}
+          ${blue}
+          ${blue}
+          ${blue}
+          ${blue}
+          ${blue}
+          ${blue}
+          ${blue}
         </div>`,
     9: `<div class="grid grid-cols-3 gap-0.5">
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-red-600"></div>
-          <div class="${dotClass} bg-red-600"></div>
-          <div class="${dotClass} bg-red-600"></div>
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
-          <div class="${dotClass} bg-blue-700"></div>
+          ${blue}
+          ${blue}
+          ${blue}
+          ${red}
+          ${red}
+          ${red}
+          ${blue}
+          ${blue}
+          ${blue}
         </div>`,
   };
   
@@ -527,6 +538,20 @@ export const tileStyles = `
   .bamboo-stick {
     width: 4px;
     height: 12px;
+  }
+}
+
+/* 竹节样式 - 小尺寸（按牌面比例真实缩小，不用 transform） */
+.bamboo-stick-sm {
+  width: 1.5px;
+  height: 6px;
+  background: #15803d;
+  border-radius: 1px;
+}
+@media (min-width: 640px) {
+  .bamboo-stick-sm {
+    width: 3px;
+    height: 7px;
   }
 }
 

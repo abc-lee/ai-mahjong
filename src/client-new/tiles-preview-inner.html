@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://code.iconify.design/3/3.1.1/iconify.min.js"></script>
+<style>
+  body { background: #1a5f3f; padding: 12px; font-family: sans-serif; }
+  .section-title { color: #fff; font-weight: bold; margin: 12px 0 6px; font-size: 14px; }
+  .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-end; margin-bottom: 4px; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .cell-label { color: #ffd; font-size: 10px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { renderTile, tileStyles } from './js/tiles.js';
+
+// 注入 tiles.js 的样式
+const styleEl = document.createElement('style');
+styleEl.textContent = tileStyles;
+document.head.appendChild(styleEl);
+
+const suits = [
+  { suit: 'wan',    name: '万子', values: [1,2,3,4,5,6,7,8,9] },
+  { suit: 'tiao',   name: '条子', values: [1,2,3,4,5,6,7,8,9] },
+  { suit: 'tong',   name: '筒子', values: [1,2,3,4,5,6,7,8,9] },
+  { suit: 'feng',   name: '风牌', values: [1,2,3,4] },
+  { suit: 'dragon', name: '箭牌', values: [1,2,3] },
+];
+
+const app = document.getElementById('app');
+let html = '';
+
+for (const { suit, name, values } of suits) {
+  html += `<div class="section-title">${name} - 大牌（手牌尺寸）</div><div class="row">`;
+  for (const v of values) {
+    const tile = { id: `${suit}-${v}`, suit, value: v };
+    html += `<div class="cell">${renderTile(tile, { size: 'normal' })}<span class="cell-label">${v}</span></div>`;
+  }
+  html += `</div>`;
+
+  html += `<div class="section-title">${name} - 小牌（弃牌/副露尺寸）</div><div class="row">`;
+  for (const v of values) {
+    const tile = { id: `${suit}-${v}-s`, suit, value: v };
+    html += `<div class="cell">${renderTile(tile, { size: 'small' })}<span class="cell-label">${v}</span></div>`;
+  }
+  html += `</div>`;
+}
+
+app.innerHTML = html;
+</script>
+</body>
+</html>
