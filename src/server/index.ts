@@ -94,6 +94,18 @@ const io = new Server(httpServer, {
 app.use(cors());
 app.use(express.json());
 
+// pkg 打包模式：从 exe 同目录的 dist 提供前端静态文件
+// @ts-ignore - process.pkg 是 pkg 打包时添加的属性
+if (process.pkg) {
+  const exeDir = path.dirname(process.execPath);
+  const distDir = path.join(exeDir, 'dist');
+  if (fs.existsSync(distDir)) {
+    app.use(express.static(distDir));
+    app.use('/assets', express.static(path.join(distDir, 'assets')));
+    console.log(`[Static] Serving frontend from: ${distDir}`);
+  }
+}
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -429,8 +441,37 @@ app.post('/api/room/add-player', async (req, res) => {
 // Setup Socket.io
 setupSocket(io);
 
+// pkg 打包模式：SPA 兜底，所有未匹配路由返回 index.html
+// @ts-ignore
+if (process.pkg) {
+  const exeDir = path.dirname(process.execPath);
+  const distDir = path.join(exeDir, 'dist');
+  const indexPath = path.join(distDir, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    app.get('*', (req, res) => {
+      res.sendFile(indexPath);
+    });
+  }
+}
+
 // Start server
 const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
   console.log(`Mahjong server running on port ${PORT}`);
+  // @ts-ignore - process.pkg 是 pkg 打包时添加的属性
+  if (process.pkg) {
+    const url = `http://localhost:${PORT}`;
+    console.log(`\n========================================`);
+    console.log(`  游戏已启动！`);
+    console.log(`  请在浏览器打开: ${url}`);
+    console.log(`  （此窗口请保持打开，关闭即停止游戏）`);
+    console.log(`========================================\n`);
+    // 自动打开浏览器（Windows）
+    try {
+      const { exec } = require('child_process');
+      exec(`start "" "${url}"`);
+    } catch (e) {
+      // 打开失败不影响游戏，用户手动访问即可
+    }
+  }
 });
