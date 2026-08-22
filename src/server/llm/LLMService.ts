@@ -1,10 +1,6 @@
 /**
  * LLM 服务层 - 使用 Vercel AI SDK 统一处理不同提供商
  * 自动处理思考链模型（MiniMax M2.5, DeepSeek R1 等）
- *
- * 本地模型并发=1 时，多个 AI 同时请求会排队/超时导致"不说话"。
- * 添加全局信号量：默认最多3个同时请求，超过的排队等30秒。
- * 可通过环境变量 LLM_MAX_CONCURRENT / LLM_MAX_WAIT_MS 调整。
  */
 
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
@@ -19,48 +15,7 @@ export interface LLMProviderConfig {
   model: string;
 }
 
-// ===== 并发信号量 =====
-// 本地模型（ollama/llama.cpp 等）并发=1，远端模型并发=3
-const MAX_CONCURRENT = parseInt(process.env.LLM_MAX_CONCURRENT || '', 10) || 3;
-const MAX_WAIT_MS = parseInt(process.env.LLM_MAX_WAIT_MS || '', 10) || 30_000;
-
-class Semaphore {
-  private running = 0;
-  private queue: Array<{ resolve: () => void; reject: (e: Error) => void }> = [];
-
-  constructor(private max: number) {}
-
-  async acquire(): Promise<void> {
-    if (this.running < this.max) {
-      this.running++;
-      return;
-    }
-    return new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        const idx = this.queue.findIndex(q => q.reject === reject);
-        if (idx >= 0) this.queue.splice(idx, 1);
-        reject(new Error(`LLM 排队超时（${MAX_WAIT_MS / 1000}s），本地模型可能正忙`));
-      }, MAX_WAIT_MS);
-      this.queue.push({
-        resolve: () => { clearTimeout(timer); this.running++; resolve(); },
-        reject: (e) => { clearTimeout(timer); reject(e); },
-      });
-    });
-  }
-
-  release(): void {
-    this.running--;
-    if (this.queue.length > 0) {
-      const next = this.queue.shift()!;
-      next.resolve();
-    }
-  }
-}
-
-const llmSemaphore = new Semaphore(MAX_CONCURRENT);
-console.log(`[LLM] 并发限制: ${MAX_CONCURRENT}，排队超时: ${MAX_WAIT_MS / 1000}s`);
-
-// ===== 提供商缓存 =====
+// 创建提供商实例缓存
 const providers = new Map<string, any>();
 
 /**
@@ -114,7 +69,7 @@ function createModelWithReasoning(config: LLMProviderConfig) {
 }
 
 /**
- * 调用 LLM 生成文本（经过信号量控制并发）
+ * 调用 LLM 生成文本
  * SDK 会自动处理响应格式差异
  * 
  * @returns { text: 实际内容, reasoningText?: 思考链内容 }
@@ -127,7 +82,6 @@ export async function generateLLMText(
     maxTokens?: number;
   }
 ): Promise<{ text: string; reasoningText?: string }> {
-  await llmSemaphore.acquire();
   try {
     const model = createModelWithReasoning(config);
     
@@ -146,8 +100,6 @@ export async function generateLLMText(
   } catch (error: any) {
     console.error('[LLMService] generateText error:', error.message);
     throw error;
-  } finally {
-    llmSemaphore.release();
   }
 }
 
