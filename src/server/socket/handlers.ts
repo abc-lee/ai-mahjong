@@ -13,6 +13,7 @@ import { IdleDetector } from '../idle/IdleDetector';
 
 // 常量定义
 const GAME_END_DELAY_MS = 1500;  // 游戏结束评论延迟（毫秒）
+const AI_DECISION_TIMEOUT_MS = parseInt(process.env.AI_DECISION_TIMEOUT_MS || '', 10) || 30_000;  // AI 决策超时（默认30秒，本地模型可设60秒）
 
 // Socket 数据类型
 interface SocketData {
@@ -328,7 +329,7 @@ export function broadcastGameState(io: Server, roomId: string, roomManager: Room
                 forceExecutePlayerAction(currentRoom, player, turnPhase, io, roomId, roomManager);
               }
             }
-          }, 5000); // 5秒超时
+          }, AI_DECISION_TIMEOUT_MS); // AI 决策超时
         } else {
           // Agent 没有连接 socket：使用 AIAdapter
           const adapter = aiManager.getAdapter(player.id);
