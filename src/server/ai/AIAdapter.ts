@@ -535,7 +535,7 @@ export class AIAdapter {
         userPrompt,
         { 
           temperature: this.getTemperature(),
-          maxTokens: 2000,  // 思考链模型需要更多 token（reasoning + content）
+          maxTokens: 800,  // 决策层需要更多 token 输出 JSON
         }
       );
       
